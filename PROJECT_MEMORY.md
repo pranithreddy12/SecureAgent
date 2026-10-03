@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-02 (end of Phase 0)
+Last updated: 2026-10-03 (end of Phase 1)
 
 ## 1. Project Identity
 
@@ -26,12 +26,21 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
 ### Implemented
 - Phase 0: specification, memory, changelog, traceability, design docs, ADR-001…005,
   `.gitignore`, `.env.example`, README stub, git init.
+- Phase 1: backend skeleton (`backend/app/main.py` app factory, `core/config.py`
+  Settings covering every `.env.example` variable, `GET /api/health`), pytest + ruff;
+  Next.js 16 frontend (App Router, TS, Tailwind v4, standalone output, `/api/*`
+  rewrite to backend); `docker/backend.Dockerfile`, `docker/frontend.Dockerfile`,
+  `docker-compose.yml` (postgres, zap, backend, frontend, `lab` profile juice-shop),
+  Makefile, `.gitattributes` (LF), `.dockerignore`.
 
 ### In Progress
 - Nothing.
 
 ### Planned
-- Phases 1–20 per brief (§36). Next: Phase 1 repository structure.
+- Phases 2–20 per brief (§36). Next: Phase 2 database models + Alembic migrations.
+- Backend packages (`models`, `schemas`, `services`, `agents`, `tools`, `workflows`,
+  `security`, `reports`, `demo`) are created in the phase that first puts code in them,
+  not as empty placeholders.
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -103,8 +112,9 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | Phase | Status |
 |---|---|
 | 0 Requirements & architecture | ✅ Done 2026-10-02 |
-| 1 Repository structure | ⏭ Next |
-| 2–20 | Not started |
+| 1 Repository structure | ✅ Done 2026-10-03 |
+| 2 Database & migrations | ⏭ Next |
+| 3–20 | Not started |
 
 ## 14. Architecture Decisions
 
@@ -117,6 +127,10 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-005 | In-process asyncio jobs + 2 s polling; no Redis/Celery | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
+2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
+(`BACKEND_URL`, baked in at build) — keeps the auth cookie first-party; replaces
+`NEXT_PUBLIC_API_URL` in `.env.example`. Next.js 16 has breaking changes vs older
+versions: read `frontend/node_modules/next/dist/docs/` before writing frontend code;
 finding fingerprint unique per audit for idempotency; schema/API additions listed in
 changelog.
 
@@ -130,6 +144,10 @@ changelog.
 
 - PPT not yet provided (affects SPECIFICATION.md PENDING sections).
 - PDF renderer choice pending (Phase 13).
+- Docker Desktop daemon was not running on 2026-10-03: images not yet built;
+  `docker compose config` validated only. Start Docker Desktop and run `make up`.
+- `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
+  eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
 ## 17. Resolved Issues
 
@@ -137,7 +155,10 @@ changelog.
 
 ## 18. Testing Status
 
-- No code, no tests yet.
+- Backend: 2 tests passing (health endpoint, allowlist CSV parsing); ruff clean.
+- Frontend: eslint, `tsc --noEmit`, `next build` passing.
+- Docker images: not built (daemon down).
+- Known noise: StarletteDeprecationWarning about httpx in TestClient (upstream).
 
 ## 19. Known Limitations
 
@@ -156,10 +177,13 @@ changelog.
 
 - Long file writes in this environment have occasionally been cut off mid-file;
   verify every large generated file is complete (end-of-file check) before moving on.
+- pydantic-settings JSON-decodes `list[...]` env vars; CSV lists need
+  `Annotated[list[str], NoDecode]` plus a `mode="before"` validator.
 
 ## 22. Current Session Summary
 
-2026-10-02: Phase 0 completed. Folder was empty; PPT missing → owner chose the brief
-as baseline. Created spec, memory, changelog, traceability, five design docs, five
-ADRs, env/gitignore/README, git repo. **Next task: Phase 1 — repository structure**
-(backend/ and frontend/ skeletons, Makefile, docker/ dirs).
+2026-10-03: Phase 1 completed — backend/frontend skeletons, Dockerfiles, compose,
+Makefile. Local dev: `backend/.venv` (Python 3.14) with `requirements-dev.txt`.
+**Next task: Phase 2 — SQLAlchemy models for all 8 tables per `docs/database.md`,
+async session, Alembic initial migration, tests against Postgres** (needs Docker
+Desktop running for the test database).

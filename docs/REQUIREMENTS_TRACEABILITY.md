@@ -27,8 +27,8 @@ Status: Planned → In Progress → Implemented → Tested.
 | R19 | Dashboard + charts | SPEC §15 | frontend/app/dashboard | Planned |
 | R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | Planned |
 | R21 | Demo mode, clearly labelled | SPEC §15, ADR-004 | backend/app/demo/ | Planned |
-| R22 | Local vulnerable lab target (Juice Shop) | BRIEF §31 | docker-compose `lab` profile | Planned |
-| R23 | Docker Compose deployment | SPEC §15 | docker-compose.yml, docker/ | Planned |
+| R22 | Local vulnerable lab target (Juice Shop) | BRIEF §31 | docker-compose `lab` profile | In Progress (service defined) |
+| R23 | Docker Compose deployment | SPEC §15 | docker-compose.yml, docker/ | In Progress (files written, images not yet built) |
 | R24 | Automated tests incl. security restrictions | SPEC §15 | backend/tests/ | Planned |
 | R25 | Optional LLM reasoning with deterministic fallback | SPEC §6 | backend/app/agents/llm.py | Planned |
 | R26 | Structured logging per audit ID | BRIEF §33 | backend/app/core/logging.py | Planned |

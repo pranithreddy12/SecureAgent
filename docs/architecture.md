@@ -10,7 +10,7 @@ actual code; update this file when the code diverges.
                  ┌────────────────────────────┐
   Browser ─────► │ frontend (Next.js / React) │
                  └─────────────┬──────────────┘
-                               │ REST /api/* (JWT in httpOnly cookie)
+                               │ same-origin /api/* → Next rewrite → FastAPI
                  ┌─────────────▼──────────────┐
                  │ backend (FastAPI)          │
                  │  api → services → models   │
@@ -91,8 +91,10 @@ frontend/
   types/          API types mirroring backend schemas
 ```
 
-- Auth: httpOnly cookie set by backend; Next.js middleware redirects unauthenticated
-  users to `/login` for protected routes.
+- Next.js 16 (App Router). API calls go to same-origin `/api/*`; `next.config.ts`
+  rewrites them to `BACKEND_URL`, so the httpOnly auth cookie is first-party.
+- Auth: httpOnly cookie set by backend; unauthenticated users are redirected to
+  `/login` for protected routes (mechanism per Next 16 docs, decided in Phase 3/14).
 - Progress: polling every 2 s while an audit is `queued`/`running`.
 - Charts: one small chart library (Recharts) — decided at Phase 14.
 - Demo-mode banner shown globally when backend reports `demo_mode: true` and on every
