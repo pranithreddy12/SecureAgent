@@ -35,8 +35,8 @@ Status: Planned → In Progress → Implemented → Tested.
 | R27 | UML diagrams (7) matching the code | SPEC §16 | docs/diagrams/ | Planned |
 | R28 | Academic docs | SPEC §15 | docs/*.md | In Progress (design docs done) |
 | R30 | Source repository ingestion (authorized, read-only, limits) | ADR-008 | backend/app/analysis/ingest.py | Implemented + Tested |
-| R31 | Code Intelligence: Application Model (routes, guards, models, trust boundaries) | ADR-008 | backend/app/agents/code_intelligence_agent.py (planned) | Designed |
-| R32 | Business-logic flaw detection (BOLA/IDOR, authz, workflow, client-trust, limits, state) | ADR-008 | backend/app/agents/business_logic_agent.py (planned) | Designed |
+| R31 | Code Intelligence: routes + authorization (Application Model core) | ADR-008 | backend/app/analysis/routes.py | Implemented + Tested (routes/authz); models/trust-boundaries pending |
+| R32 | Business-logic flaw detection (BOLA/IDOR, authz, workflow, client-trust, limits, state) | ADR-008 | routes.py (function-level authz done); rest planned | In Progress |
 | R33 | Hardcoded-secret detection (redacted) | ADR-008 | backend/app/analysis/secrets.py + app/cli.py | Implemented + Tested |
 | R34 | Developer-intent description (roles, workflows, test accounts) | ADR-008 | schema + UI (planned) | Designed |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |

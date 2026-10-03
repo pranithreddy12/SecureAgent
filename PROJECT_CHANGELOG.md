@@ -170,3 +170,27 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - First real, standalone, usable component of the grey-box engine (ADR-008).
+
+## 2026-10-03 (BL-2 routes/authz + static report wiring)
+
+### Added
+- `app/analysis/routes.py` — HTTP route extraction (Python via stdlib `ast`;
+  JS/TS via regex) with per-handler authorization detection (auth decorators,
+  FastAPI `Depends`/`dependencies=`, Express middleware); flags unprotected
+  state-changing/privileged endpoints as `missing_function_level_authorization`
+  (CWE-862, OWASP A01), low-confidence "review" status.
+- `app/analysis/reporting.py` — maps a ScanResult to the Phase-13 ReportContext;
+  secrets → CWE-798/A05 (status likely), routes → CWE-862/A01 (status suspicious).
+- CLI `--report <html>` / `--pdf <pdf>`; text/JSON now include routes + authz findings
+  and total-finding exit code.
+
+### Changed
+- `scan_repo` now also extracts routes; `ScanResult` gains routes + route_findings.
+
+### Tests
+- test_route_scan.py (11 cases). Static + report suite: 28 passed, 1 skipped (PDF).
+- Verified on the project's own backend (real routes + HTML report).
+
+### Notes
+- Honest by design: static route findings are never `confirmed` (global middleware
+  is invisible to static analysis).

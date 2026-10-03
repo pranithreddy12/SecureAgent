@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (BL-1+BL-3 static secret scanner built; Phases 4–5 blocked)
+Last updated: 2026-10-03 (BL-1/2/3 static engine + report wiring; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -91,6 +91,16 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   full value never stored), `app/analysis/scanner.py`, `app/cli.py`
   (`python -m app.cli scan <dir>`, text/JSON, exit 1 on findings → CI-gating).
   `make scan DIR=...`. Verified on the project's own tree.
+  **BL-2 built & tested:** `app/analysis/routes.py` extracts HTTP routes (Python via
+  stdlib `ast` for FastAPI/Flask-style; JS/TS via regex for Express-style) and flags
+  state-changing or privileged endpoints with no detected auth
+  dependency/decorator/middleware → `missing_function_level_authorization` findings
+  (deliberately 0.4 confidence / status `suspicious`, since global middleware is
+  invisible to static analysis; never `confirmed`). **Report wiring built:**
+  `app/analysis/reporting.py` maps a `ScanResult` → the Phase-13 `ReportContext`;
+  CLI `--report out.html` / `--pdf out.pdf` produce the 19-section professional
+  report from a pure source scan. Real run on our own `app/`: 5 routes found, 3
+  unauthenticated POSTs flagged for review (correct — login/register are public).
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -187,7 +197,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 5 Authorization & restrictions | ⛔ Blocked (see §3) |
 | 6–13 | Not started (depend on 4–5) |
 | 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
-| BL-1/BL-3 Static secret scanner | ✅ Done 2026-10-03 (standalone CLI) |
+| BL-1/2/3 Static engine (secrets + routes/authz + report) | ✅ Done 2026-10-03 (standalone CLI + HTML/PDF) |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
 | 15–20 | Not started |
 
@@ -229,6 +239,11 @@ changelog.
   manual checks.
 - Secret scanner is regex+entropy (gitleaks-class), not dataflow; may miss obfuscated
   secrets and flag test fixtures. Tune rules as real repos are scanned.
+- Route/authz detection is per-handler; it cannot see **global** middleware/router-level
+  guards, so unprotected-endpoint findings are low-confidence "review" items by design.
+  FastAPI `Annotated[User, Depends(...)]` annotations aren't yet parsed as guards
+  (only signature defaults + decorators + `dependencies=`); acceptable (such routes
+  are usually GET and unflagged). Add annotation parsing when tuning.
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -238,7 +253,10 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB) pass: 17 + reports. Secret scanner:
+- Backend: static-analysis + report tests (no DB): 28 passed + 1 skipped (PDF).
+  Route tests (test_route_scan.py): FastAPI/Flask/Express guard detection, only
+  unprotected sensitive endpoints flagged, benign GETs ignored, syntax-error files
+  skipped, scan→report HTML renders with honest status and redacted secrets. Secret scanner:
   10 tests (detection of planted fakes, skips vendored/VCS/binary, placeholders & env
   refs ignored, full value never leaks, CLI text/JSON/exit codes, clean repo exit 0,
   bad path exit 2). DB-backed tests (models, auth) require the test Postgres container
@@ -311,13 +329,14 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-03: Owner wants a real-world usable tool, not just a demo. Built the first
-real, standalone piece of the grey-box engine: a static **secret scanner**
-(BL-1 ingestion + BL-3 detection) with a CLI (`python -m app.cli scan`), text/JSON
-output, CI exit codes, redaction, and 10 tests — all green; runs on real repos today
-and finds nothing in our own `app/` source (clean). Read-only, never executes scanned
-code, never stores full secret values.
-**Next:** more static analysers that don't need the blocked web pipeline — route/auth
-extraction toward the Application Model (BL-2), or dependency/known-CVE checks. The
-live web-scan pipeline still needs Phases 4–5 (blocked); `backend/app/schemas/target.py`
-remains untracked.
+2026-10-03: Extended the static engine with two real builds. BL-2: route +
+authorization extraction (`app/analysis/routes.py`, stdlib `ast` + JS regex) flags
+state-changing/privileged endpoints lacking a visible auth guard, honestly
+low-confidence. Report wiring (`app/analysis/reporting.py` + CLI `--report/--pdf`)
+turns any source scan into the Phase-13 19-section HTML/PDF report. Verified on our
+own backend (5 routes, 3 public POSTs flagged for review). 28 static/report tests
+pass (+1 PDF skip on Windows).
+**Next unblocked builds:** dependency/known-CVE check from lockfiles; more route
+frameworks (Django urls, NestJS); FastAPI `Annotated[...Depends]` guard parsing;
+or a `secureagent` console entry-point. Live web pipeline still needs Phases 4–5
+(blocked); `backend/app/schemas/target.py` untracked.

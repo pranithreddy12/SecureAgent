@@ -96,7 +96,7 @@ def test_cli_text_and_exit_code(repo: Path, capsys: pytest.CaptureFixture) -> No
     code = main(["scan", str(repo), "--no-color"])
     out = capsys.readouterr().out
     assert code == 1  # findings present -> non-zero (gates CI)
-    assert "potential hardcoded secret" in out
+    assert "finding(s):" in out and "Hardcoded secrets:" in out
     assert FAKE_AWS_ID not in out and FAKE_GH not in out  # redacted in console too
 
 
@@ -114,7 +114,7 @@ def test_cli_clean_repo_exit_zero(tmp_path: Path, capsys: pytest.CaptureFixture)
     (tmp_path / "main.py").write_text("print('hello world')\n", encoding="utf-8")
     code = main(["scan", str(tmp_path), "--no-color"])
     assert code == 0
-    assert "No hardcoded secrets detected" in capsys.readouterr().out
+    assert "No hardcoded secrets or unprotected endpoints detected" in capsys.readouterr().out
 
 
 def test_cli_bad_path_exit_two(capsys: pytest.CaptureFixture) -> None:
