@@ -10,6 +10,7 @@ from app.analysis.ingest import IngestStats, SourceFile, iter_source_files, read
 from app.analysis.osv import OsvClient, OsvError, Vuln
 from app.analysis.routes import Route, RouteFinding, extract_routes, route_findings
 from app.analysis.secrets import SecretFinding
+from app.analysis.sinks import SinkFinding, scan_sinks
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4, "informational": 5}
 
@@ -40,6 +41,7 @@ class ScanResult:
     secret_findings: list[SecretFinding] = field(default_factory=list)
     routes: list[Route] = field(default_factory=list)
     route_findings: list[RouteFinding] = field(default_factory=list)
+    sink_findings: list[SinkFinding] = field(default_factory=list)
     dependencies: list[Dependency] = field(default_factory=list)
     dependency_findings: list[DependencyFinding] = field(default_factory=list)
     osv_note: str | None = None
@@ -47,7 +49,12 @@ class ScanResult:
 
     @property
     def total_findings(self) -> int:
-        return len(self.secret_findings) + len(self.route_findings) + len(self.dependency_findings)
+        return (
+            len(self.secret_findings)
+            + len(self.route_findings)
+            + len(self.sink_findings)
+            + len(self.dependency_findings)
+        )
 
     @property
     def ordered_secrets(self) -> list[SecretFinding]:
@@ -64,6 +71,13 @@ class ScanResult:
         )
 
     @property
+    def ordered_sink_findings(self) -> list[SinkFinding]:
+        return sorted(
+            self.sink_findings,
+            key=lambda f: (SEVERITY_ORDER.get(f.severity, 9), f.relpath, f.line),
+        )
+
+    @property
     def ordered_dependency_findings(self) -> list[DependencyFinding]:
         return sorted(
             self.dependency_findings,
@@ -75,6 +89,8 @@ class ScanResult:
         for f in self.secret_findings:
             counts[f.severity] = counts.get(f.severity, 0) + 1
         for f in self.route_findings:
+            counts[f.severity] = counts.get(f.severity, 0) + 1
+        for f in self.sink_findings:
             counts[f.severity] = counts.get(f.severity, 0) + 1
         for f in self.dependency_findings:
             counts[f.severity] = counts.get(f.severity, 0) + 1
@@ -103,6 +119,7 @@ def scan_repo(
             continue
         result.secret_findings.extend(secrets.scan_text(file.relpath, text))
         result.routes.extend(extract_routes(file.relpath, text))
+        result.sink_findings.extend(scan_sinks(file.relpath, text))
         if is_lockfile(file.relpath):
             result.dependencies.extend(parse_dependencies(file.relpath, text))
 

@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (static engine: secrets+routes+deps/OSV; Phases 4–5 blocked)
+Last updated: 2026-10-04 (static engine + dangerous-sink pack; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -108,6 +108,16 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   versions. Findings → A06/CWE-1104, status `likely`, CVE only when the advisory id
   is a real CVE (never invented). CLI `--no-osv` for offline; graceful on network
   failure. Real run: flagged PyYAML 5.1 (critical) and requests 2.19.0 (high).
+  **Batch #1 dangerous-sink pack built & tested:** `app/analysis/sinks.py` (Python via
+  `ast` with import-alias resolution; JS/TS via regex) detects insecure
+  deserialization (pickle/yaml.load/marshal → CWE-502/A08), command execution
+  (os.system, subprocess shell=True → CWE-78/A03), code execution (eval/exec → CWE-95),
+  weak hashing (md5/sha1 → CWE-327/A02), disabled TLS verification (verify=False →
+  CWE-295), insecure temp files (mktemp → CWE-377), XXE-prone XML parsing (CWE-611),
+  and JS innerHTML XSS sinks (CWE-79). Honest status: definite misconfig (weak crypto,
+  TLS) → likely; input-dependent sinks → suspicious; never confirmed. Wired into
+  scanner/CLI/report. Real run flagged all 6 planted sinks correctly; safe variants
+  (yaml.safe_load, sha256, argv subprocess, verify=True) not flagged.
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -204,7 +214,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 5 Authorization & restrictions | ⛔ Blocked (see §3) |
 | 6–13 | Not started (depend on 4–5) |
 | 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
-| Static engine (secrets + deps/OSV + routes/authz + report) | ✅ Done 2026-10-03 (standalone CLI + HTML/PDF) |
+| Static engine (secrets + deps/OSV + sinks + routes/authz + report) | ✅ Done 2026-10-04 (standalone CLI + HTML/PDF) |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
 | 15–20 | Not started |
 
@@ -263,7 +273,9 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 37 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 51 passed + 1 skipped (PDF).
+  Sink tests (test_sinks.py, 14): each category detected, safe variants not flagged,
+  alias-resolved XXE, status/severity mapping, report HTML, benign code clean.
   Dependency/OSV tests (test_dependencies.py, 9): lockfile parsers offline, OSV
   mapping via injected fake transport, scanner integration, --no-osv, graceful
   network-failure, CVE-vs-GHSA id handling. No test hits the network.
@@ -342,14 +354,14 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-03: Added real SCA to the static engine — dependency inventory
-(requirements/Pipfile.lock/poetry.lock/package-lock.json) + OSV known-vulnerability
-lookup (`app/analysis/dependencies.py`, `app/analysis/osv.py`), wired into scanner,
-CLI (`--no-osv`), and the HTML/PDF report (A06/CWE-1104, real advisory ids only).
-Verified live against OSV (PyYAML 5.1 critical, requests 2.19.0 high). 37 static/report
-tests pass (+1 PDF skip); dependency tests use an injected transport (no network).
-The standalone scanner now covers secrets + vulnerable dependencies + unprotected
-endpoints, with professional reports — genuinely usable on real repos today.
-**Next unblocked:** more frameworks (Django/NestJS, FastAPI Annotated guards), yarn.lock,
-or a pip-installable `secureagent` entry point. Live web pipeline still needs Phases 4–5
-(blocked); `backend/app/schemas/target.py` untracked.
+2026-10-04: Built batch #1 of broader vulnerability coverage — the dangerous-sink
+detector pack (`app/analysis/sinks.py`): insecure deserialization, command/code
+execution, weak hashing, disabled TLS verification, insecure temp files, XXE, JS XSS
+sinks. AST-based for Python with import-alias resolution; regex for JS. Wired into
+scanner/CLI/report with honest status (definite misconfig = likely, input-dependent
+sink = suspicious, never confirmed). 51 static/report tests pass (+1 PDF skip). The
+standalone scanner now covers OWASP A01(partial)/A02/A03(sinks)/A05/A06/A08.
+**Next (per the OWASP coverage map in this session):** batch #2 taint-lite (connect
+request input → sinks for real SQL/command injection/SSRF), batch #3 IDOR/ownership,
+batch #4 security misconfiguration. Live web pipeline still needs Phases 4–5 (blocked);
+`backend/app/schemas/target.py` untracked.

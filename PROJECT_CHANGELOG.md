@@ -214,3 +214,22 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - No new dependencies (stdlib urllib/tomllib/json). Honest: no invented CVE/severity.
+
+## 2026-10-04 (Batch #1: dangerous-sink detectors)
+
+### Added
+- `app/analysis/sinks.py` — static detection of insecure deserialization (CWE-502),
+  command execution (CWE-78), code execution (CWE-95), weak hashing (CWE-327),
+  disabled TLS verification (CWE-295), insecure temp files (CWE-377), XXE (CWE-611),
+  and JS innerHTML XSS sinks (CWE-79). Python via stdlib `ast` with import-alias
+  resolution; JS/TS via regex.
+- Wired into scanner (`sink_findings`), CLI (text + JSON), and the report (mapped to
+  OWASP A02/A03/A05/A08 with per-category remediation). Honest status: definite
+  misconfig = likely, input-dependent sink = suspicious, never confirmed.
+
+### Tests
+- test_sinks.py (14 cases). Static + report suite: 51 passed, 1 skipped (PDF).
+- Real run flagged 6/6 planted sinks; safe variants not flagged.
+
+### Notes
+- Coverage now spans OWASP A01(partial)/A02/A03/A05/A06/A08. No new dependencies.

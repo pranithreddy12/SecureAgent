@@ -64,6 +64,32 @@ def _dependency_finding(f) -> ReportFinding:
     )
 
 
+def _sink_finding(f) -> ReportFinding:
+    # Definite misconfigurations (weak hash, disabled TLS) are "likely"; dangerous
+    # sinks whose exploitability depends on input reachability are "suspicious".
+    status = FindingStatus.LIKELY if f.definite else FindingStatus.SUSPICIOUS
+    reason = (
+        "Definite insecure usage."
+        if f.definite
+        else "Dangerous sink; confirm untrusted input cannot reach it (taint/dynamic)."
+    )
+    return ReportFinding(
+        title=f.title,
+        type=f.category,
+        severity=Severity(f.severity),
+        confidence=f.confidence,
+        status=status,
+        status_reason=reason,
+        endpoint=f"{f.relpath}:{f.line}",
+        evidence=f"{f.rule} — {f.evidence}",
+        validation_method="static dangerous-sink analysis",
+        owasp_category=f.owasp,
+        cwe=f.cwe,
+        remediation=f.remediation,
+        sources=["static:sinks"],
+    )
+
+
 def _route_finding(f) -> ReportFinding:
     r = f.route
     return ReportFinding(
@@ -102,6 +128,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
 
     findings = [_secret_finding(f) for f in result.ordered_secrets]
     findings += [_dependency_finding(f) for f in result.ordered_dependency_findings]
+    findings += [_sink_finding(f) for f in result.ordered_sink_findings]
     findings += [_route_finding(f) for f in result.ordered_route_findings]
 
     endpoints = sorted({f"{r.method} {r.path}" for r in result.routes})
@@ -129,6 +156,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
             "Read-only source ingestion (vendored/VCS/binary excluded)",
             "Hardcoded-secret detection (redacted)",
             "Dependency inventory matched against the OSV vulnerability database",
+            "Dangerous-sink detection (deserialization, injection, weak crypto, TLS)",
             "Route and authorization extraction",
         ],
         technologies=sorted({d.ecosystem for d in result.dependencies}),

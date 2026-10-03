@@ -68,6 +68,12 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"      {f.relpath}:{f.line}")
             lines.append(f"      value: {f.redacted}   confidence: {f.confidence:.0%}")
 
+    if result.ordered_sink_findings:
+        lines.append("\nDangerous code patterns:")
+        for f in result.ordered_sink_findings:
+            lines.append(f"  {_tag(f.severity, color)} {f.category.replace('_', ' ')} — {f.rule}")
+            lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
+
     if result.ordered_dependency_findings:
         lines.append("\nVulnerable dependencies (known advisories in OSV):")
         for f in result.ordered_dependency_findings:
@@ -86,8 +92,8 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"      {r.relpath}:{r.line}   confidence: {f.confidence:.0%}")
 
     lines.append(
-        "\nRotate any exposed credential and remove it from source; verify each listed "
-        "endpoint enforces authorization."
+        "\nReview each finding above. Run with --report report.html for the full report "
+        "with CWE/OWASP mapping and remediation for every finding."
     )
     return "\n".join(lines)
 
@@ -106,6 +112,20 @@ def _render_json(result: ScanResult) -> str:
         "dependencies_found": len(result.dependencies),
         "osv_note": result.osv_note,
         "secret_findings": [asdict(f) for f in result.ordered_secrets],
+        "dangerous_sink_findings": [
+            {
+                "category": f.category,
+                "rule": f.rule,
+                "severity": f.severity,
+                "confidence": f.confidence,
+                "relpath": f.relpath,
+                "line": f.line,
+                "cwe": f.cwe,
+                "owasp": f.owasp,
+                "evidence": f.evidence,
+            }
+            for f in result.ordered_sink_findings
+        ],
         "dependency_findings": [
             {
                 "severity": f.severity,
