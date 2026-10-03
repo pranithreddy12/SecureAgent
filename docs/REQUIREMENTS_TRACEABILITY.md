@@ -6,7 +6,7 @@ Status: Planned → In Progress → Implemented → Tested.
 
 | # | Requirement | Source | Implementation (planned path) | Status |
 |---|---|---|---|---|
-| R1 | User registration / login / me / logout | SPEC §3 | backend/app/api/auth.py, services/auth_service.py | Planned |
+| R1 | User registration / login / me / logout | SPEC §3 | backend/app/api/auth.py, services/user_service.py, core/security.py | Implemented + Tested |
 | R2 | Target CRUD | SPEC §3 | backend/app/api/targets.py | Planned |
 | R3 | Authorization confirmation + record | SPEC §13 | backend/app/services/authorization_service.py | Planned |
 | R4 | Target safety validation (scheme, private/loopback/link-local/metadata blocking, allowlist) | SPEC §13 | backend/app/security/target_validation.py | Planned |

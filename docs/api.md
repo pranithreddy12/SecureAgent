@@ -1,6 +1,6 @@
 # SecureAgent – REST API Design
 
-Status: **Design (Phase 0)**. Base path `/api`. JSON. OpenAPI docs at `/docs`.
+Status: **Partially implemented** — health and `/api/auth/*` done (Phase 3); rest designed. Base path `/api`. JSON. OpenAPI docs at `/docs`.
 
 Authentication: JWT (HS256, `SECRET_KEY`) issued on login, returned in an httpOnly,
 `SameSite=Lax` cookie (`Secure` when `COOKIE_SECURE=true`). `Authorization: Bearer`

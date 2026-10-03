@@ -55,8 +55,8 @@ escalation.
 
 ## 5. Application Security
 
-- Passwords hashed with a slow adaptive algorithm (passlib/bcrypt or argon2);
-  plaintext never stored or logged.
+- Passwords hashed with Argon2id (ADR-006); plaintext never stored or logged; login
+  failures are indistinguishable (same message, same hashing cost).
 - JWT signed with `SECRET_KEY` from the environment; short expiry; httpOnly cookie,
   `SameSite=Lax`, `Secure` in production.
 - Ownership checks on every resource; other users' resources return 404.

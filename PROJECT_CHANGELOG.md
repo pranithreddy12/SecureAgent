@@ -73,3 +73,20 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Local `.env` generated with random secrets (gitignored, not committed).
+
+## 2026-10-03 (Phase 3)
+
+### Added
+- Authentication: Argon2id hashing, HS256 JWT, httpOnly cookie + Bearer support,
+  `POST /api/auth/register|login|logout`, `GET /api/auth/me`, `CurrentUser` and
+  `require_admin` dependencies.
+- ADR-006 (authentication).
+- Compose backend healthcheck; frontend starts only after backend is healthy.
+- Dependencies: argon2-cffi, pyjwt, email-validator.
+
+### Fixed
+- Frontend proxy 500s during backend cold start (healthcheck ordering).
+
+### Tests
+- 30 backend tests passing (18 new auth tests). End-to-end auth smoke test through
+  the frontend proxy in the running stack passed.

@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (end of Phase 2)
+Last updated: 2026-10-03 (end of Phase 3)
 
 ## 1. Project Identity
 
@@ -37,12 +37,16 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   [Vulnerability], report, enums, base); async engine/session + `get_db` dependency
   (`app/core/database.py`); Alembic (async template, URL from settings) with initial
   migration `afb3ff51caae`; backend container runs `alembic upgrade head` on start.
+- Phase 3: authentication (ADR-006) — `app/core/security.py` (Argon2id, JWT),
+  `app/schemas/auth.py`, `app/services/user_service.py`, `app/api/deps.py`
+  (`DbSession`, `CurrentUser`, `require_admin`), `app/api/auth.py`
+  (register/login/logout/me). Compose: backend healthcheck; frontend waits for it.
 
 ### In Progress
 - Nothing.
 
 ### Planned
-- Phases 3–20 per brief (§36). Next: Phase 3 authentication.
+- Phases 4–20 per brief (§36). Next: Phase 4 target management.
 - Backend packages (`models`, `schemas`, `services`, `agents`, `tools`, `workflows`,
   `security`, `reports`, `demo`) are created in the phase that first puts code in them,
   not as empty placeholders.
@@ -87,7 +91,11 @@ target → audit → children; `unique(audit_id, fingerprint)` on vulnerabilitie
 ## 8. API Structure
 
 Designed in `docs/api.md` (brief endpoints + health, logout, target validate,
-global findings, activity). Not yet implemented.
+global findings, activity).
+Implemented: `GET /api/health`; `POST /api/auth/register` (201/409/422),
+`POST /api/auth/login` (sets httpOnly cookie, returns token + user; 401 generic),
+`POST /api/auth/logout` (204), `GET /api/auth/me`. Routers live in `app/api/`, are
+mounted under `/api` in `app/main.py`; protected routes use `CurrentUser`.
 
 ## 9. Frontend Structure
 
@@ -105,7 +113,7 @@ features; honest CVE/CVSS.
 Per spec: Python/FastAPI/Pydantic/SQLAlchemy, LangGraph/LangChain, Next.js/React/TS/
 Tailwind, PostgreSQL, ZAP, Nuclei, Docker Compose.
 Added (justified): Alembic (migrations), asyncpg (async driver), Jinja2 (report
-templates), httpx (HTTP client). To decide in later phases: PDF renderer
+templates), httpx (HTTP client), argon2-cffi, PyJWT, email-validator (Phase 3). To decide in later phases: PDF renderer
 (WeasyPrint vs alternative — Windows local-dev friction), chart library (Recharts),
 password hashing lib.
 
@@ -123,8 +131,9 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 0 Requirements & architecture | ✅ Done 2026-10-02 |
 | 1 Repository structure | ✅ Done 2026-10-03 |
 | 2 Database & migrations | ✅ Done 2026-10-03 |
-| 3 Authentication | ⏭ Next |
-| 4–20 | Not started |
+| 3 Authentication | ✅ Done 2026-10-03 |
+| 4 Target management | ⏭ Next |
+| 5–20 | Not started |
 
 ## 14. Architecture Decisions
 
@@ -135,6 +144,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-003 | Exploitation Agent → SafeValidationAgent (non-destructive) | Accepted |
 | ADR-004 | Demo mode swaps tool adapters only; labelled everywhere | Accepted |
 | ADR-005 | In-process asyncio jobs + 2 s polling; no Redis/Celery | Accepted |
+| ADR-006 | Argon2id + HS256 JWT in httpOnly SameSite=Lax cookie (+ Bearer) | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -154,6 +164,10 @@ changelog.
 
 - PPT not yet provided (affects SPECIFICATION.md PENDING sections).
 - PDF renderer choice pending (Phase 13).
+- No admin bootstrap: every registration is `auditor`. Need a CLI/seed command to
+  promote a user to `admin` before any admin-only feature ships.
+- No login rate limiting / lockout yet (not in brief; consider before deployment).
+- Local dev DB contains smoke-test users (`smoke*@example.com`) from Phase 3 checks.
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -163,7 +177,11 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: 12 tests passing — health, settings, and DB tests run against real
+- Backend: 30 tests passing. Auth: hashing, register (normalised email, no hash
+  leak, duplicate case-insensitive 409, validation 422, role injection ignored), login
+  cookie flags, me via cookie and Bearer, indistinguishable login failures, bad
+  tokens (garbage, expired, unknown user, wrong key, alg=none), logout, deleted user.
+- Earlier: health, settings, and DB tests run against real
   Postgres through the real Alembic migration (downgrade base → upgrade head):
   full graph round-trip, enum value storage, unique fingerprint, unique email,
   CHECK constraints (progress, status, confidence, severity), cascade delete,
@@ -198,14 +216,18 @@ changelog.
   native_enum=False)` under a naming convention. Delete the explicit enum
   `sa.CheckConstraint(... IN (...))` lines from generated migrations; the Enum column
   type creates the single `ck_<table>_<enum>` constraint. Verify with `alembic check`.
+- Frontend proxy returns 500 while the backend container restarts (migrations at
+  boot); fixed for cold start with a backend healthcheck + `service_healthy`.
+  Always re-run smoke checks after the backend reports healthy.
 - Bash heredocs containing many nested quotes have failed to parse in this
   environment; use the Write tool for multi-file source creation.
 
 ## 22. Current Session Summary
 
-2026-10-03: Phases 1 and 2 completed. Database layer implemented and verified both
-in tests and in the running compose stack. Local `.env` created (gitignored) with
-random secrets. Test DB container `secureagent-testdb` on port 55432.
-**Next task: Phase 3 — authentication**: password hashing, JWT in httpOnly cookie +
-Bearer, `POST /api/auth/register|login|logout`, `GET /api/auth/me`, `get_current_user`
-dependency, role check helper, tests.
+2026-10-03: Phases 1–3 completed and committed. Full stack (postgres, zap, backend,
+frontend) runs under compose; auth verified end-to-end through the frontend proxy.
+**Next task: Phase 4 — target management**: Pydantic schemas, `target_service`,
+`/api/targets` CRUD with ownership checks (404 for others' targets),
+`MAX_TARGETS_PER_USER`, URL normalisation, scope default = target host, URL/scope
+change resets authorization, delete blocked while an audit runs; tests.
+Phase 5 then adds safety validation + `/authorize` + `/validate`.
