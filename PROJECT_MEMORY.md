@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (Phase 13 rendering layer; Phases 4–5 blocked)
+Last updated: 2026-10-03 (grey-box scope change designed; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -82,6 +82,8 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
 - Backend packages (`models`, `schemas`, `services`, `agents`, `tools`, `workflows`,
   `security`, `reports`, `demo`) are created in the phase that first puts code in them,
   not as empty placeholders.
+- **Grey-box business-logic engine (ADR-008, `docs/business-logic-engine.md`)** —
+  designed 2026-10-03; phases BL-1…BL-7. Depends on Phases 4–5. Not implemented.
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -100,7 +102,11 @@ Details: `docs/architecture.md`.
 
 ReconnaissanceAgent, VulnerabilityScannerAgent, SafeValidationAgent (= PPT
 "Exploitation Agent", ADR-003), ValidatorAgent, ReportAgent.
-Details: `docs/agent-workflow.md` §4.
+Added by the grey-box scope change (ADR-008, designed, not built): **Code
+Intelligence Agent** (static source analysis → Application Model) and
+**Business-Logic Reasoning Agent** (logic-flaw candidates from the model + dev
+description + recon). Details: `docs/agent-workflow.md` §4 and
+`docs/business-logic-engine.md`.
 
 ## 6. LangGraph Workflow
 
@@ -188,6 +194,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-005 | In-process asyncio jobs + 2 s polling; no Redis/Celery | Accepted |
 | ADR-006 | Argon2id + HS256 JWT in httpOnly SameSite=Lax cookie (+ Bearer) | Accepted |
 | ADR-007 | Report: Pydantic context → Jinja2 HTML → WeasyPrint PDF | Accepted |
+| ADR-008 | Grey-box: source-code analysis + dev intent for business-logic flaws | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -202,6 +209,7 @@ changelog.
 | Date | Original | Change | Reason | Impact | Status |
 |---|---|---|---|---|---|
 | 2026-10-02 | Baseline from PPT | Baseline from owner's brief; PPT sections PENDING | PPT not in repo | SPECIFICATION.md partial | Open until PPT supplied |
+| 2026-10-03b | Black-box (DAST) auditor only | **Grey-box**: also ingest the app's source repo + developer description, build an Application Model, and detect business-logic flaws (BOLA/IDOR, function-level & inconsistent authz, workflow bypass, client-trusted values, missing limits, hardcoded secrets, insecure state change). Dynamic scanning retained; source optional but recommended. | Owner's primary goal is finding complex business-logic vulns in developers' own apps; scanners can't infer intended rules. | New agents (Code Intelligence, Business-Logic Reasoning), Application Model artifact, repo-ingestion tool, DB additions (`source_artifacts`, `application_models`, `code_locations`/`detection_source` on vulnerabilities), new deps (tree-sitter, git/zip). Designed in ADR-008 + `docs/business-logic-engine.md`. | Designed; not implemented (prereq: Phases 4–5) |
 
 ## 16. Open Issues
 
@@ -261,6 +269,9 @@ changelog.
   when needed — would supersede ADR-005).
 - SSE progress streaming.
 - Authenticated scanning with user-supplied test credentials (not in baseline).
+- Deep taint/dataflow SAST (CodeQL-class) — ADR-008 takes a lighter structural
+  Application Model; full dataflow analysis is future work.
+- More language grammars for Code Intelligence beyond the initial stack(s).
 
 ## 21. Lessons Learned
 
@@ -285,10 +296,17 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-03: Phases 4–5 still blocked (see §3). Completed Phase 13's rendering layer
-(ADR-007): report context schema, 19-section template, HTML + PDF rendering, tests;
-backend image now includes WeasyPrint's native libraries (build is slow on this
-network: ~20 kB/s from the Debian mirror).
-**Next task (unblocked):** demo-mode fixture design (Phase 16 data files + a builder
-that turns fixtures into a `ReportContext`), or frontend tests. Phases 4–5 still need
-the owner's decision; `backend/app/schemas/target.py` remains untracked.
+2026-10-03: Owner refined the goal — help developers find **business-logic**
+vulnerabilities in their own apps, using the application's **source code + a
+developer description** alongside dynamic testing. Recorded as scope change
+2026-10-03b and designed as a grey-box engine: ADR-008 + `docs/business-logic-engine.md`
+(Application Model, Code Intelligence + Business-Logic Reasoning agents, updated
+LangGraph fan-out, DB additions, safety boundaries incl. never executing the repo
+and redacting secrets, phasing BL-1…BL-7). Design only — no code this step.
+Note: two earlier attempts to generate the target-safety/target-service code
+(Phases 4–5) were stopped by a safety classifier; those remain blocked and are the
+prerequisite for the business-logic phases. `backend/app/schemas/target.py` stays
+untracked.
+**Next task (owner's choice):** proceed with design/build of an unblocked BL piece
+that is static-only (e.g. BL-3 hardcoded-secret detection design, or BL-7 demo
+fixtures), or produce academic docs/diagrams reflecting the grey-box architecture.

@@ -34,4 +34,9 @@ Status: Planned → In Progress → Implemented → Tested.
 | R26 | Structured logging per audit ID | BRIEF §33 | backend/app/core/logging.py | Planned |
 | R27 | UML diagrams (7) matching the code | SPEC §16 | docs/diagrams/ | Planned |
 | R28 | Academic docs | SPEC §15 | docs/*.md | In Progress (design docs done) |
+| R30 | Source repository ingestion (authorized, read-only, limits) | ADR-008 / BRIEF 2026-10-03b | backend/app/tools/repo_tool.py (planned) | Designed |
+| R31 | Code Intelligence: Application Model (routes, guards, models, trust boundaries) | ADR-008 | backend/app/agents/code_intelligence_agent.py (planned) | Designed |
+| R32 | Business-logic flaw detection (BOLA/IDOR, authz, workflow, client-trust, limits, state) | ADR-008 | backend/app/agents/business_logic_agent.py (planned) | Designed |
+| R33 | Hardcoded-secret detection (redacted) | ADR-008 | code_intelligence_agent / finding type hardcoded_secret (planned) | Designed |
+| R34 | Developer-intent description (roles, workflows, test accounts) | ADR-008 | schema + UI (planned) | Designed |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |

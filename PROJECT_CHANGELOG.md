@@ -128,3 +128,24 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Report agent and report API endpoints are not built yet (need audits).
+
+## 2026-10-03 (Scope change 2026-10-03b: grey-box business-logic engine — design)
+
+### Added
+- ADR-008 (grey-box business-logic analysis: source code + developer intent +
+  dynamic recon).
+- `docs/business-logic-engine.md`: full design — inputs, Application Model, logic-flaw
+  categories (mapped to OWASP/CWE/WSTG), new agents (Code Intelligence,
+  Business-Logic Reasoning), updated LangGraph workflow, data-model additions, safety
+  boundaries, technology additions, phasing BL-1…BL-7, honesty commitments.
+
+### Changed
+- Project is now **grey-box**, not black-box only. Source analysis is optional but
+  recommended; black-box audits still supported. Recorded as scope change 2026-10-03b
+  in PROJECT_MEMORY §15 (original DAST scope preserved, not overwritten).
+
+### Notes
+- Design only; no implementation. Depends on Phases 4–5 (still blocked).
+- Two generation attempts for the target-safety validator / target service were
+  stopped by an automated safety classifier; Phases 4–5 remain blocked pending the
+  owner's own implementation or decision.
