@@ -111,3 +111,20 @@ Append-only. Never rewrite past entries.
 ### Tests
 - Frontend lint, typecheck and production build pass; manual end-to-end UI check in
   the running stack passed. Backend suite unchanged (30 passing).
+
+## 2026-10-03 (Phase 13 rendering layer)
+
+### Added
+- `ReportContext` schema with deterministic derived views and honest CVE/CVSS
+  fallbacks; 19-section Jinja2 report template (A4 print CSS, page numbers, DEMO
+  watermark); `render_html` / `render_pdf` (WeasyPrint).
+- ADR-007 (report rendering).
+- Dependencies: jinja2, weasyprint. Backend image installs Pango, HarfBuzz and
+  DejaVu fonts; apt retries enabled.
+
+### Tests
+- 8 report tests; all pass in the backend container (PDF test skipped on Windows).
+- Backend suite locally: 37 passed, 1 skipped.
+
+### Notes
+- Report agent and report API endpoints are not built yet (need audits).

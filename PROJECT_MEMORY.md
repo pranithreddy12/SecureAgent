@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (Phase 14 part 1; Phases 4–5 blocked)
+Last updated: 2026-10-03 (Phase 13 rendering layer; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -50,6 +50,15 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   `SystemStatus`; pages `/login`, `/register` (auto-login), `/dashboard` (live
   health + honest empty state, no simulated metrics), `/settings` (account + status),
   `/` → `/dashboard`.
+- Phase 13 (rendering layer, ADR-007): `app/schemas/report.py` (`ReportContext`,
+  `ReportFinding`, `CvssScore`, `TimelineEntry`; derived views: reportable findings
+  sorted by severity, false-positive split, severity/status counts, OWASP/CWE
+  grouping, deterministic executive summary; `NO_CVE`/`NO_CVSS` fallback strings),
+  `app/reports/templates/report.html` (all 19 sections, A4 print CSS, page numbers,
+  DEMO watermark/banner), `app/reports/renderer.py` (`render_html` autoescaped +
+  StrictUndefined; `render_pdf` via WeasyPrint, lazy import). Not yet wired to the
+  DB or an API — the Report Agent (which builds `ReportContext` from an audit) and
+  `/api/audits/{id}/report*` endpoints come once audits exist.
 
 ### In Progress
 - Phase 14 frontend: auth pages + app shell done; data pages wait on their APIs.
@@ -141,7 +150,8 @@ features; honest CVE/CVSS.
 Per spec: Python/FastAPI/Pydantic/SQLAlchemy, LangGraph/LangChain, Next.js/React/TS/
 Tailwind, PostgreSQL, ZAP, Nuclei, Docker Compose.
 Added (justified): Alembic (migrations), asyncpg (async driver), Jinja2 (report
-templates), httpx (HTTP client), argon2-cffi, PyJWT, email-validator (Phase 3). To decide in later phases: PDF renderer
+templates), httpx (HTTP client), argon2-cffi, PyJWT, email-validator (Phase 3), jinja2, weasyprint (Phase 13; backend
+image installs Pango/HarfBuzz/DejaVu fonts). To decide in later phases: PDF renderer
 (WeasyPrint vs alternative — Windows local-dev friction), chart library (Recharts),
 password hashing lib.
 
@@ -163,6 +173,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 4 Target management | ⛔ Blocked (see §3) |
 | 5 Authorization & restrictions | ⛔ Blocked (see §3) |
 | 6–13 | Not started (depend on 4–5) |
+| 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
 | 15–20 | Not started |
 
@@ -176,6 +187,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-004 | Demo mode swaps tool adapters only; labelled everywhere | Accepted |
 | ADR-005 | In-process asyncio jobs + 2 s polling; no Redis/Celery | Accepted |
 | ADR-006 | Argon2id + HS256 JWT in httpOnly SameSite=Lax cookie (+ Bearer) | Accepted |
+| ADR-007 | Report: Pydantic context → Jinja2 HTML → WeasyPrint PDF | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -194,7 +206,6 @@ changelog.
 ## 16. Open Issues
 
 - PPT not yet provided (affects SPECIFICATION.md PENDING sections).
-- PDF renderer choice pending (Phase 13).
 - No admin bootstrap: every registration is `auditor`. Need a CLI/seed command to
   promote a user to `admin` before any admin-only feature ships.
 - No login rate limiting / lockout yet (not in brief; consider before deployment).
@@ -209,7 +220,7 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: 30 tests passing. Auth: hashing, register (normalised email, no hash
+- Backend: 37 passing + 1 skipped locally (PDF; passes in Docker). Auth: hashing, register (normalised email, no hash
   leak, duplicate case-insensitive 409, validation 422, role injection ignored), login
   cookie flags, me via cookie and Bearer, indistinguishable login failures, bad
   tokens (garbage, expired, unknown user, wrong key, alg=none), logout, deleted user.
@@ -219,6 +230,15 @@ changelog.
   CHECK constraints (progress, status, confidence, severity), cascade delete,
   FK enforcement. ruff clean. DB tests need `make testdb` (localhost:55432) or
   `TEST_DATABASE_URL`.
+- Reports: 8 tests (all 19 sections, false positives excluded from counts but
+  listed, CVE/CVSS never invented, untrusted content escaped, DEMO label only on demo,
+  deterministic summary, empty-audit wording, PDF). Locally 7 pass + PDF skipped (no
+  Pango on Windows); in the backend container all 8 pass. Sample PDF (5 A4 pages)
+  checked: sections, page numbers, DEMO watermark, fallback strings.
+  Container test run: `MSYS_NO_PATHCONV=1 docker compose run --rm --no-deps -e HOME=/tmp
+  -v "$(pwd -W)/backend/tests:/app/tests:ro" backend sh -c "pip install --user pytest
+  anyio httpx && python -m pytest tests/test_reports.py"` (Git Bash rewrites `/tmp`
+  paths unless MSYS_NO_PATHCONV=1).
 - Frontend: eslint, `tsc --noEmit`, `next build` passing. Manually verified in the
   running stack (browser pane): unauthenticated redirects with `?next=`, register →
   auto-login → dashboard with live health, settings shows account, wrong password
@@ -255,15 +275,20 @@ changelog.
 - Frontend proxy returns 500 while the backend container restarts (migrations at
   boot); fixed for cold start with a backend healthcheck + `service_healthy`.
   Always re-run smoke checks after the backend reports healthy.
+- WeasyPrint on Windows raises `OSError` at import (no Pango) — `pytest.importorskip`
+  does not catch that; catch `(ImportError, OSError)` and skip. On Python 3.14,
+  `pip install weasyprint` hung building from source; `--only-binary=:all:` worked.
+- Docker builds can fail on transient Debian mirror timeouts; apt uses
+  `-o Acquire::Retries=5`.
 - Bash heredocs containing many nested quotes have failed to parse in this
   environment; use the Write tool for multi-file source creation.
 
 ## 22. Current Session Summary
 
-2026-10-03: Phases 4–5 blocked (safety-classifier stops; see §3 Blocked). Built
-Phase 14 part 1 (frontend auth + shell) instead, verified in the running stack.
-Repo pushed to github.com/pranithreddy12/SecureAgent (`main`); commits carry only
-the owner's authorship — no AI co-author trailers.
-**Next task:** owner decision on Phases 4–5 (write target service + validator, or
-keep `schemas/target.py`). Unblocked work meanwhile: report HTML templates
-(Phase 13 presentation layer), demo fixture design (Phase 16), frontend tests.
+2026-10-03: Phases 4–5 still blocked (see §3). Completed Phase 13's rendering layer
+(ADR-007): report context schema, 19-section template, HTML + PDF rendering, tests;
+backend image now includes WeasyPrint's native libraries (build is slow on this
+network: ~20 kB/s from the Debian mirror).
+**Next task (unblocked):** demo-mode fixture design (Phase 16 data files + a builder
+that turns fixtures into a `ReportContext`), or frontend tests. Phases 4–5 still need
+the owner's decision; `backend/app/schemas/target.py` remains untracked.

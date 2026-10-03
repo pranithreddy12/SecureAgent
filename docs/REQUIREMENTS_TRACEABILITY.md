@@ -19,7 +19,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R11 | Exploitation Agent → Safe Validation Agent | SPEC §8, ADR-003 | backend/app/agents/safe_validation_agent.py, tools/validation_tool.py | Planned |
 | R12 | Validator Agent / false-positive reduction | SPEC §8 | backend/app/agents/validator_agent.py | Planned |
 | R13 | OWASP / CWE / CVE / CVSS mapping (no fabrication) | SPEC §12 | backend/app/security/standards.py | Planned |
-| R14 | Report Agent — HTML + PDF | SPEC §8, §15 | backend/app/agents/report_agent.py, reports/ | Planned |
+| R14 | Report Agent — HTML + PDF | SPEC §8, §15 | backend/app/reports/ (renderer, template), schemas/report.py; agent pending | In Progress (rendering done + tested) |
 | R15 | Audit progress tracking + logs | SPEC §3 | services/audit_runner.py, api/audits.py | Planned |
 | R16 | Background execution | BRIEF §43, ADR-005 | backend/app/workflows/runner.py | Planned |
 | R17 | Resumable / idempotent audits | BRIEF §34 | runner + fingerprint constraint | Planned |

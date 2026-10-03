@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security Audit Report – {{ r.target_name }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm;
+    @bottom-left { content: "SecureAgent · Audit {{ r.audit_id[:8] }}"; font-size: 8pt; color: #64748b; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #64748b; }
+    {% if r.is_demo %}@top-center { content: "DEMO / SIMULATED SECURITY AUDIT"; font-size: 9pt; font-weight: 700; color: #b91c1c; }{% endif %}
+  }
+  :root { --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --soft:#f8fafc;
+          --critical:#be123c; --high:#c2410c; --medium:#a16207; --low:#1d4ed8; --informational:#475569; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; color: var(--ink); font-size: 10pt; line-height: 1.5; margin: 0 auto; max-width: 900px; padding: 24px; }
+  h1 { font-size: 22pt; margin: 0 0 4px; }
+  h2 { font-size: 13pt; border-bottom: 2px solid var(--ink); padding-bottom: 4px; margin: 28px 0 12px; break-after: avoid; }
+  h3 { font-size: 11pt; margin: 0 0 6px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--soft); font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .kv th { width: 30%; text-transform: none; font-size: 9.5pt; letter-spacing: 0; }
+  .muted { color: var(--muted); }
+  .cover { border-bottom: 3px solid var(--ink); padding-bottom: 16px; margin-bottom: 8px; }
+  .eyebrow { font-size: 8.5pt; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); }
+  .demo { border: 2px solid #b91c1c; background: #fef2f2; color: #b91c1c; font-weight: 700; padding: 10px 14px; margin: 12px 0; text-align: center; letter-spacing: .05em; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 8pt; font-weight: 700; text-transform: uppercase; color: #fff; }
+  .sev-critical { background: var(--critical); } .sev-high { background: var(--high); }
+  .sev-medium { background: var(--medium); } .sev-low { background: var(--low); }
+  .sev-informational { background: var(--informational); }
+  .status { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 8pt; border: 1px solid var(--line); background: var(--soft); }
+  .bar { height: 10px; border-radius: 3px; min-width: 2px; }
+  .finding { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; margin: 0 0 14px; break-inside: avoid; }
+  .finding table { margin: 6px 0; }
+  pre { white-space: pre-wrap; word-break: break-word; background: var(--soft); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font-size: 8.5pt; margin: 4px 0; }
+  ul { margin: 4px 0 8px; padding-left: 20px; }
+  .grid { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { flex: 1 1 120px; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 16pt; }
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <div class="eyebrow">SecureAgent · Multi-Agent AI Application Security Auditor</div>
+  <h1>Security Audit Report</h1>
+  <div>{{ r.target_name }} — <span class="muted">{{ r.target_url }}</span></div>
+  <div class="muted">Generated {{ r.generated_at | dt }} · Audit {{ r.audit_id }}</div>
+  {% if r.is_demo %}
+  <div class="demo">DEMO / SIMULATED SECURITY AUDIT — results below come from fixture data, not a real scan.</div>
+  {% endif %}
+</header>
+
+<h2>1. Executive Summary</h2>
+<p>{{ r.executive_summary or r.default_executive_summary() }}</p>
+{% if not r.executive_summary %}<p class="muted">AI narrative unavailable; deterministic summary used.</p>{% endif %}
+
+<h2>2. Target Information</h2>
+<table class="kv">
+  <tr><th>Name</th><td>{{ r.target_name }}</td></tr>
+  <tr><th>URL</th><td>{{ r.target_url }}</td></tr>
+  <tr><th>Description</th><td>{{ r.target_description or "—" }}</td></tr>
+  <tr><th>Scope – hosts</th><td>{{ (r.scope.get("allowed_hosts") or []) | join(", ") or "—" }}</td></tr>
+  <tr><th>Scope – paths</th><td>{{ (r.scope.get("path_prefixes") or []) | join(", ") or "—" }}</td></tr>
+</table>
+
+<h2>3. Audit Information</h2>
+<table class="kv">
+  <tr><th>Audit ID</th><td>{{ r.audit_id }}</td></tr>
+  <tr><th>Status</th><td>{{ r.audit_status }}</td></tr>
+  <tr><th>Started</th><td>{{ r.started_at | dt }}</td></tr>
+  <tr><th>Completed</th><td>{{ r.completed_at | dt }}</td></tr>
+  <tr><th>Mode</th><td>{{ "Demo (simulated)" if r.is_demo else "Live" }}</td></tr>
+</table>
+
+<h2>4. Authorization Information</h2>
+<table class="kv">
+  <tr><th>Confirmed by</th><td>{{ r.authorized_by }}</td></tr>
+  <tr><th>Confirmed at</th><td>{{ r.authorized_at | dt }}</td></tr>
+  <tr><th>Statement</th><td>“{{ r.authorization_statement }}”</td></tr>
+</table>
+
+<h2>5. Methodology</h2>
+{% if r.methodology %}<ol>{% for step in r.methodology %}<li>{{ step }}</li>{% endfor %}</ol>{% else %}<p class="muted">Not recorded.</p>{% endif %}
+
+<h2>6. Attack Surface Summary</h2>
+<div class="grid">
+  <div class="stat"><b>{{ r.endpoints | length }}</b>Endpoints</div>
+  <div class="stat"><b>{{ r.api_endpoints | length }}</b>API endpoints</div>
+  <div class="stat"><b>{{ r.forms | length }}</b>Forms</div>
+  <div class="stat"><b>{{ r.parameters | length }}</b>Parameters</div>
+</div>
+{% if r.interesting_paths %}<h3>Interesting paths</h3><ul>{% for p in r.interesting_paths %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+
+<h2>7. Technology Stack Detected</h2>
+{% if r.technologies %}<ul>{% for t in r.technologies %}<li>{{ t }}</li>{% endfor %}</ul>{% else %}<p class="muted">No technologies identified.</p>{% endif %}
+
+<h2>8. Findings Summary</h2>
+{% if r.reportable_findings %}
+<table>
+  <tr><th>Severity</th><th>Title</th><th>Endpoint</th><th>Status</th><th>Confidence</th></tr>
+  {% for f in r.reportable_findings %}
+  <tr><td><span class="badge sev-{{ f.severity.value }}">{{ f.severity.value }}</span></td><td>{{ f.title }}</td><td>{{ f.endpoint }}</td><td><span class="status">{{ f.status.value }}</span></td><td>{{ f.confidence | pct }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">No reportable findings.</p>{% endif %}
+
+<h2>9. Severity Distribution</h2>
+{% set total = r.reportable_findings | length %}
+<table>
+  {% for sev, n in r.severity_counts.items() %}
+  <tr><td style="width:18%"><span class="badge sev-{{ sev.value }}">{{ sev.value }}</span></td><td style="width:8%">{{ n }}</td>
+      <td><div class="bar sev-{{ sev.value }}" style="width: {{ (100 * n / total) if total else 0 }}%"></div></td></tr>
+  {% endfor %}
+</table>
+
+<h2>10. Detailed Findings &amp; 11. Evidence</h2>
+{% for f in r.reportable_findings %}
+<div class="finding">
+  <h3><span class="badge sev-{{ f.severity.value }}">{{ f.severity.value }}</span> {{ f.title }}</h3>
+  <table class="kv">
+    <tr><th>Type</th><td>{{ f.type }}</td></tr>
+    <tr><th>Endpoint</th><td>{{ f.endpoint }}</td></tr>
+    <tr><th>Parameter</th><td>{{ f.parameter or "—" }}</td></tr>
+    <tr><th>Status</th><td><span class="status">{{ f.status.value }}</span> {{ f.status_reason or "" }}</td></tr>
+    <tr><th>Confidence</th><td>{{ f.confidence | pct }}</td></tr>
+    <tr><th>Detected by</th><td>{{ f.sources | join(", ") or "—" }}</td></tr>
+    <tr><th>OWASP</th><td>{{ f.owasp_category or "Unmapped" }}</td></tr>
+    <tr><th>CWE</th><td>{{ f.cwe or "Unmapped" }}</td></tr>
+    <tr><th>CVE</th><td>{{ f.cve_display }}</td></tr>
+    <tr><th>CVSS</th><td>{{ f.cvss_display }}</td></tr>
+  </table>
+  {% if f.description %}<p><b>Description.</b> {{ f.description }}</p>{% endif %}
+  {% if f.impact %}<p><b>Impact.</b> {{ f.impact }}</p>{% endif %}
+  <p><b>Evidence.</b>{% if f.validation_method %} <span class="muted">(validation: {{ f.validation_method }})</span>{% endif %}</p>
+  {% if f.evidence %}<pre>{{ f.evidence }}</pre>{% else %}<p class="muted">No evidence recorded.</p>{% endif %}
+  <p><b>Remediation.</b> {{ f.remediation or "No remediation guidance recorded." }}</p>
+</div>
+{% else %}<p class="muted">No reportable findings.</p>{% endfor %}
+
+<h2>12. OWASP Top 10 Mapping</h2>
+{% set by_owasp = r.grouped_by("owasp_category") %}
+{% if by_owasp %}<table><tr><th>Category</th><th>Findings</th></tr>
+{% for cat, items in by_owasp.items() %}<tr><td>{{ cat }}</td><td>{{ items | map(attribute="title") | join("; ") }}</td></tr>{% endfor %}
+</table>{% else %}<p class="muted">No findings to map.</p>{% endif %}
+
+<h2>13. CWE Mapping</h2>
+{% set by_cwe = r.grouped_by("cwe") %}
+{% if by_cwe %}<table><tr><th>CWE</th><th>Findings</th></tr>
+{% for cwe, items in by_cwe.items() %}<tr><td>{{ cwe }}</td><td>{{ items | map(attribute="title") | join("; ") }}</td></tr>{% endfor %}
+</table>{% else %}<p class="muted">No findings to map.</p>{% endif %}
+
+<h2>14. CVE Information</h2>
+{% if r.reportable_findings %}<table><tr><th>Finding</th><th>CVE</th></tr>
+{% for f in r.reportable_findings %}<tr><td>{{ f.title }}</td><td>{{ f.cve_display }}</td></tr>{% endfor %}
+</table>{% else %}<p class="muted">No findings.</p>{% endif %}
+
+<h2>15. CVSS Information</h2>
+{% if r.reportable_findings %}<table><tr><th>Finding</th><th>CVSS</th></tr>
+{% for f in r.reportable_findings %}<tr><td>{{ f.title }}</td><td>{{ f.cvss_display }}</td></tr>{% endfor %}
+</table>
+<p class="muted">CVSS values are reported only when supplied by a reliable source (tool or advisory metadata); they are never estimated.</p>
+{% else %}<p class="muted">No findings.</p>{% endif %}
+
+<h2>16. Remediation</h2>
+{% if r.reportable_findings %}<ol>{% for f in r.reportable_findings %}<li><b>{{ f.title }}</b> ({{ f.severity.value }}): {{ f.remediation or "No remediation guidance recorded." }}</li>{% endfor %}</ol>
+{% else %}<p class="muted">No remediation required for reported findings.</p>{% endif %}
+
+<h2>17. Validation Status</h2>
+<table><tr><th>Status</th><th>Count</th></tr>
+{% for st, n in r.status_counts.items() %}<tr><td>{{ st.value }}</td><td>{{ n }}</td></tr>{% endfor %}
+</table>
+{% if r.false_positives %}<h3>Rejected as false positives</h3><ul>
+{% for f in r.false_positives %}<li>{{ f.title }} — {{ f.endpoint }}{% if f.status_reason %}: {{ f.status_reason }}{% endif %}</li>{% endfor %}
+</ul>{% endif %}
+
+<h2>18. Limitations</h2>
+<ul>
+  {% if r.is_demo %}<li>This is a demonstration report generated from fixture data; it does not describe a real system.</li>{% endif %}
+  <li>Automated testing covers only the authorized scope and the checks performed; absence of findings does not prove absence of vulnerabilities.</li>
+  <li>Validation is non-destructive; some real issues may remain classified as likely or suspicious rather than confirmed.</li>
+  {% for l in r.limitations %}<li>{{ l }}</li>{% endfor %}
+</ul>
+
+<h2>19. Audit Timeline</h2>
+{% if r.timeline %}<table><tr><th>Stage</th><th>Status</th><th>Started</th><th>Completed</th><th>Notes</th></tr>
+{% for t in r.timeline %}<tr><td>{{ t.stage }}</td><td>{{ t.status }}</td><td>{{ t.started_at | dt }}</td><td>{{ t.completed_at | dt }}</td><td>{{ t.note or "" }}</td></tr>{% endfor %}
+</table>{% else %}<p class="muted">No timeline recorded.</p>{% endif %}
+
+</body>
+</html>
