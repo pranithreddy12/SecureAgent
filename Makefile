@@ -1,4 +1,4 @@
-.PHONY: up down lab logs backend-dev frontend-dev test lint build
+.PHONY: up down lab logs backend-dev frontend-dev testdb migrate test lint build
 
 up:            ## build and start the stack
 	docker compose up --build -d
@@ -17,6 +17,12 @@ backend-dev:
 
 frontend-dev:
 	cd frontend && npm run dev
+
+testdb:        ## throwaway Postgres for backend tests (localhost:55432)
+	docker run -d --name secureagent-testdb -e POSTGRES_USER=secureagent -e POSTGRES_PASSWORD=secureagent -e POSTGRES_DB=secureagent_test -p 55432:5432 postgres:16
+
+migrate:       ## apply migrations to DATABASE_URL
+	cd backend && .venv/Scripts/alembic upgrade head
 
 test:
 	cd backend && .venv/Scripts/python -m pytest -q

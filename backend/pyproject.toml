@@ -1,10 +1,17 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["alembic/versions"]  # generated migrations
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
 ignore = ["S101"]  # assert is fine in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]  # dummy credentials in fixtures
+
+[tool.ruff.lint.isort]
+known-third-party = ["alembic"]  # local alembic/ dir is migrations, not the package
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

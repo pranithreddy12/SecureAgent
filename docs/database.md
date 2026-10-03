@@ -1,6 +1,6 @@
 # SecureAgent – Database Design
 
-Status: **Design (Phase 0)**. PostgreSQL 16, SQLAlchemy 2.x ORM, Alembic migrations.
+Status: **Implemented (Phase 2, migration `afb3ff51caae`)**. PostgreSQL 16, SQLAlchemy 2.x ORM, Alembic migrations.
 All primary keys are UUIDs. All timestamps are `timestamptz` (UTC).
 
 Fields marked **(+)** are additions beyond the brief's model list, needed for
@@ -28,6 +28,8 @@ security_audits 1─* audit_logs
 | email | varchar(255) | not null, unique (lower-cased), indexed |
 | password_hash | varchar(255) | not null (argon2/bcrypt) |
 | role | enum(`admin`,`auditor`) | not null, default `auditor` |
+
+Enum columns are stored as `varchar(32)` + CHECK constraint (not native PG enums).
 | created_at | timestamptz | not null, default now |
 
 ### targets

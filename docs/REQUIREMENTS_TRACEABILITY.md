@@ -23,7 +23,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R15 | Audit progress tracking + logs | SPEC §3 | services/audit_runner.py, api/audits.py | Planned |
 | R16 | Background execution | BRIEF §43, ADR-005 | backend/app/workflows/runner.py | Planned |
 | R17 | Resumable / idempotent audits | BRIEF §34 | runner + fingerprint constraint | Planned |
-| R18 | PostgreSQL schema + migrations | SPEC §9, ADR-002 | backend/app/models/, backend/alembic/ | Planned |
+| R18 | PostgreSQL schema + migrations | SPEC §9, ADR-002 | backend/app/models/, backend/alembic/ | Implemented + Tested |
 | R19 | Dashboard + charts | SPEC §15 | frontend/app/dashboard | Planned |
 | R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | Planned |
 | R21 | Demo mode, clearly labelled | SPEC §15, ADR-004 | backend/app/demo/ | Planned |

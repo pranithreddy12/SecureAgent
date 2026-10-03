@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (end of Phase 1)
+Last updated: 2026-10-03 (end of Phase 2)
 
 ## 1. Project Identity
 
@@ -32,12 +32,17 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   rewrite to backend); `docker/backend.Dockerfile`, `docker/frontend.Dockerfile`,
   `docker-compose.yml` (postgres, zap, backend, frontend, `lab` profile juice-shop),
   Makefile, `.gitattributes` (LF), `.dockerignore`.
+- Phase 2: SQLAlchemy 2 models for all 8 tables (`backend/app/models/`: user, target
+  [+AuthorizationRecord], audit [+ReconnaissanceResult, AuditLog], finding
+  [Vulnerability], report, enums, base); async engine/session + `get_db` dependency
+  (`app/core/database.py`); Alembic (async template, URL from settings) with initial
+  migration `afb3ff51caae`; backend container runs `alembic upgrade head` on start.
 
 ### In Progress
 - Nothing.
 
 ### Planned
-- Phases 2–20 per brief (§36). Next: Phase 2 database models + Alembic migrations.
+- Phases 3–20 per brief (§36). Next: Phase 3 authentication.
 - Backend packages (`models`, `schemas`, `services`, `agents`, `tools`, `workflows`,
   `security`, `reports`, `demo`) are created in the phase that first puts code in them,
   not as empty placeholders.
@@ -70,10 +75,14 @@ persistence in `security_audits.stage_state`. Details: `docs/agent-workflow.md`.
 
 ## 7. Database Schema
 
-Designed: users, targets, authorization_records, security_audits,
-reconnaissance_results, vulnerabilities, security_reports, audit_logs.
-Additions beyond the brief are marked (+) in `docs/database.md`.
-Not yet implemented; no migrations exist.
+Implemented (Phase 2) exactly per `docs/database.md`: users, targets,
+authorization_records, security_audits, reconnaissance_results, vulnerabilities,
+security_reports, audit_logs. Migration head: `afb3ff51caae` (initial schema).
+Conventions: UUID PKs; timestamptz with server defaults; enums stored as varchar +
+CHECK (`native_enum=False`, values not names); deterministic constraint names via
+naming convention; JSONB for semi-structured fields; ON DELETE CASCADE from user →
+target → audit → children; `unique(audit_id, fingerprint)` on vulnerabilities;
+`AuditLog.meta` ORM attribute ↔ `metadata` column.
 
 ## 8. API Structure
 
@@ -113,8 +122,9 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 |---|---|
 | 0 Requirements & architecture | ✅ Done 2026-10-02 |
 | 1 Repository structure | ✅ Done 2026-10-03 |
-| 2 Database & migrations | ⏭ Next |
-| 3–20 | Not started |
+| 2 Database & migrations | ✅ Done 2026-10-03 |
+| 3 Authentication | ⏭ Next |
+| 4–20 | Not started |
 
 ## 14. Architecture Decisions
 
@@ -144,8 +154,6 @@ changelog.
 
 - PPT not yet provided (affects SPECIFICATION.md PENDING sections).
 - PDF renderer choice pending (Phase 13).
-- Docker Desktop daemon was not running on 2026-10-03: images not yet built;
-  `docker compose config` validated only. Start Docker Desktop and run `make up`.
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -155,9 +163,16 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: 2 tests passing (health endpoint, allowlist CSV parsing); ruff clean.
+- Backend: 12 tests passing — health, settings, and DB tests run against real
+  Postgres through the real Alembic migration (downgrade base → upgrade head):
+  full graph round-trip, enum value storage, unique fingerprint, unique email,
+  CHECK constraints (progress, status, confidence, severity), cascade delete,
+  FK enforcement. ruff clean. DB tests need `make testdb` (localhost:55432) or
+  `TEST_DATABASE_URL`.
 - Frontend: eslint, `tsc --noEmit`, `next build` passing.
-- Docker images: not built (daemon down).
+- Docker: backend + frontend images build; postgres+backend+frontend start, migrations
+  apply on boot, `/api/health` reachable directly (8000) and via the frontend proxy
+  (3000). ZAP container not yet started/pulled (Phase 9).
 - Known noise: StarletteDeprecationWarning about httpx in TestClient (upstream).
 
 ## 19. Known Limitations
@@ -179,11 +194,18 @@ changelog.
   verify every large generated file is complete (end-of-file check) before moving on.
 - pydantic-settings JSON-decodes `list[...]` env vars; CSV lists need
   `Annotated[list[str], NoDecode]` plus a `mode="before"` validator.
+- Alembic autogenerate duplicates CHECK constraints for `Enum(create_constraint=True,
+  native_enum=False)` under a naming convention. Delete the explicit enum
+  `sa.CheckConstraint(... IN (...))` lines from generated migrations; the Enum column
+  type creates the single `ck_<table>_<enum>` constraint. Verify with `alembic check`.
+- Bash heredocs containing many nested quotes have failed to parse in this
+  environment; use the Write tool for multi-file source creation.
 
 ## 22. Current Session Summary
 
-2026-10-03: Phase 1 completed — backend/frontend skeletons, Dockerfiles, compose,
-Makefile. Local dev: `backend/.venv` (Python 3.14) with `requirements-dev.txt`.
-**Next task: Phase 2 — SQLAlchemy models for all 8 tables per `docs/database.md`,
-async session, Alembic initial migration, tests against Postgres** (needs Docker
-Desktop running for the test database).
+2026-10-03: Phases 1 and 2 completed. Database layer implemented and verified both
+in tests and in the running compose stack. Local `.env` created (gitignored) with
+random secrets. Test DB container `secureagent-testdb` on port 55432.
+**Next task: Phase 3 — authentication**: password hashing, JWT in httpOnly cookie +
+Bearer, `POST /api/auth/register|login|logout`, `GET /api/auth/me`, `get_current_user`
+dependency, role check helper, tests.
