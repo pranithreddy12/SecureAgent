@@ -7,10 +7,10 @@ Status: Planned → In Progress → Implemented → Tested.
 | # | Requirement | Source | Implementation (planned path) | Status |
 |---|---|---|---|---|
 | R1 | User registration / login / me / logout | SPEC §3 | backend/app/api/auth.py, services/user_service.py, core/security.py | Implemented + Tested |
-| R2 | Target CRUD | SPEC §3 | backend/app/api/targets.py | Planned |
-| R3 | Authorization confirmation + record | SPEC §13 | backend/app/services/authorization_service.py | Planned |
-| R4 | Target safety validation (scheme, private/loopback/link-local/metadata blocking, allowlist) | SPEC §13 | backend/app/security/target_validation.py | Planned |
-| R5 | Scope enforcement in every tool | SPEC §13 | backend/app/tools/* | Planned |
+| R2 | Target CRUD | SPEC §3 | backend/app/api/targets.py | Blocked (see PROJECT_MEMORY §3) |
+| R3 | Authorization confirmation + record | SPEC §13 | backend/app/services/authorization_service.py | Blocked (see PROJECT_MEMORY §3) |
+| R4 | Target safety validation (scheme, private/loopback/link-local/metadata blocking, allowlist) | SPEC §13 | backend/app/security/target_validation.py | Blocked (see PROJECT_MEMORY §3) |
+| R5 | Scope enforcement in every tool | SPEC §13 | backend/app/tools/* | Blocked (see PROJECT_MEMORY §3) |
 | R6 | LangGraph audit workflow + AuditState | SPEC §7, ADR-001 | backend/app/workflows/audit_graph.py | Planned |
 | R7 | Reconnaissance Agent | SPEC §8 | backend/app/agents/reconnaissance_agent.py, tools/recon_tool.py | Planned |
 | R8 | Vulnerability Scanner Agent | SPEC §8 | backend/app/agents/vulnerability_scanner_agent.py | Planned |
@@ -25,7 +25,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R17 | Resumable / idempotent audits | BRIEF §34 | runner + fingerprint constraint | Planned |
 | R18 | PostgreSQL schema + migrations | SPEC §9, ADR-002 | backend/app/models/, backend/alembic/ | Implemented + Tested |
 | R19 | Dashboard + charts | SPEC §15 | frontend/app/dashboard | Planned |
-| R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | Planned |
+| R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | In Progress (login, register, dashboard shell, settings done) |
 | R21 | Demo mode, clearly labelled | SPEC §15, ADR-004 | backend/app/demo/ | Planned |
 | R22 | Local vulnerable lab target (Juice Shop) | BRIEF §31 | docker-compose `lab` profile | In Progress (service defined) |
 | R23 | Docker Compose deployment | SPEC §15 | docker-compose.yml, docker/ | In Progress (files written, images not yet built) |

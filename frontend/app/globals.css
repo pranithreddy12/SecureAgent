@@ -1,14 +1,43 @@
 @import "tailwindcss";
 
-/* Dark security theme; full design system arrives in Phase 14. */
+/* SecureAgent dark security theme. Severity colours are reserved for findings. */
 :root {
-  --background: #0b0f17;
-  --foreground: #e5e7eb;
+  --background: #0a0e14;
+  --surface: #111721;
+  --surface-raised: #18202c;
+  --border: #243041;
+  --foreground: #e6edf3;
+  --muted: #8b98a9;
+  --accent: #22d3ee;
+  --accent-strong: #06b6d4;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+
+  --sev-critical: #e11d48;
+  --sev-high: #f97316;
+  --sev-medium: #eab308;
+  --sev-low: #3b82f6;
+  --sev-info: #64748b;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-sev-critical: var(--sev-critical);
+  --color-sev-high: var(--sev-high);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-low: var(--sev-low);
+  --color-sev-info: var(--sev-info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

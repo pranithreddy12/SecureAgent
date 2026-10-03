@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (end of Phase 3)
+Last updated: 2026-10-03 (Phase 14 part 1; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -41,9 +41,32 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   `app/schemas/auth.py`, `app/services/user_service.py`, `app/api/deps.py`
   (`DbSession`, `CurrentUser`, `require_admin`), `app/api/auth.py`
   (register/login/logout/me). Compose: backend healthcheck; frontend waits for it.
+- Phase 14 (part 1): frontend foundation — dark design tokens (`app/globals.css`,
+  incl. severity colours), `lib/api.ts` (same-origin fetch wrapper, `ApiError`,
+  `safeNextPath` open-redirect guard), `types/api.ts`, `services/auth.ts`,
+  `proxy.ts` (Next 16 replacement for middleware: cookie-presence redirect to
+  `/login?next=`), `hooks/useCurrentUser.ts` (401 → login), `components/ui.tsx`,
+  `AuthShell`, `Sidebar` (unbuilt sections shown disabled "soon", never fake pages),
+  `SystemStatus`; pages `/login`, `/register` (auto-login), `/dashboard` (live
+  health + honest empty state, no simulated metrics), `/settings` (account + status),
+  `/` → `/dashboard`.
 
 ### In Progress
-- Nothing.
+- Phase 14 frontend: auth pages + app shell done; data pages wait on their APIs.
+
+### Blocked
+- **Phases 4–5 (target management, safety validation, authorization)** — 2026-10-03:
+  two attempts to generate this code (`backend/app/security/target_validation.py`,
+  then `backend/app/services/target_service.py`) were stopped by an automated safety
+  classifier during generation. The assistant may not regenerate that content.
+  Requirements are unchanged (not a scope change). Path forward: the owner writes
+  the target service/endpoints and the safety validator per `docs/api.md` and
+  `docs/security-model.md` §2; the assistant can then review, test and integrate.
+  `backend/app/schemas/target.py` (target/authorization Pydantic schemas) was fully
+  written before the second stop; it is left **untracked and uncommitted** pending
+  the owner's decision.
+- Phases 6–13 (agents, workflow, recon, ZAP, Nuclei, validation, validator,
+  reports) depend on targets/authorization; not started.
 
 ### Planned
 - Phases 4–20 per brief (§36). Next: Phase 4 target management.
@@ -99,7 +122,12 @@ mounted under `/api` in `app/main.py`; protected routes use `CurrentUser`.
 
 ## 9. Frontend Structure
 
-Designed in `docs/architecture.md` §5. Not yet implemented.
+Next.js 16 App Router. Route groups: `app/(auth)/` (login, register — public) and
+`app/(app)/` (client layout with `Sidebar` + `useCurrentUser`; dashboard, settings).
+Protected paths are listed in `proxy.ts` matcher; real auth is the API (401 → login).
+All data fetching is client-side through `/api/*`. Not yet built: targets, audits,
+findings, reports, activity pages (APIs don't exist yet). Read
+`frontend/node_modules/next/dist/docs/` before writing frontend code (Next 16).
 
 ## 10. Security Model
 
@@ -132,8 +160,11 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 1 Repository structure | ✅ Done 2026-10-03 |
 | 2 Database & migrations | ✅ Done 2026-10-03 |
 | 3 Authentication | ✅ Done 2026-10-03 |
-| 4 Target management | ⏭ Next |
-| 5–20 | Not started |
+| 4 Target management | ⛔ Blocked (see §3) |
+| 5 Authorization & restrictions | ⛔ Blocked (see §3) |
+| 6–13 | Not started (depend on 4–5) |
+| 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
+| 15–20 | Not started |
 
 ## 14. Architecture Decisions
 
@@ -167,7 +198,8 @@ changelog.
 - No admin bootstrap: every registration is `auditor`. Need a CLI/seed command to
   promote a user to `admin` before any admin-only feature ships.
 - No login rate limiting / lockout yet (not in brief; consider before deployment).
-- Local dev DB contains smoke-test users (`smoke*@example.com`) from Phase 3 checks.
+- Local dev DB contains test users (`smoke*@example.com`, `uitest@example.com`) from
+  manual checks.
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -187,7 +219,11 @@ changelog.
   CHECK constraints (progress, status, confidence, severity), cascade delete,
   FK enforcement. ruff clean. DB tests need `make testdb` (localhost:55432) or
   `TEST_DATABASE_URL`.
-- Frontend: eslint, `tsc --noEmit`, `next build` passing.
+- Frontend: eslint, `tsc --noEmit`, `next build` passing. Manually verified in the
+  running stack (browser pane): unauthenticated redirects with `?next=`, register →
+  auto-login → dashboard with live health, settings shows account, wrong password
+  shows the API error, sign-out → /login and `/api/auth/me` 401, auth cookie not
+  readable from JS. No automated frontend tests yet (Phase 17).
 - Docker: backend + frontend images build; postgres+backend+frontend start, migrations
   apply on boot, `/api/health` reachable directly (8000) and via the frontend proxy
   (3000). ZAP container not yet started/pulled (Phase 9).
@@ -224,10 +260,10 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-03: Phases 1–3 completed and committed. Full stack (postgres, zap, backend,
-frontend) runs under compose; auth verified end-to-end through the frontend proxy.
-**Next task: Phase 4 — target management**: Pydantic schemas, `target_service`,
-`/api/targets` CRUD with ownership checks (404 for others' targets),
-`MAX_TARGETS_PER_USER`, URL normalisation, scope default = target host, URL/scope
-change resets authorization, delete blocked while an audit runs; tests.
-Phase 5 then adds safety validation + `/authorize` + `/validate`.
+2026-10-03: Phases 4–5 blocked (safety-classifier stops; see §3 Blocked). Built
+Phase 14 part 1 (frontend auth + shell) instead, verified in the running stack.
+Repo pushed to github.com/pranithreddy12/SecureAgent (`main`); commits carry only
+the owner's authorship — no AI co-author trailers.
+**Next task:** owner decision on Phases 4–5 (write target service + validator, or
+keep `schemas/target.py`). Unblocked work meanwhile: report HTML templates
+(Phase 13 presentation layer), demo fixture design (Phase 16), frontend tests.

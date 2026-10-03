@@ -90,3 +90,24 @@ Append-only. Never rewrite past entries.
 ### Tests
 - 30 backend tests passing (18 new auth tests). End-to-end auth smoke test through
   the frontend proxy in the running stack passed.
+
+## 2026-10-03 (Phase 14 part 1; Phases 4–5 blocked)
+
+### Added
+- Frontend foundation: dark design tokens incl. severity palette, same-origin API
+  client with error handling and open-redirect guard, auth service, Next 16
+  `proxy.ts` route protection, `useCurrentUser` hook, UI primitives, sidebar
+  (unbuilt sections disabled), system-status card.
+- Pages: `/login`, `/register`, `/dashboard` (live health, honest empty state),
+  `/settings`; `/` redirects to `/dashboard`.
+
+### Notes
+- Phases 4–5 blocked: generation of the target safety validator and target service
+  was stopped twice by an automated safety classifier. Requirements unchanged;
+  owner to implement or decide. `backend/app/schemas/target.py` left untracked.
+- Repository published to github.com/pranithreddy12/SecureAgent; earlier commits
+  rewritten to remove AI co-author trailers at the owner's request.
+
+### Tests
+- Frontend lint, typecheck and production build pass; manual end-to-end UI check in
+  the running stack passed. Backend suite unchanged (30 passing).
