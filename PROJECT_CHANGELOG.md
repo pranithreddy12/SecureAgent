@@ -194,3 +194,23 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Honest by design: static route findings are never `confirmed` (global middleware
   is invisible to static analysis).
+
+## 2026-10-03 (Dependency / known-vulnerability scanning — OSV)
+
+### Added
+- `app/analysis/dependencies.py` — parse requirements.txt, Pipfile.lock, poetry.lock
+  (PyPI) and package-lock.json v1/v2+ (npm) into a package inventory (offline).
+- `app/analysis/osv.py` — query the public OSV database for known advisories on
+  declared versions; injectable HTTP transport; severity from database_specific or
+  CVSS; CVE id extracted only when real.
+- Scanner integration (`dependencies`, `dependency_findings`, `osv_note`), CLI
+  `--no-osv` + dependency sections in text/JSON, report mapping (A06 / CWE-1104).
+- README "Usable now" updated (secrets + dependencies + endpoints).
+
+### Tests
+- test_dependencies.py (9): parsers, OSV mapping via fake transport, scanner
+  integration, --no-osv, graceful network failure. Static+report suite: 37 passed,
+  1 skipped (PDF). Verified live against OSV (PyYAML 5.1 critical, requests 2.19.0).
+
+### Notes
+- No new dependencies (stdlib urllib/tomllib/json). Honest: no invented CVE/severity.

@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (BL-1/2/3 static engine + report wiring; Phases 4–5 blocked)
+Last updated: 2026-10-03 (static engine: secrets+routes+deps/OSV; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -101,6 +101,13 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   CLI `--report out.html` / `--pdf out.pdf` produce the 19-section professional
   report from a pure source scan. Real run on our own `app/`: 5 routes found, 3
   unauthenticated POSTs flagged for review (correct — login/register are public).
+  **Dependency/SCA built & tested:** `app/analysis/dependencies.py` parses
+  requirements.txt / Pipfile.lock / poetry.lock / package-lock.json (PyPI + npm);
+  `app/analysis/osv.py` queries the public OSV database (osv.dev, no key, stdlib
+  urllib; injectable fetch for offline tests) for known advisories on declared
+  versions. Findings → A06/CWE-1104, status `likely`, CVE only when the advisory id
+  is a real CVE (never invented). CLI `--no-osv` for offline; graceful on network
+  failure. Real run: flagged PyYAML 5.1 (critical) and requests 2.19.0 (high).
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -197,7 +204,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 5 Authorization & restrictions | ⛔ Blocked (see §3) |
 | 6–13 | Not started (depend on 4–5) |
 | 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
-| BL-1/2/3 Static engine (secrets + routes/authz + report) | ✅ Done 2026-10-03 (standalone CLI + HTML/PDF) |
+| Static engine (secrets + deps/OSV + routes/authz + report) | ✅ Done 2026-10-03 (standalone CLI + HTML/PDF) |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
 | 15–20 | Not started |
 
@@ -244,6 +251,9 @@ changelog.
   FastAPI `Annotated[User, Depends(...)]` annotations aren't yet parsed as guards
   (only signature defaults + decorators + `dependencies=`); acceptable (such routes
   are usually GET and unflagged). Add annotation parsing when tuning.
+- SCA matches declared lockfile versions to OSV advisories; it does not yet resolve
+  transitive ranges beyond what the lockfile pins, nor yarn.lock. OSV detail fetch is
+  capped (MAX_DETAIL_FETCHES=150) and needs network (skipped/graceful otherwise).
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -253,7 +263,10 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 28 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 37 passed + 1 skipped (PDF).
+  Dependency/OSV tests (test_dependencies.py, 9): lockfile parsers offline, OSV
+  mapping via injected fake transport, scanner integration, --no-osv, graceful
+  network-failure, CVE-vs-GHSA id handling. No test hits the network.
   Route tests (test_route_scan.py): FastAPI/Flask/Express guard detection, only
   unprotected sensitive endpoints flagged, benign GETs ignored, syntax-error files
   skipped, scan→report HTML renders with honest status and redacted secrets. Secret scanner:
@@ -329,14 +342,14 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-03: Extended the static engine with two real builds. BL-2: route +
-authorization extraction (`app/analysis/routes.py`, stdlib `ast` + JS regex) flags
-state-changing/privileged endpoints lacking a visible auth guard, honestly
-low-confidence. Report wiring (`app/analysis/reporting.py` + CLI `--report/--pdf`)
-turns any source scan into the Phase-13 19-section HTML/PDF report. Verified on our
-own backend (5 routes, 3 public POSTs flagged for review). 28 static/report tests
-pass (+1 PDF skip on Windows).
-**Next unblocked builds:** dependency/known-CVE check from lockfiles; more route
-frameworks (Django urls, NestJS); FastAPI `Annotated[...Depends]` guard parsing;
-or a `secureagent` console entry-point. Live web pipeline still needs Phases 4–5
+2026-10-03: Added real SCA to the static engine — dependency inventory
+(requirements/Pipfile.lock/poetry.lock/package-lock.json) + OSV known-vulnerability
+lookup (`app/analysis/dependencies.py`, `app/analysis/osv.py`), wired into scanner,
+CLI (`--no-osv`), and the HTML/PDF report (A06/CWE-1104, real advisory ids only).
+Verified live against OSV (PyYAML 5.1 critical, requests 2.19.0 high). 37 static/report
+tests pass (+1 PDF skip); dependency tests use an injected transport (no network).
+The standalone scanner now covers secrets + vulnerable dependencies + unprotected
+endpoints, with professional reports — genuinely usable on real repos today.
+**Next unblocked:** more frameworks (Django/NestJS, FastAPI Annotated guards), yarn.lock,
+or a pip-installable `secureagent` entry point. Live web pipeline still needs Phases 4–5
 (blocked); `backend/app/schemas/target.py` untracked.

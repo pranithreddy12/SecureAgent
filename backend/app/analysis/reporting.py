@@ -38,6 +38,32 @@ def _secret_finding(f) -> ReportFinding:
     )
 
 
+def _dependency_finding(f) -> ReportFinding:
+    d = f.dependency
+    ids = ", ".join(v.id for v in f.vulns[:10])
+    cve = next((v.cve for v in f.vulns if v.cve), None)
+    severity = f.severity if f.severity != "unknown" else "medium"
+    return ReportFinding(
+        title=f.title,
+        type="vulnerable_dependency",
+        severity=Severity(severity),
+        confidence=f.confidence,
+        status=FindingStatus.LIKELY,
+        status_reason=f"The lockfile declares {d.name} {d.version}, which has known advisories.",
+        endpoint=d.relpath,
+        parameter=f"{d.ecosystem}:{d.name}@{d.version}",
+        description=f"{len(f.vulns)} known advisory/advisories affect this version: {ids}.",
+        impact="Known-vulnerable dependencies can be exploited through your application.",
+        evidence="; ".join(f"{v.id} [{v.severity}] {v.summary}".strip() for v in f.vulns[:10]),
+        validation_method="dependency manifest matched against the OSV database",
+        owasp_category="A06:2021 Vulnerable and Outdated Components",
+        cwe="CWE-1104",
+        cve=cve,  # only a real advisory id; never invented
+        remediation="Upgrade to a non-vulnerable version listed in the advisories.",
+        sources=["static:dependencies(osv)"],
+    )
+
+
 def _route_finding(f) -> ReportFinding:
     r = f.route
     return ReportFinding(
@@ -75,6 +101,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
         who = "unknown"
 
     findings = [_secret_finding(f) for f in result.ordered_secrets]
+    findings += [_dependency_finding(f) for f in result.ordered_dependency_findings]
     findings += [_route_finding(f) for f in result.ordered_route_findings]
 
     endpoints = sorted({f"{r.method} {r.path}" for r in result.routes})
@@ -101,8 +128,10 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
         methodology=[
             "Read-only source ingestion (vendored/VCS/binary excluded)",
             "Hardcoded-secret detection (redacted)",
+            "Dependency inventory matched against the OSV vulnerability database",
             "Route and authorization extraction",
         ],
+        technologies=sorted({d.ecosystem for d in result.dependencies}),
         endpoints=endpoints,
         findings=findings,
         limitations=limitations,

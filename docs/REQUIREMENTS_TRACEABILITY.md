@@ -38,5 +38,6 @@ Status: Planned → In Progress → Implemented → Tested.
 | R31 | Code Intelligence: routes + authorization (Application Model core) | ADR-008 | backend/app/analysis/routes.py | Implemented + Tested (routes/authz); models/trust-boundaries pending |
 | R32 | Business-logic flaw detection (BOLA/IDOR, authz, workflow, client-trust, limits, state) | ADR-008 | routes.py (function-level authz done); rest planned | In Progress |
 | R33 | Hardcoded-secret detection (redacted) | ADR-008 | backend/app/analysis/secrets.py + app/cli.py | Implemented + Tested |
+| R35 | Dependency / known-vulnerability scanning (OSV) | ADR-008 (extends R13 CVE) | backend/app/analysis/dependencies.py, osv.py | Implemented + Tested |
 | R34 | Developer-intent description (roles, workflows, test accounts) | ADR-008 | schema + UI (planned) | Designed |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |

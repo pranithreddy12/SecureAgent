@@ -12,19 +12,26 @@ application's **own source code** plus a short developer description to find com
 
 ## Usable now: static secret scanner
 
-The static analysis engine's first component works today, standalone (no database or
-server). It scans a source tree you own or are authorized to audit for **hardcoded
-secrets** (API keys, tokens, private keys, credentials), redacts them, and exits
-non-zero when any are found — so it can gate CI:
+The static analysis engine works today, standalone (no database or server). It scans a
+source tree you own or are authorized to audit and reports three classes of real issue:
+
+- **Hardcoded secrets** — API keys, tokens, private keys, credentials (redacted on output).
+- **Vulnerable dependencies** — declared packages checked against the public
+  [OSV](https://osv.dev) vulnerability database (real advisory IDs only).
+- **Endpoints without visible authorization** — HTTP routes (Python/JS) that change
+  data or look privileged with no detected auth guard (low-confidence review items).
 
 ```bash
 cd backend
-python -m app.cli scan /path/to/your/repo              # human-readable
+python -m app.cli scan /path/to/your/repo                         # human-readable
 python -m app.cli scan /path/to/your/repo --format json --output findings.json
+python -m app.cli scan /path/to/your/repo --report report.html    # professional report
+python -m app.cli scan /path/to/your/repo --no-osv                # offline (skip OSV)
 ```
 
-It only reads files — it never executes anything from the scanned project — and it
-never prints or stores a secret's full value, only a masked preview and a fingerprint.
+It only reads files — it never executes anything from the scanned project — never
+prints or stores a secret's full value (only a masked preview and a fingerprint), and
+exits non-zero when findings exist, so it can gate CI.
 
 - Baseline requirements: [SPECIFICATION.md](SPECIFICATION.md)
 - Current state: [PROJECT_MEMORY.md](PROJECT_MEMORY.md)

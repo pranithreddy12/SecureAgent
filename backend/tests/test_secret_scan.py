@@ -114,7 +114,7 @@ def test_cli_clean_repo_exit_zero(tmp_path: Path, capsys: pytest.CaptureFixture)
     (tmp_path / "main.py").write_text("print('hello world')\n", encoding="utf-8")
     code = main(["scan", str(tmp_path), "--no-color"])
     assert code == 0
-    assert "No hardcoded secrets or unprotected endpoints detected" in capsys.readouterr().out
+    assert "No hardcoded secrets" in capsys.readouterr().out
 
 
 def test_cli_bad_path_exit_two(capsys: pytest.CaptureFixture) -> None:

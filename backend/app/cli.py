@@ -40,16 +40,20 @@ def _render_text(result: ScanResult, color: bool) -> str:
     lines.append(
         f"Scanned {result.stats.files_scanned} files "
         f"({result.stats.bytes_scanned // 1024} KiB); "
-        f"{len(result.routes)} route(s) found; "
+        f"{len(result.routes)} route(s), {len(result.dependencies)} dependency(ies) found; "
         f"skipped {result.stats.skipped_binary} binary, "
         f"{result.stats.skipped_too_large} oversized."
     )
     if result.stats.truncated:
         lines.append("WARNING: scan was truncated by a limit; results are partial.")
+    if result.osv_note:
+        lines.append(result.osv_note)
     lines.append("")
 
     if result.total_findings == 0:
-        lines.append("No hardcoded secrets or unprotected endpoints detected.")
+        lines.append(
+            "No hardcoded secrets, vulnerable dependencies or unprotected endpoints detected."
+        )
         return "\n".join(lines)
 
     counts = {k: v for k, v in result.severity_counts().items() if v}
@@ -63,6 +67,14 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}")
             lines.append(f"      value: {f.redacted}   confidence: {f.confidence:.0%}")
+
+    if result.ordered_dependency_findings:
+        lines.append("\nVulnerable dependencies (known advisories in OSV):")
+        for f in result.ordered_dependency_findings:
+            d = f.dependency
+            ids = ", ".join(v.id for v in f.vulns[:5])
+            lines.append(f"  {_tag(f.severity, color)} {d.name} {d.version}  ({d.ecosystem})")
+            lines.append(f"      {d.relpath}   {len(f.vulns)} advisory(ies): {ids}")
 
     if result.ordered_route_findings:
         lines.append(
@@ -91,7 +103,24 @@ def _render_json(result: ScanResult) -> str:
             "truncated": result.stats.truncated,
         },
         "routes_found": len(result.routes),
+        "dependencies_found": len(result.dependencies),
+        "osv_note": result.osv_note,
         "secret_findings": [asdict(f) for f in result.ordered_secrets],
+        "dependency_findings": [
+            {
+                "severity": f.severity,
+                "confidence": f.confidence,
+                "ecosystem": f.dependency.ecosystem,
+                "name": f.dependency.name,
+                "version": f.dependency.version,
+                "relpath": f.dependency.relpath,
+                "advisories": [
+                    {"id": v.id, "severity": v.severity, "summary": v.summary, "url": v.url}
+                    for v in f.vulns
+                ],
+            }
+            for f in result.ordered_dependency_findings
+        ],
         "authorization_findings": [
             {
                 "severity": f.severity,
@@ -139,11 +168,14 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument(
         "--max-files", type=int, default=None, help="Cap the number of files scanned."
     )
+    scan.add_argument(
+        "--no-osv", action="store_true", help="Skip the OSV known-vulnerability lookup (offline)."
+    )
     scan.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
     args = parser.parse_args(argv)
 
     try:
-        result = scan_repo(args.path, max_files=args.max_files)
+        result = scan_repo(args.path, max_files=args.max_files, check_osv=not args.no_osv)
     except (IngestError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
