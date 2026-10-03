@@ -33,3 +33,6 @@ lint:
 
 build:
 	cd frontend && npm run build
+
+scan:          ## static secret scan of a repo: make scan DIR=/path/to/repo
+	cd backend && .venv/Scripts/python -m app.cli scan $(DIR)

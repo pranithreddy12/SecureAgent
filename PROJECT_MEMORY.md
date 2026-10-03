@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-03 (grey-box scope change designed; Phases 4–5 blocked)
+Last updated: 2026-10-03 (BL-1+BL-3 static secret scanner built; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -83,7 +83,14 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   `security`, `reports`, `demo`) are created in the phase that first puts code in them,
   not as empty placeholders.
 - **Grey-box business-logic engine (ADR-008, `docs/business-logic-engine.md`)** —
-  designed 2026-10-03; phases BL-1…BL-7. Depends on Phases 4–5. Not implemented.
+  designed 2026-10-03; phases BL-1…BL-7. Most phases depend on Phases 4–5.
+  **BL-1 + BL-3 built & tested (static, standalone, no DB/web needed):**
+  `app/analysis/ingest.py` (read-only repo walk; skips vendored/VCS/binary; size &
+  file-count limits; never executes repo code), `app/analysis/secrets.py` (provider
+  signatures + generic secret-keyword/entropy detection; redaction + fingerprint,
+  full value never stored), `app/analysis/scanner.py`, `app/cli.py`
+  (`python -m app.cli scan <dir>`, text/JSON, exit 1 on findings → CI-gating).
+  `make scan DIR=...`. Verified on the project's own tree.
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -180,6 +187,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 5 Authorization & restrictions | ⛔ Blocked (see §3) |
 | 6–13 | Not started (depend on 4–5) |
 | 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
+| BL-1/BL-3 Static secret scanner | ✅ Done 2026-10-03 (standalone CLI) |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
 | 15–20 | Not started |
 
@@ -219,6 +227,8 @@ changelog.
 - No login rate limiting / lockout yet (not in brief; consider before deployment).
 - Local dev DB contains test users (`smoke*@example.com`, `uitest@example.com`) from
   manual checks.
+- Secret scanner is regex+entropy (gitleaks-class), not dataflow; may miss obfuscated
+  secrets and flag test fixtures. Tune rules as real repos are scanned.
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -228,7 +238,12 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: 37 passing + 1 skipped locally (PDF; passes in Docker). Auth: hashing, register (normalised email, no hash
+- Backend: static-analysis + report tests (no DB) pass: 17 + reports. Secret scanner:
+  10 tests (detection of planted fakes, skips vendored/VCS/binary, placeholders & env
+  refs ignored, full value never leaks, CLI text/JSON/exit codes, clean repo exit 0,
+  bad path exit 2). DB-backed tests (models, auth) require the test Postgres container
+  (`make testdb`); they errored this run only because Docker Desktop was stopped — not
+  a code regression. Full suite last green: 37 passed + 1 skipped (before Docker went down). Auth: hashing, register (normalised email, no hash
   leak, duplicate case-insensitive 409, validation 422, role injection ignored), login
   cookie flags, me via cookie and Bearer, indistinguishable login failures, bad
   tokens (garbage, expired, unknown user, wrong key, alg=none), logout, deleted user.
@@ -296,17 +311,13 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-03: Owner refined the goal — help developers find **business-logic**
-vulnerabilities in their own apps, using the application's **source code + a
-developer description** alongside dynamic testing. Recorded as scope change
-2026-10-03b and designed as a grey-box engine: ADR-008 + `docs/business-logic-engine.md`
-(Application Model, Code Intelligence + Business-Logic Reasoning agents, updated
-LangGraph fan-out, DB additions, safety boundaries incl. never executing the repo
-and redacting secrets, phasing BL-1…BL-7). Design only — no code this step.
-Note: two earlier attempts to generate the target-safety/target-service code
-(Phases 4–5) were stopped by a safety classifier; those remain blocked and are the
-prerequisite for the business-logic phases. `backend/app/schemas/target.py` stays
-untracked.
-**Next task (owner's choice):** proceed with design/build of an unblocked BL piece
-that is static-only (e.g. BL-3 hardcoded-secret detection design, or BL-7 demo
-fixtures), or produce academic docs/diagrams reflecting the grey-box architecture.
+2026-10-03: Owner wants a real-world usable tool, not just a demo. Built the first
+real, standalone piece of the grey-box engine: a static **secret scanner**
+(BL-1 ingestion + BL-3 detection) with a CLI (`python -m app.cli scan`), text/JSON
+output, CI exit codes, redaction, and 10 tests — all green; runs on real repos today
+and finds nothing in our own `app/` source (clean). Read-only, never executes scanned
+code, never stores full secret values.
+**Next:** more static analysers that don't need the blocked web pipeline — route/auth
+extraction toward the Application Model (BL-2), or dependency/known-CVE checks. The
+live web-scan pipeline still needs Phases 4–5 (blocked); `backend/app/schemas/target.py`
+remains untracked.

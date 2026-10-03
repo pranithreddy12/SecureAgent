@@ -149,3 +149,24 @@ Append-only. Never rewrite past entries.
 - Two generation attempts for the target-safety validator / target service were
   stopped by an automated safety classifier; Phases 4–5 remain blocked pending the
   owner's own implementation or decision.
+
+## 2026-10-03 (BL-1 + BL-3: static secret scanner — implemented)
+
+### Added
+- `app/analysis/ingest.py` — safe, read-only source-tree walk (skips vendored/VCS/
+  binary; size, file-count and total-byte limits; no symlink following; never executes
+  repo code).
+- `app/analysis/secrets.py` — defensive secret detection: provider signatures (private
+  keys, AWS/Google/GitHub/Slack/Stripe/Twilio, JWT) + generic secret-keyword/entropy
+  rule; whitespace/placeholder/env-reference filtering; redaction + sha256 fingerprint
+  (full value never stored/printed/logged).
+- `app/analysis/scanner.py`, `app/cli.py` — `python -m app.cli scan <dir>`
+  (text/JSON, `--output`, `--max-files`, exit 1 on findings for CI). `make scan`.
+- README "Usable now" section; 10 tests in `tests/test_secret_scan.py`.
+
+### Tests
+- 10 secret-scanner tests pass; report tests pass (17 non-DB total). DB-backed tests
+  need the test Postgres container (Docker was down at end of session).
+
+### Notes
+- First real, standalone, usable component of the grey-box engine (ADR-008).
