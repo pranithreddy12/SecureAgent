@@ -68,6 +68,12 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"      {f.relpath}:{f.line}")
             lines.append(f"      value: {f.redacted}   confidence: {f.confidence:.0%}")
 
+    if result.ordered_taint_findings:
+        lines.append("\nInjection risks (untrusted input reaches a sink):")
+        for f in result.ordered_taint_findings:
+            lines.append(f"  {_tag(f.severity, color)} {f.vuln_type.replace('_', ' ')} → {f.sink}")
+            lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
+
     if result.ordered_sink_findings:
         lines.append("\nDangerous code patterns:")
         for f in result.ordered_sink_findings:
@@ -112,6 +118,20 @@ def _render_json(result: ScanResult) -> str:
         "dependencies_found": len(result.dependencies),
         "osv_note": result.osv_note,
         "secret_findings": [asdict(f) for f in result.ordered_secrets],
+        "injection_findings": [
+            {
+                "vuln_type": f.vuln_type,
+                "severity": f.severity,
+                "confidence": f.confidence,
+                "sink": f.sink,
+                "relpath": f.relpath,
+                "line": f.line,
+                "cwe": f.cwe,
+                "owasp": f.owasp,
+                "evidence": f.evidence,
+            }
+            for f in result.ordered_taint_findings
+        ],
         "dangerous_sink_findings": [
             {
                 "category": f.category,
@@ -176,7 +196,18 @@ def _write_report(result: ScanResult, html_path: str | None, pdf_path: str | Non
         print(f"Wrote PDF report to {pdf_path}", file=sys.stderr)
 
 
+def _force_utf8_output() -> None:
+    # Reports use typographic characters; a legacy console (Windows cp1252) would
+    # otherwise raise UnicodeEncodeError. Degrade gracefully if reconfigure is absent.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_output()
     parser = argparse.ArgumentParser(prog="secureagent", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     scan = sub.add_parser("scan", help="Static scan of a source tree.")

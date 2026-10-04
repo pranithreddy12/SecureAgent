@@ -233,3 +233,27 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Coverage now spans OWASP A01(partial)/A02/A03/A05/A06/A08. No new dependencies.
+
+## 2026-10-04 (Batch #2: taint analysis)
+
+### Added
+- `app/analysis/taint.py` — intraprocedural, flow-insensitive Python taint analysis.
+  Sources: web-handler params + request.* accesses. Sinks: SQL (query arg only),
+  command, code, outbound HTTP (SSRF), filesystem paths. Findings: sql_injection
+  (CWE-89), command_injection (78), code_injection (95), ssrf (918/A10),
+  path_traversal (22). Parameterised queries are not flagged.
+- Wired into scanner (`taint_findings`), CLI (text + JSON), report (status likely for
+  strong injection, suspicious for ssrf/path; never confirmed). Bare sinks superseded
+  by a taint finding at the same location are de-duplicated.
+
+### Fixed
+- CLI crash (UnicodeEncodeError) printing non-ASCII to a legacy Windows console:
+  stdout/stderr are reconfigured to utf-8 (errors=replace) at startup.
+
+### Tests
+- test_taint.py (12). Static + report suite: 63 passed, 1 skipped (PDF).
+- Real run flagged a concatenated SQL query, command injection and SSRF, while a
+  parameterised query was correctly not flagged.
+
+### Notes
+- Intraprocedural + no sanitizer modeling; Python only. Honest status reflects this.

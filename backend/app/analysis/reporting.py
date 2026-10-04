@@ -64,6 +64,31 @@ def _dependency_finding(f) -> ReportFinding:
     )
 
 
+def _taint_finding(f) -> ReportFinding:
+    status = FindingStatus.LIKELY if f.strong else FindingStatus.SUSPICIOUS
+    return ReportFinding(
+        title=f.title,
+        type=f.vuln_type,
+        severity=Severity(f.severity),
+        confidence=f.confidence,
+        status=status,
+        status_reason=(
+            "Untrusted request input reaches this sink (static dataflow). Confirm no "
+            "sanitizer neutralises it; verify dynamically where possible."
+        ),
+        endpoint=f"{f.relpath}:{f.line}",
+        description=f"User-controlled input flows into {f.sink}.",
+        impact="An attacker-controlled value reaching this sink can lead to "
+        f"{f.vuln_type.replace('_', ' ')}.",
+        evidence=f"{f.sink} — {f.evidence}",
+        validation_method="static taint analysis (source → sink)",
+        owasp_category=f.owasp,
+        cwe=f.cwe,
+        remediation=f.remediation,
+        sources=["static:taint"],
+    )
+
+
 def _sink_finding(f) -> ReportFinding:
     # Definite misconfigurations (weak hash, disabled TLS) are "likely"; dangerous
     # sinks whose exploitability depends on input reachability are "suspicious".
@@ -127,6 +152,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
         who = "unknown"
 
     findings = [_secret_finding(f) for f in result.ordered_secrets]
+    findings += [_taint_finding(f) for f in result.ordered_taint_findings]
     findings += [_dependency_finding(f) for f in result.ordered_dependency_findings]
     findings += [_sink_finding(f) for f in result.ordered_sink_findings]
     findings += [_route_finding(f) for f in result.ordered_route_findings]
@@ -157,6 +183,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
             "Hardcoded-secret detection (redacted)",
             "Dependency inventory matched against the OSV vulnerability database",
             "Dangerous-sink detection (deserialization, injection, weak crypto, TLS)",
+            "Taint analysis (untrusted input reaching injection/SSRF/path sinks)",
             "Route and authorization extraction",
         ],
         technologies=sorted({d.ecosystem for d in result.dependencies}),

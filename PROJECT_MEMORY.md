@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-04 (static engine + dangerous-sink pack; Phases 4–5 blocked)
+Last updated: 2026-10-04 (static engine + taint analysis; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -118,6 +118,17 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   TLS) → likely; input-dependent sinks → suspicious; never confirmed. Wired into
   scanner/CLI/report. Real run flagged all 6 planted sinks correctly; safe variants
   (yaml.safe_load, sha256, argv subprocess, verify=True) not flagged.
+  **Batch #2 taint-lite built & tested:** `app/analysis/taint.py` — intraprocedural,
+  flow-insensitive (fixpoint) Python taint. Sources: web-handler params (route-
+  decorated funcs; excludes self/cls, Depends-injected, and safe names like db/
+  current_user) and `request.*` accesses. Sinks: SQL execute/text (query arg only →
+  parameterised queries are safe), os.system/popen/subprocess(shell=True), eval/exec,
+  outbound HTTP (requests/httpx/urllib/aiohttp → SSRF), open/send_file (path
+  traversal). Findings: sql_injection(CWE-89), command_injection(78),
+  code_injection(95), ssrf(918/A10), path_traversal(22). Status likely for
+  sql/cmd/code, suspicious for ssrf/path; never confirmed. Bare sinks superseded by a
+  taint finding at the same line are de-duplicated. Real run correctly flagged the
+  concatenated SQL query but NOT the parameterised one.
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -214,7 +225,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 5 Authorization & restrictions | ⛔ Blocked (see §3) |
 | 6–13 | Not started (depend on 4–5) |
 | 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
-| Static engine (secrets + deps/OSV + sinks + routes/authz + report) | ✅ Done 2026-10-04 (standalone CLI + HTML/PDF) |
+| Static engine (secrets + deps/OSV + sinks + taint + routes/authz + report) | ✅ Done 2026-10-04 (standalone CLI + HTML/PDF) |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
 | 15–20 | Not started |
 
@@ -264,6 +275,10 @@ changelog.
 - SCA matches declared lockfile versions to OSV advisories; it does not yet resolve
   transitive ranges beyond what the lockfile pins, nor yarn.lock. OSV detail fetch is
   capped (MAX_DETAIL_FETCHES=150) and needs network (skipped/graceful otherwise).
+- Taint is intraprocedural (single function) and flow-insensitive: it does not follow
+  input across function calls, and it does not model sanitizers, so it can miss
+  cross-function flows and may over-report where a sanitizer exists. Python only (no
+  JS taint yet). Honest status reflects this (likely/suspicious, never confirmed).
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -273,7 +288,10 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 51 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 63 passed + 1 skipped (PDF).
+  Taint tests (test_taint.py, 12): SQLi flagged, parameterised query safe, cmd/ssrf/
+  path/code injection, constant sinks & non-handler helpers & Depends params not
+  tainted, report status mapping.
   Sink tests (test_sinks.py, 14): each category detected, safe variants not flagged,
   alias-resolved XXE, status/severity mapping, report HTML, benign code clean.
   Dependency/OSV tests (test_dependencies.py, 9): lockfile parsers offline, OSV
@@ -351,17 +369,20 @@ changelog.
   `-o Acquire::Retries=5`.
 - Bash heredocs containing many nested quotes have failed to parse in this
   environment; use the Write tool for multi-file source creation.
+- CLI printed to a legacy Windows console (cp1252) raised UnicodeEncodeError on
+  non-ASCII (e.g. the "->" arrow U+2192). Fixed: `_force_utf8_output()` reconfigures
+  stdout/stderr to utf-8 with errors=replace at CLI start.
 
 ## 22. Current Session Summary
 
-2026-10-04: Built batch #1 of broader vulnerability coverage — the dangerous-sink
-detector pack (`app/analysis/sinks.py`): insecure deserialization, command/code
-execution, weak hashing, disabled TLS verification, insecure temp files, XXE, JS XSS
-sinks. AST-based for Python with import-alias resolution; regex for JS. Wired into
-scanner/CLI/report with honest status (definite misconfig = likely, input-dependent
-sink = suspicious, never confirmed). 51 static/report tests pass (+1 PDF skip). The
-standalone scanner now covers OWASP A01(partial)/A02/A03(sinks)/A05/A06/A08.
-**Next (per the OWASP coverage map in this session):** batch #2 taint-lite (connect
-request input → sinks for real SQL/command injection/SSRF), batch #3 IDOR/ownership,
-batch #4 security misconfiguration. Live web pipeline still needs Phases 4–5 (blocked);
+2026-10-04: Built batch #2 — lightweight taint analysis (`app/analysis/taint.py`):
+tracks untrusted request input to SQL/command/code/SSRF/path sinks within a function,
+so the tool reports real injection candidates (not just risky calls) and correctly
+treats parameterised queries as safe. Wired into scanner/CLI/report; bare sinks
+superseded by taint are de-duplicated. Fixed a Windows cp1252 CLI crash on non-ASCII
+output. 63 static/report tests pass (+1 PDF skip). Coverage now adds A03(injection,
+real)/A10(SSRF)/A01(path traversal).
+**Next unblocked:** batch #3 IDOR/ownership (object fetched by request id without an
+ownership check), batch #4 security misconfiguration (DEBUG, CORS, weak JWT), or
+cross-function/JS taint. Live web pipeline still needs Phases 4–5 (blocked);
 `backend/app/schemas/target.py` untracked.
