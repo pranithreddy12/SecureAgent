@@ -68,6 +68,12 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"      {f.relpath}:{f.line}")
             lines.append(f"      value: {f.redacted}   confidence: {f.confidence:.0%}")
 
+    if result.ordered_idor_findings:
+        lines.append("\nBroken object-level authorization (possible IDOR):")
+        for f in result.ordered_idor_findings:
+            lines.append(f"  {_tag(f.severity, color)} {f.handler}() — lookup via {f.lookup}")
+            lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})  confidence: {f.confidence:.0%}")
+
     if result.ordered_taint_findings:
         lines.append("\nInjection risks (untrusted input reaches a sink):")
         for f in result.ordered_taint_findings:
@@ -118,6 +124,19 @@ def _render_json(result: ScanResult) -> str:
         "dependencies_found": len(result.dependencies),
         "osv_note": result.osv_note,
         "secret_findings": [asdict(f) for f in result.ordered_secrets],
+        "idor_findings": [
+            {
+                "severity": f.severity,
+                "confidence": f.confidence,
+                "handler": f.handler,
+                "lookup": f.lookup,
+                "relpath": f.relpath,
+                "line": f.line,
+                "cwe": f.cwe,
+                "owasp": f.owasp,
+            }
+            for f in result.ordered_idor_findings
+        ],
         "injection_findings": [
             {
                 "vuln_type": f.vuln_type,

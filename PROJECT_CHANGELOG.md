@@ -257,3 +257,23 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Intraprocedural + no sanitizer modeling; Python only. Honest status reflects this.
+
+## 2026-10-06 (Batch #3: IDOR / object-level authorization)
+
+### Added
+- `app/analysis/access_control.py` — flags route handlers that look up a record by a
+  request-supplied id with no ownership scoping (IDOR, CWE-639 / A01). Detects
+  db.query(M).get, Model.query.get_or_404, session.get(M, id), filter_by(id=...),
+  filter(M.id == input). Suppressed when the query is scoped to the current user, an
+  ownership comparison (record.user_id != current_user.id) exists, or an admin guard
+  is present. Reuses taint sources.
+- Wired into scanner (`idor_findings`), CLI (text + JSON), report (status suspicious,
+  confidence 0.4 if current_user referenced else 0.6).
+
+### Tests
+- test_access_control.py (10). Static + report suite: 73 passed, 1 skipped (PDF).
+- Real run flagged an unscoped handler but not a user-scoped one.
+
+### Notes
+- Heuristic/intraprocedural; ownership enforced out of view is invisible (honest
+  low/medium confidence). Python only. Coverage now A01/A02/A03/A05/A06/A08/A10.

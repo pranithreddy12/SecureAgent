@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-04 (static engine + taint analysis; Phases 4–5 blocked)
+Last updated: 2026-10-06 (static engine + IDOR/object-authz; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -129,6 +129,14 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   sql/cmd/code, suspicious for ssrf/path; never confirmed. Bare sinks superseded by a
   taint finding at the same line are de-duplicated. Real run correctly flagged the
   concatenated SQL query but NOT the parameterised one.
+  **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
+  flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
+  Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
+  with no ownership scoping. Suppressed when the query is scoped to the current user
+  (filter by current_user/user_id), an ownership comparison exists (record.user_id !=
+  current_user.id), or an admin guard is present. Reuses taint sources. Finding: idor
+  (CWE-639/A01), status suspicious, confidence 0.4 if current_user referenced else 0.6.
+  Real run flagged the unscoped handler but not the user-scoped one.
 
 ### Deferred
 - Continuous / scheduled audits, CI/CD integration (architecture extensible only).
@@ -225,7 +233,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 5 Authorization & restrictions | ⛔ Blocked (see §3) |
 | 6–13 | Not started (depend on 4–5) |
 | 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
-| Static engine (secrets + deps/OSV + sinks + taint + routes/authz + report) | ✅ Done 2026-10-04 (standalone CLI + HTML/PDF) |
+| Static engine (secrets + deps/OSV + sinks + taint + IDOR + routes/authz + report) | ✅ Done 2026-10-06 (standalone CLI + HTML/PDF) |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
 | 15–20 | Not started |
 
@@ -279,6 +287,10 @@ changelog.
   input across function calls, and it does not model sanitizers, so it can miss
   cross-function flows and may over-report where a sanitizer exists. Python only (no
   JS taint yet). Honest status reflects this (likely/suspicious, never confirmed).
+- IDOR detection is heuristic/intraprocedural: ownership enforced via middleware, a
+  base queryset, or a helper call is invisible, so it can over-report (low/medium
+  confidence, suspicious). `.get()` on an ORM-like receiver (query/session/db/objects/
+  repo) may still FP on a cache named 'db'. Python only.
 - `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
   eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
 
@@ -288,7 +300,10 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 63 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 73 passed + 1 skipped (PDF).
+  IDOR tests (test_access_control.py, 10): vuln FastAPI/Flask flagged, scoped query &
+  ownership comparison & admin-only & dict .get & non-handler & constant id not
+  flagged, confidence lowering, scan+report integration.
   Taint tests (test_taint.py, 12): SQLi flagged, parameterised query safe, cmd/ssrf/
   path/code injection, constant sinks & non-handler helpers & Depends params not
   tainted, report status mapping.
@@ -375,14 +390,14 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-04: Built batch #2 — lightweight taint analysis (`app/analysis/taint.py`):
-tracks untrusted request input to SQL/command/code/SSRF/path sinks within a function,
-so the tool reports real injection candidates (not just risky calls) and correctly
-treats parameterised queries as safe. Wired into scanner/CLI/report; bare sinks
-superseded by taint are de-duplicated. Fixed a Windows cp1252 CLI crash on non-ASCII
-output. 63 static/report tests pass (+1 PDF skip). Coverage now adds A03(injection,
-real)/A10(SSRF)/A01(path traversal).
-**Next unblocked:** batch #3 IDOR/ownership (object fetched by request id without an
-ownership check), batch #4 security misconfiguration (DEBUG, CORS, weak JWT), or
-cross-function/JS taint. Live web pipeline still needs Phases 4–5 (blocked);
-`backend/app/schemas/target.py` untracked.
+2026-10-06: Built batch #3 — IDOR / object-level authorization
+(`app/analysis/access_control.py`), the core of the business-logic goal. Flags
+handlers that fetch a record by a request-supplied id without scoping to the current
+user; suppresses when the query is user-scoped, an ownership comparison exists, or an
+admin guard is present. Wired into scanner/CLI/report (CWE-639/A01, suspicious).
+Real run flagged the unscoped handler but not the user-scoped one. 73 static/report
+tests pass (+1 PDF skip). Coverage now spans OWASP A01(real IDOR+authz)/A02/A03/A05/
+A06/A08/A10.
+**Next unblocked:** batch #4 security misconfiguration (DEBUG, permissive CORS, weak
+JWT, missing CSRF), cross-function/JS taint, or Django/NestJS route support. Live web
+pipeline still needs Phases 4–5 (blocked); `backend/app/schemas/target.py` untracked.

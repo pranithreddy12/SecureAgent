@@ -64,6 +64,31 @@ def _dependency_finding(f) -> ReportFinding:
     )
 
 
+def _idor_finding(f) -> ReportFinding:
+    return ReportFinding(
+        title=f.title,
+        type="idor",
+        severity=Severity(f.severity),
+        confidence=f.confidence,
+        status=FindingStatus.SUSPICIOUS,
+        status_reason=(
+            "A record is fetched by a request-supplied id with no ownership scoping "
+            "detected. Confirm the caller is authorized for this object (ownership may be "
+            "enforced elsewhere)."
+        ),
+        endpoint=f"{f.relpath}:{f.line}",
+        parameter=f.lookup,
+        description=f"Handler {f.handler}() looks up a record via {f.lookup} using input.",
+        impact="Another user could read or modify an object they do not own.",
+        evidence=f"lookup: {f.lookup}",
+        validation_method="static access-control analysis",
+        owasp_category=f.owasp,
+        cwe=f.cwe,
+        remediation=f.remediation,
+        sources=["static:access-control"],
+    )
+
+
 def _taint_finding(f) -> ReportFinding:
     status = FindingStatus.LIKELY if f.strong else FindingStatus.SUSPICIOUS
     return ReportFinding(
@@ -152,6 +177,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
         who = "unknown"
 
     findings = [_secret_finding(f) for f in result.ordered_secrets]
+    findings += [_idor_finding(f) for f in result.ordered_idor_findings]
     findings += [_taint_finding(f) for f in result.ordered_taint_findings]
     findings += [_dependency_finding(f) for f in result.ordered_dependency_findings]
     findings += [_sink_finding(f) for f in result.ordered_sink_findings]
@@ -184,6 +210,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
             "Dependency inventory matched against the OSV vulnerability database",
             "Dangerous-sink detection (deserialization, injection, weak crypto, TLS)",
             "Taint analysis (untrusted input reaching injection/SSRF/path sinks)",
+            "Object-level authorization (IDOR) analysis",
             "Route and authorization extraction",
         ],
         technologies=sorted({d.ecosystem for d in result.dependencies}),
