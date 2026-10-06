@@ -40,7 +40,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R33 | Hardcoded-secret detection (redacted) | ADR-008 | backend/app/analysis/secrets.py + app/cli.py | Implemented + Tested |
 | R39 | Security-misconfiguration detection (debug, CORS, JWT, CSRF, autoescape, hosts, cookies) | ADR-008 (OWASP A05) | backend/app/analysis/misconfig.py | Implemented + Tested |
 | R38 | IDOR / object-level authorization analysis | ADR-008 (OWASP A01, CWE-639) | backend/app/analysis/access_control.py | Implemented + Tested |
-| R37 | Taint analysis: injection/SSRF/path-traversal (input→sink) | ADR-008 (OWASP A03/A10/A01) | backend/app/analysis/taint.py | Implemented + Tested |
+| R37 | Taint: injection/SSRF/path/open-redirect (interprocedural Python + JS) | ADR-008 (OWASP A03/A10/A01) | backend/app/analysis/taint.py | Implemented + Tested |
 | R36 | Dangerous-sink detection (deserialization, cmd/code exec, weak crypto, TLS, XXE, XSS sink) | ADR-008 (OWASP A02/A03/A05/A08) | backend/app/analysis/sinks.py | Implemented + Tested |
 | R35 | Dependency / known-vulnerability scanning (OSV) | ADR-008 (extends R13 CVE) | backend/app/analysis/dependencies.py, osv.py | Implemented + Tested |
 | R34 | Developer-intent description (roles, workflows, test accounts) | ADR-008 | schema + UI (planned) | Designed |

@@ -1,31 +1,29 @@
-"""Lightweight intraprocedural taint analysis: does untrusted request input reach a
-dangerous sink within the same function?
+"""Taint analysis: does untrusted request input reach a dangerous sink?
 
-This is what turns "a risky call exists somewhere" (sinks.py) into "user-controlled
-data flows into this SQL query / command / outbound URL". Sources are web-request
-inputs (handler parameters and ``request.*`` accesses); sinks are SQL execution,
-command execution, code execution, outbound requests (SSRF) and filesystem paths.
+Python analysis is AST-based and now **interprocedural within a file**: taint flows
+from a handler into locally-defined functions it calls (bounded depth, cycle-guarded),
+so an injection reached through a helper is caught, not only an inline one. It stays
+flow-insensitive within each function and does not cross files or model sanitizers, so
+findings are "likely/suspicious", never "confirmed". Parameterised queries (constant
+SQL, tainted parameters only) are not flagged.
 
-It is intentionally lightweight and flow-insensitive within a function: it over-
-approximates (may report a path a sanitizer actually neutralises), so findings are
-"likely/suspicious", never "confirmed". Parameterised queries — where the SQL string
-is constant and only the *parameters* are tainted — are correctly NOT flagged.
-Python only; JS taint is future work.
+JavaScript/TypeScript analysis is a lighter, file-scoped heuristic over ``req.*``
+sources. Both are honest about their limits via finding status and confidence.
 """
 
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass
 
 from app.analysis.routes import HTTP_METHODS
 
 SOURCE_ROOTS = {"request", "req"}
-# Handler params that are framework-injected services, not raw user input.
 SAFE_PARAM_NAMES = {"self", "cls", "db", "session", "request", "req", "current_user", "user"}
+MAX_CALL_DEPTH = 4
 
-# vuln_type -> (cwe, owasp, remediation, strong)
-# strong=True -> report status "likely"; else "suspicious".
+# vuln_type -> (cwe, owasp, remediation, strong)  strong=True -> status likely else suspicious
 TAINT_META = {
     "sql_injection": (
         "CWE-89",
@@ -57,6 +55,12 @@ TAINT_META = {
         "Validate and normalise paths; restrict access to a base directory.",
         False,
     ),
+    "open_redirect": (
+        "CWE-601",
+        "A01:2021 Broken Access Control",
+        "Allowlist redirect targets; do not redirect to a raw user-supplied URL.",
+        False,
+    ),
 }
 SEVERITY = {
     "sql_injection": "high",
@@ -64,6 +68,7 @@ SEVERITY = {
     "code_injection": "critical",
     "ssrf": "high",
     "path_traversal": "high",
+    "open_redirect": "medium",
 }
 
 
@@ -98,32 +103,101 @@ class TaintFinding:
         return f"{self.vuln_type.replace('_', ' ').title()} (tainted input → {self.sink})"
 
 
+JS_EXTENSIONS = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
+
+
 def analyze_taint(relpath: str, text: str) -> list[TaintFinding]:
-    if not relpath.endswith(".py"):
-        return []
+    if relpath.endswith(".py"):
+        return _python_taint(relpath, text)
+    if relpath.endswith(JS_EXTENSIONS):
+        return _js_taint(relpath, text)
+    return []
+
+
+# --------------------------------------------------------------------------- Python
+
+
+def _python_taint(relpath: str, text: str) -> list[TaintFinding]:
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
         return []
     lines = text.splitlines()
-    findings: list[TaintFinding] = []
+    functions: dict[str, ast.AST] = {}
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            _analyze_function(node, relpath, lines, findings)
+            functions[node.name] = node
+
+    findings: list[TaintFinding] = []
+    # Intraprocedural: every function; handlers seed their params as sources.
+    for func in functions.values():
+        init = _handler_param_taint(func) if _is_handler(func) else set()
+        tainted = _function_tainted(func, init)
+        findings += _sinks_in_function(func, tainted, relpath, lines)
+    # Interprocedural: follow taint from each handler into local callees.
+    for func in functions.values():
+        if _is_handler(func):
+            tainted = _function_tainted(func, _handler_param_taint(func))
+            findings += _propagate(func, tainted, functions, relpath, lines, 0, set())
+
+    # Deduplicate (a helper reachable from several handlers, or intra+inter overlap).
+    unique: dict[tuple, TaintFinding] = {}
+    for f in findings:
+        unique[(f.relpath, f.line, f.vuln_type, f.sink)] = f
+    return list(unique.values())
+
+
+def _propagate(func, tainted, functions, relpath, lines, depth, visited) -> list[TaintFinding]:
+    if depth >= MAX_CALL_DEPTH:
+        return []
+    findings: list[TaintFinding] = []
+    for call in ast.walk(func):
+        if not isinstance(call, ast.Call):
+            continue
+        callee_name = (_dotted(call.func) or "").rsplit(".", 1)[-1]
+        callee = functions.get(callee_name)
+        if callee is None:
+            continue
+        passed = _tainted_params_for_call(call, tainted, callee)
+        if not passed:
+            continue
+        key = (callee_name, frozenset(passed))
+        if key in visited:
+            continue
+        visited.add(key)
+        callee_tainted = _function_tainted(callee, passed)
+        findings += _sinks_in_function(callee, callee_tainted, relpath, lines)
+        findings += _propagate(
+            callee, callee_tainted, functions, relpath, lines, depth + 1, visited
+        )
     return findings
 
 
-def _analyze_function(func, relpath: str, lines: list[str], out: list[TaintFinding]) -> None:
-    tainted: set[str] = set()
-    if _is_handler(func):
-        injected = _injected_params(func)
-        for arg in _all_params(func):
-            if arg.arg not in SAFE_PARAM_NAMES and arg.arg not in injected:
-                tainted.add(arg.arg)
+def _tainted_params_for_call(call: ast.Call, caller_tainted: set[str], callee) -> set[str]:
+    positional = [a.arg for a in [*getattr(callee.args, "posonlyargs", []), *callee.args.args]]
+    passed: set[str] = set()
+    for i, arg in enumerate(call.args):
+        if i < len(positional) and _expr_tainted(arg, caller_tainted):
+            passed.add(positional[i])
+    names = set(positional) | {a.arg for a in callee.args.kwonlyargs}
+    for kw in call.keywords:
+        if kw.arg in names and _expr_tainted(kw.value, caller_tainted):
+            passed.add(kw.arg)
+    return passed
 
+
+def _handler_param_taint(func) -> set[str]:
+    injected = _injected_params(func)
+    return {
+        a.arg for a in _all_params(func) if a.arg not in SAFE_PARAM_NAMES and a.arg not in injected
+    }
+
+
+def _function_tainted(func, initial: set[str]) -> set[str]:
+    tainted = set(initial)
     assigns = _collect_assignments(func)
     changed = True
-    while changed:  # fixpoint: propagate taint through assignments
+    while changed:
         changed = False
         for targets, value in assigns:
             if _expr_tainted(value, tainted):
@@ -131,7 +205,13 @@ def _analyze_function(func, relpath: str, lines: list[str], out: list[TaintFindi
                     if t not in tainted:
                         tainted.add(t)
                         changed = True
+    return tainted
 
+
+def _sinks_in_function(
+    func, tainted: set[str], relpath: str, lines: list[str]
+) -> list[TaintFinding]:
+    out: list[TaintFinding] = []
     seen: set[tuple[str, int]] = set()
     for call in ast.walk(func):
         if not isinstance(call, ast.Call):
@@ -143,15 +223,10 @@ def _analyze_function(func, relpath: str, lines: list[str], out: list[TaintFindi
             snippet = lines[call.lineno - 1].strip()[:160] if 0 < call.lineno <= len(lines) else ""
             out.append(
                 TaintFinding(
-                    vuln_type=vuln_type,
-                    severity=SEVERITY[vuln_type],
-                    confidence=0.75,
-                    relpath=relpath,
-                    line=call.lineno,
-                    sink=sink,
-                    evidence=snippet,
+                    vuln_type, SEVERITY[vuln_type], 0.75, relpath, call.lineno, sink, snippet
                 )
             )
+    return out
 
 
 def _check_sink(call: ast.Call, tainted: set[str]) -> tuple[str, str] | None:
@@ -159,18 +234,12 @@ def _check_sink(call: ast.Call, tainted: set[str]) -> tuple[str, str] | None:
     last = name.rsplit(".", 1)[-1]
     args = call.args
     kw = {k.arg: k.value for k in call.keywords if k.arg}
+    a0 = args[0] if args else None
 
-    def arg0() -> ast.expr | None:
-        return args[0] if args else None
-
-    # SQL: the *query* argument tainted (parameters passed separately stay safe).
-    if last in {"execute", "executemany", "executescript", "raw"} and _tainted(arg0(), tainted):
+    if last in {"execute", "executemany", "executescript", "raw"} and _tainted(a0, tainted):
         return "sql_injection", name
-    if last == "text" and _tainted(arg0(), tainted):
-        # sqlalchemy.text(tainted) builds raw SQL from input.
+    if last == "text" and _tainted(a0, tainted):
         return "sql_injection", name
-
-    # Command execution
     if (name in {"os.system", "os.popen"} or last in {"system", "popen", "getoutput"}) and any(
         _tainted(a, tainted) for a in args
     ):
@@ -181,23 +250,14 @@ def _check_sink(call: ast.Call, tainted: set[str]) -> tuple[str, str] | None:
         and any(_tainted(a, tainted) for a in args)
     ):
         return "command_injection", f"{name}(shell=True)"
-
-    # Code execution
-    if name in {"eval", "exec", "builtins.eval", "builtins.exec"} and _tainted(arg0(), tainted):
+    if name in {"eval", "exec", "builtins.eval", "builtins.exec"} and _tainted(a0, tainted):
         return "code_injection", name
-
-    # SSRF: outbound HTTP with a tainted URL.
-    if _is_http_call(name, last) and (
-        _tainted(arg0(), tainted) or _tainted(kw.get("url"), tainted)
-    ):
+    if _is_http_call(name, last) and (_tainted(a0, tainted) or _tainted(kw.get("url"), tainted)):
         return "ssrf", name
-
-    # Path traversal: filesystem path built from input.
     if (
         name == "open" or last in {"send_file", "send_from_directory", "FileResponse"}
-    ) and _tainted(arg0(), tainted):
+    ) and _tainted(a0, tainted):
         return "path_traversal", name
-
     return None
 
 
@@ -209,7 +269,71 @@ def _is_http_call(name: str, last: str) -> bool:
     return any(m in name.lower() for m in ("requests", "httpx", "aiohttp", "session", "urllib"))
 
 
-# --------------------------------------------------------------------------- helpers
+# --------------------------------------------------------------------------- JS / TS
+
+_JS_SOURCE = re.compile(r"\breq(?:uest)?\.(?:query|params|body|cookies|headers)\b")
+_JS_ASSIGN = re.compile(
+    r"(?:const|let|var)\s+(\w+)\s*=\s*[^;]*req(?:uest)?\.(?:query|params|body|cookies|headers)"
+)
+_JS_DESTRUCTURE = re.compile(
+    r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*req(?:uest)?\.(?:query|params|body|cookies|headers)"
+)
+_JS_SINKS = [
+    ("sql_injection", re.compile(r"\.(query|execute)\s*\("), re.compile(r"[`+]|\$\{")),
+    ("command_injection", re.compile(r"\b(?:child_process\.)?(?:exec|execSync)\s*\("), None),
+    ("code_injection", re.compile(r"\beval\s*\(|\bnew\s+Function\s*\("), None),
+    ("ssrf", re.compile(r"\b(?:axios|fetch)\s*\(|\bhttps?\.(?:get|request)\s*\("), None),
+    (
+        "path_traversal",
+        re.compile(
+            r"\bfs\.(?:readFile|readFileSync|createReadStream|writeFile)\s*\(|\.sendFile\s*\("
+        ),
+        None,
+    ),
+    ("open_redirect", re.compile(r"\.redirect\s*\("), None),
+]
+
+
+def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
+    lines = text.splitlines()
+    tainted: set[str] = set()
+    for line in lines:
+        for m in _JS_ASSIGN.finditer(line):
+            tainted.add(m.group(1))
+        for m in _JS_DESTRUCTURE.finditer(line):
+            tainted.update(re.findall(r"\w+", m.group(1)))
+
+    var_res = [re.compile(r"\b" + re.escape(v) + r"\b") for v in tainted]
+    findings: list[TaintFinding] = []
+    seen: set[tuple[str, int]] = set()
+    for lineno, line in enumerate(lines, start=1):
+        if len(line) > 4000:
+            continue
+        if not (_JS_SOURCE.search(line) or any(r.search(line) for r in var_res)):
+            continue
+        for vuln_type, sink_re, extra_re in _JS_SINKS:
+            m = sink_re.search(line)
+            if (
+                m
+                and (extra_re is None or extra_re.search(line))
+                and (vuln_type, lineno) not in seen
+            ):
+                seen.add((vuln_type, lineno))
+                findings.append(
+                    TaintFinding(
+                        vuln_type,
+                        SEVERITY[vuln_type],
+                        0.6,
+                        relpath,
+                        lineno,
+                        m.group(0).strip("( "),
+                        line.strip()[:160],
+                    )
+                )
+    return findings
+
+
+# --------------------------------------------------------------------------- shared helpers
 
 
 def _all_params(func):

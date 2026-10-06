@@ -294,3 +294,25 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Static engine now covers OWASP A01/A02/A03/A05/A06/A07/A08/A10. No new dependencies.
+
+## 2026-10-06 (#1: deeper taint — interprocedural + JavaScript)
+
+### Added
+- Interprocedural Python taint within a file: taint flows from handlers into locally
+  defined callees (bounded depth, cycle-guarded); sinks reported at the callee line;
+  constant arguments do not taint callees; findings deduplicated across callers.
+- JavaScript/TypeScript taint: req.query/params/body/cookies/headers → SQL, command,
+  eval/new Function, outbound requests (SSRF), fs/sendFile (path traversal),
+  res.redirect (open redirect, new CWE-601 / A01 type).
+
+### Changed
+- Rewrote `app/analysis/taint.py` (public API and access_control imports preserved).
+
+### Tests
+- test_taint_deep.py (12). Full static + report suite: 97 passed, 1 skipped (PDF).
+- Real run: command injection caught inside a helper (interprocedural); JS SQLi and
+  open redirect detected.
+
+### Notes
+- Python taint remains within-file and flow-insensitive; JS taint is a file-scoped
+  regex heuristic. Honest status unchanged (likely/suspicious).

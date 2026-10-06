@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-06 (static engine + misconfig; OWASP Top-10 static coverage; Phases 4–5 blocked)
+Last updated: 2026-10-06 (taint deepened: interprocedural + JS; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -129,6 +129,11 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   sql/cmd/code, suspicious for ssrf/path; never confirmed. Bare sinks superseded by a
   taint finding at the same line are de-duplicated. Real run correctly flagged the
   concatenated SQL query but NOT the parameterised one.
+  **Deepened (#1):** Python taint is now interprocedural within a file (handler → local
+  callees, bounded MAX_CALL_DEPTH=4, cycle-guarded, sink reported at the callee line,
+  deduped). Added JS/TS taint over req.query/params/body/cookies/headers → SQL/command/
+  code/SSRF/path + res.redirect open_redirect (CWE-601/A01). Real run caught command
+  injection inside a helper and JS SQLi + open redirect.
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -293,10 +298,11 @@ changelog.
 - SCA matches declared lockfile versions to OSV advisories; it does not yet resolve
   transitive ranges beyond what the lockfile pins, nor yarn.lock. OSV detail fetch is
   capped (MAX_DETAIL_FETCHES=150) and needs network (skipped/graceful otherwise).
-- Taint is intraprocedural (single function) and flow-insensitive: it does not follow
-  input across function calls, and it does not model sanitizers, so it can miss
-  cross-function flows and may over-report where a sanitizer exists. Python only (no
-  JS taint yet). Honest status reflects this (likely/suspicious, never confirmed).
+- Taint is now interprocedural **within a file** (Python) and flow-insensitive; it does
+  not follow taint across files/modules, through class attributes or return values, and
+  it does not model sanitizers (can over-report). JS taint is a file-scoped regex
+  heuristic (no JS AST), coarser than the Python analysis. Honest status reflects this
+  (likely/suspicious, never confirmed).
 - IDOR detection is heuristic/intraprocedural: ownership enforced via middleware, a
   base queryset, or a helper call is invisible, so it can over-report (low/medium
   confidence, suspicious). `.get()` on an ORM-like receiver (query/session/db/objects/
@@ -310,7 +316,9 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 86 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 97 passed + 1 skipped (PDF).
+  Deep-taint tests (test_taint_deep.py, 12): interprocedural one/two hops, constant-arg
+  safe, no duplicate across callers; JS SQLi/command/eval/SSRF/open-redirect/path, .ts.
   Misconfig tests (test_misconfig.py, 13): debug/CORS/JWT/CSRF/autoescape/ALLOWED_HOSTS/
   cookie detected, safe variants not flagged, scan+report integration.
   IDOR tests (test_access_control.py, 10): vuln FastAPI/Flask flagged, scoped query &
@@ -402,14 +410,13 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-06: Built batch #4 — security-misconfiguration detection
-(`app/analysis/misconfig.py`): debug mode, permissive CORS, disabled JWT verification/
-alg 'none', CSRF disabled, template autoescape off, wildcard ALLOWED_HOSTS, insecure
-cookies. Wired into scanner/CLI/report (status likely). Real run flagged all four
-planted misconfigs with correct severities. 86 static/report tests pass (+1 PDF skip).
-**The standalone static engine now covers OWASP Top 10 A01/A02/A03/A05/A06/A07/A08/A10**
-(A04 insecure-design = business-logic, partially via IDOR; A09 logging not yet).
-**Next unblocked:** deepen taint (cross-function, JS), more frameworks (Django/NestJS),
-A09 logging checks, or consolidate (dedupe/baseline/severity tuning, a `secureagent`
-entry point). Live web pipeline still needs Phases 4–5 (blocked);
+2026-10-06: Deepened taint (option #1). Python taint is now interprocedural within a
+file (handler → local callees, bounded + cycle-guarded, sink at the callee line,
+deduped). Added JS/TS taint over req.* sources (SQL, command, code, SSRF, path,
+open-redirect). Rewrote `app/analysis/taint.py` keeping the helpers access_control.py
+imports. 97 static/report tests pass (+1 PDF skip). Real run caught command injection
+inside a helper and JS SQLi/open-redirect.
+**Next unblocked:** more frameworks (Django/NestJS routes), cross-file/return-value
+taint, A09 logging checks, or consolidation (baseline/ignore file, `secureagent` entry
+point, GitHub Action). Live web pipeline still needs Phases 4–5 (blocked);
 `backend/app/schemas/target.py` untracked.
