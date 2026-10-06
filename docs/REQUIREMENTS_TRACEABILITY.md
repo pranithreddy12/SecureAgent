@@ -38,6 +38,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R31 | Code Intelligence: routes + authorization (Application Model core) | ADR-008 | backend/app/analysis/routes.py | Implemented + Tested (routes/authz); models/trust-boundaries pending |
 | R32 | Business-logic flaw detection (BOLA/IDOR, authz, workflow, client-trust, limits, state) | ADR-008 | routes.py (function-level authz done); rest planned | In Progress |
 | R33 | Hardcoded-secret detection (redacted) | ADR-008 | backend/app/analysis/secrets.py + app/cli.py | Implemented + Tested |
+| R39 | Security-misconfiguration detection (debug, CORS, JWT, CSRF, autoescape, hosts, cookies) | ADR-008 (OWASP A05) | backend/app/analysis/misconfig.py | Implemented + Tested |
 | R38 | IDOR / object-level authorization analysis | ADR-008 (OWASP A01, CWE-639) | backend/app/analysis/access_control.py | Implemented + Tested |
 | R37 | Taint analysis: injection/SSRF/path-traversal (input→sink) | ADR-008 (OWASP A03/A10/A01) | backend/app/analysis/taint.py | Implemented + Tested |
 | R36 | Dangerous-sink detection (deserialization, cmd/code exec, weak crypto, TLS, XXE, XSS sink) | ADR-008 (OWASP A02/A03/A05/A08) | backend/app/analysis/sinks.py | Implemented + Tested |

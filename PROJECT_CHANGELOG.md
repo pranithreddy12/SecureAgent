@@ -277,3 +277,20 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Heuristic/intraprocedural; ownership enforced out of view is invisible (honest
   low/medium confidence). Python only. Coverage now A01/A02/A03/A05/A06/A08/A10.
+
+## 2026-10-06 (Batch #4: security misconfiguration)
+
+### Added
+- `app/analysis/misconfig.py` — AST detection of debug mode (CWE-489), permissive CORS
+  (CWE-942), disabled JWT verification / alg 'none' (CWE-347), CSRF disabled (CWE-352),
+  template autoescape off (CWE-79), wildcard ALLOWED_HOSTS (CWE-16), insecure cookies
+  (CWE-614). Mostly OWASP A05.
+- Wired into scanner (`misconfig_findings`), CLI (text + JSON), report (status likely).
+
+### Tests
+- test_misconfig.py (13). Static + report suite: 86 passed, 1 skipped (PDF).
+- Real run flagged DEBUG=True, wildcard-CORS-with-credentials, jwt verify=False and
+  wildcard ALLOWED_HOSTS with correct severities.
+
+### Notes
+- Static engine now covers OWASP A01/A02/A03/A05/A06/A07/A08/A10. No new dependencies.

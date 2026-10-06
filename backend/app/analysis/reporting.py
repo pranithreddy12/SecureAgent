@@ -64,6 +64,24 @@ def _dependency_finding(f) -> ReportFinding:
     )
 
 
+def _misconfig_finding(f) -> ReportFinding:
+    return ReportFinding(
+        title=f.title,
+        type=f.category,
+        severity=Severity(f.severity),
+        confidence=f.confidence,
+        status=FindingStatus.LIKELY,  # the setting is present in the source
+        status_reason="Insecure configuration present in source.",
+        endpoint=f"{f.relpath}:{f.line}",
+        evidence=f"{f.rule} — {f.evidence}",
+        validation_method="static configuration analysis",
+        owasp_category=f.owasp,
+        cwe=f.cwe,
+        remediation=f.remediation,
+        sources=["static:misconfig"],
+    )
+
+
 def _idor_finding(f) -> ReportFinding:
     return ReportFinding(
         title=f.title,
@@ -177,6 +195,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
         who = "unknown"
 
     findings = [_secret_finding(f) for f in result.ordered_secrets]
+    findings += [_misconfig_finding(f) for f in result.ordered_misconfig_findings]
     findings += [_idor_finding(f) for f in result.ordered_idor_findings]
     findings += [_taint_finding(f) for f in result.ordered_taint_findings]
     findings += [_dependency_finding(f) for f in result.ordered_dependency_findings]
@@ -211,6 +230,7 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
             "Dangerous-sink detection (deserialization, injection, weak crypto, TLS)",
             "Taint analysis (untrusted input reaching injection/SSRF/path sinks)",
             "Object-level authorization (IDOR) analysis",
+            "Security misconfiguration detection (debug, CORS, JWT, CSRF, autoescape)",
             "Route and authorization extraction",
         ],
         technologies=sorted({d.ecosystem for d in result.dependencies}),
