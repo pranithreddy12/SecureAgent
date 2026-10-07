@@ -29,6 +29,16 @@ python -m app.cli scan /path/to/your/repo --report report.html    # professional
 python -m app.cli scan /path/to/your/repo --no-osv                # offline (skip OSV)
 ```
 
+Install it as a command and gate CI on **new** findings only:
+
+```bash
+pip install -e backend                 # provides the `secureagent` command
+secureagent scan . --write-baseline .secureagent-baseline.json   # accept today's findings
+secureagent scan . --baseline .secureagent-baseline.json --fail-on high   # fail on new high+
+```
+
+See [docs/ci/github-actions-example.yml](docs/ci/github-actions-example.yml) for a workflow.
+
 It only reads files — it never executes anything from the scanned project — never
 prints or stores a secret's full value (only a masked preview and a fingerprint), and
 exits non-zero when findings exist, so it can gate CI.

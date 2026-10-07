@@ -116,7 +116,7 @@ def _render_text(result: ScanResult, color: bool) -> str:
     return "\n".join(lines)
 
 
-def _render_json(result: ScanResult) -> str:
+def _render_json(result: ScanResult, items=None, baseline=None) -> str:
     payload = {
         "root": result.root,
         "stats": {
@@ -214,6 +214,28 @@ def _render_json(result: ScanResult) -> str:
             for f in result.ordered_route_findings
         ],
     }
+    if items is not None:
+        base = baseline or set()
+        payload["findings"] = [
+            {
+                "fingerprint": fp,
+                "type": f.type,
+                "severity": f.severity.value,
+                "status": f.status.value,
+                "cwe": f.cwe,
+                "cve": f.cve,
+                "owasp": f.owasp_category,
+                "location": f.endpoint,
+                "title": f.title,
+                "baselined": fp in base,
+            }
+            for fp, f in items
+        ]
+        payload["summary"] = {
+            "total": len(items),
+            "new": sum(1 for fp, _ in items if fp not in base),
+            "baselined": sum(1 for fp, _ in items if fp in base),
+        }
     return json.dumps(payload, indent=2)
 
 
@@ -261,6 +283,15 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument(
         "--no-osv", action="store_true", help="Skip the OSV known-vulnerability lookup (offline)."
     )
+    scan.add_argument("--baseline", help="Suppress findings listed in this baseline file.")
+    scan.add_argument(
+        "--write-baseline", help="Write all current findings to this baseline file and exit."
+    )
+    scan.add_argument(
+        "--fail-on",
+        choices=["critical", "high", "medium", "low"],
+        help="Exit non-zero only if a new finding at or above this severity remains.",
+    )
     scan.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
     args = parser.parse_args(argv)
 
@@ -270,8 +301,29 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
+    # Unified findings drive baselining, the JSON canonical list, and CI gating.
+    from app.analysis.baseline import fails_threshold, fingerprint, load_baseline, write_baseline
+    from app.analysis.reporting import scan_to_report_context
+
+    unified = scan_to_report_context(result).findings
+    items = [(fingerprint(f), f) for f in unified]
+
+    if args.write_baseline:
+        n = write_baseline(args.write_baseline, [fp for fp, _ in items])
+        print(f"Wrote baseline with {n} fingerprint(s) to {args.write_baseline}", file=sys.stderr)
+        return 0
+
+    baseline = load_baseline(args.baseline) if args.baseline else set()
+    new_items = [(fp, f) for fp, f in items if fp not in baseline]
+    suppressed = len(items) - len(new_items)
+
     color = (not args.no_color) and sys.stdout.isatty() and args.format == "text"
-    report = _render_json(result) if args.format == "json" else _render_text(result, color)
+    if args.format == "json":
+        report = _render_json(result, items, baseline)
+    else:
+        report = _render_text(result, color)
+        if args.baseline:
+            report += f"\nBaseline: {suppressed} suppressed, {len(new_items)} new."
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:
@@ -287,7 +339,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: could not render report: {exc}", file=sys.stderr)
             return 2
 
-    return 1 if result.total_findings else 0
+    gating = new_items if args.baseline else items
+    if args.fail_on:
+        failed = any(fails_threshold(f.severity.value, args.fail_on) for _, f in gating)
+    else:
+        failed = bool(gating)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

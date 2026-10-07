@@ -316,3 +316,24 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Python taint remains within-file and flow-insensitive; JS taint is a file-scoped
   regex heuristic. Honest status unchanged (likely/suspicious).
+
+## 2026-10-08 (CI adoption: baseline, fail-on, installable CLI)
+
+### Added
+- `app/analysis/baseline.py` — line-independent finding fingerprints; load/write
+  baseline; severity-threshold helper.
+- CLI `--write-baseline`, `--baseline` (gate on new findings only), `--fail-on
+  critical|high|medium|low`; JSON gains a unified `findings` list with fingerprints
+  and a `summary` (total/new/baselined).
+- Packaging: pyproject `[project]` + `[project.scripts] secureagent = app.cli:main`
+  (`pip install -e backend`), report templates shipped as package data.
+- `docs/ci/github-actions-example.yml`; README CI usage.
+
+### Tests
+- test_baseline.py (10). Full static + report suite: 110 passed, 1 skipped (PDF).
+- Verified end-to-end via the installed `secureagent` command: first scan exit 1 →
+  write-baseline → baselined scan exit 0 → new vuln with --fail-on high → exit 1.
+
+### Notes
+- Baseline affects CI gating and the JSON summary; the text/JSON detail still lists
+  all findings (transparency) with a suppressed count.

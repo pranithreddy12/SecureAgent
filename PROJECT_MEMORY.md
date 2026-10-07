@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-06 (taint deepened: interprocedural + JS; Phases 4–5 blocked)
+Last updated: 2026-10-08 (CI adoption: baseline + fail-on + installable CLI; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -134,6 +134,14 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   deduped). Added JS/TS taint over req.query/params/body/cookies/headers → SQL/command/
   code/SSRF/path + res.redirect open_redirect (CWE-601/A01). Real run caught command
   injection inside a helper and JS SQLi + open redirect.
+  **Consolidation for adoption:** `app/analysis/baseline.py` (line-independent finding
+  fingerprint; load/write baseline; severity threshold). CLI: `--write-baseline`,
+  `--baseline` (suppress accepted findings → gate on NEW only), `--fail-on
+  critical|high|medium|low`; JSON now has a unified `findings` list with fingerprints +
+  `summary`. Installable: pyproject `[project]` + `[project.scripts] secureagent=app.cli:main`
+  (`pip install -e backend`; deps jinja2+pydantic; report templates as package-data).
+  `docs/ci/github-actions-example.yml`. Verified end-to-end: first scan exit 1 →
+  write-baseline → baselined scan exit 0 → new vuln + --fail-on high → exit 1.
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -316,7 +324,9 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 97 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 110 passed + 1 skipped (PDF).
+  Baseline tests (test_baseline.py, 10): fingerprint stability across line moves,
+  baseline roundtrip, --write-baseline/--baseline/--fail-on exit codes, JSON summary.
   Deep-taint tests (test_taint_deep.py, 12): interprocedural one/two hops, constant-arg
   safe, no duplicate across callers; JS SQLi/command/eval/SSRF/open-redirect/path, .ts.
   Misconfig tests (test_misconfig.py, 13): debug/CORS/JWT/CSRF/autoescape/ALLOWED_HOSTS/
@@ -410,13 +420,14 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-06: Deepened taint (option #1). Python taint is now interprocedural within a
-file (handler → local callees, bounded + cycle-guarded, sink at the callee line,
-deduped). Added JS/TS taint over req.* sources (SQL, command, code, SSRF, path,
-open-redirect). Rewrote `app/analysis/taint.py` keeping the helpers access_control.py
-imports. 97 static/report tests pass (+1 PDF skip). Real run caught command injection
-inside a helper and JS SQLi/open-redirect.
-**Next unblocked:** more frameworks (Django/NestJS routes), cross-file/return-value
-taint, A09 logging checks, or consolidation (baseline/ignore file, `secureagent` entry
-point, GitHub Action). Live web pipeline still needs Phases 4–5 (blocked);
-`backend/app/schemas/target.py` untracked.
+2026-10-08: Consolidated the static engine for real CI adoption. Added a baseline
+(`app/analysis/baseline.py`) with line-independent fingerprints so a team accepts
+today's findings and the build fails only on NEW ones; `--baseline`, `--write-baseline`
+and `--fail-on <severity>` CLI flags; a unified JSON findings list with fingerprints
+and a summary. Made it pip-installable as the `secureagent` command (pyproject
+[project]/[scripts]); added a GitHub Actions example. Verified the full gate workflow
+end-to-end. 110 static/report tests pass (+1 PDF skip); 27 DB tests error only because
+the test Postgres container was down (environment, not code).
+**Next unblocked:** more frameworks (Django/NestJS), A09 logging checks, cross-file
+taint, or SARIF output for GitHub code-scanning. Live web pipeline still needs
+Phases 4–5 (blocked); `backend/app/schemas/target.py` untracked.

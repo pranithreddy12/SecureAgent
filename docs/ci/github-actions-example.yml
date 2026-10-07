@@ -1,0 +1,40 @@
+# Example GitHub Actions workflow for SecureAgent's static scanner.
+# Copy to .github/workflows/secureagent.yml in your project and adjust paths.
+#
+# It fails the build only on NEW high/critical findings: commit a baseline once
+# (`secureagent scan . --write-baseline .secureagent-baseline.json`) so existing
+# findings do not block, then every PR is gated on newly introduced issues.
+
+name: SecureAgent
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install SecureAgent
+        run: pip install git+https://github.com/pranithreddy12/SecureAgent.git#subdirectory=backend
+
+      - name: Run static security scan
+        run: >
+          secureagent scan .
+          --baseline .secureagent-baseline.json
+          --fail-on high
+          --format json --output secureagent-findings.json
+
+      - name: Upload findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: secureagent-findings
+          path: secureagent-findings.json

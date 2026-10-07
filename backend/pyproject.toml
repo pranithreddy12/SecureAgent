@@ -1,3 +1,23 @@
+[project]
+name = "secureagent"
+version = "0.1.0"
+description = "Static application-security scanner (SecureAgent)"
+requires-python = ">=3.12"
+dependencies = ["jinja2>=3.1", "pydantic>=2"]
+
+[project.scripts]
+secureagent = "app.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.reports" = ["templates/*.html"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

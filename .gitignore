@@ -30,3 +30,8 @@ reports/*
 Thumbs.db
 .vscode/
 .idea/
+
+# python packaging
+*.egg-info/
+build/
+dist/
