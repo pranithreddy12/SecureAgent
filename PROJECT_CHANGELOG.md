@@ -381,3 +381,23 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Static engine now covers OWASP A01–A03 and A05–A10 (A04 partial). No new deps.
+
+## 2026-10-08 (Cross-file taint)
+
+### Added
+- `taint.analyze_taint_project(sources)` — project-wide taint: intra + within-file per
+  file plus cross-file flow from handlers into helper functions in other modules,
+  resolved via imports (from-import / import + attribute base; unique-name fallback;
+  collisions resolved by the caller's import). Sinks reported at the callee file/line.
+
+### Changed
+- `scanner.scan_repo` collects py/js sources and runs taint once over the project
+  (replaces the per-file `analyze_taint` call). `analyze_taint` (single file) retained.
+
+### Tests
+- test_taint_crossfile.py (6). Static + report suite: 143 passed, 1 skipped (PDF).
+- Real run: input in views.py reaches a sink in db_utils.py (SQLi, reported there).
+
+### Notes
+- Cross-file resolution is heuristic (import hint / unique name); ambiguous names with
+  no hint are skipped. Whole-project source held in memory during the taint pass.

@@ -14,7 +14,7 @@ from app.analysis.osv import OsvClient, OsvError, Vuln
 from app.analysis.routes import Route, RouteFinding, extract_routes, route_findings
 from app.analysis.secrets import SecretFinding
 from app.analysis.sinks import SinkFinding, scan_sinks
-from app.analysis.taint import TaintFinding, analyze_taint
+from app.analysis.taint import JS_EXTENSIONS, TaintFinding, analyze_taint_project
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4, "informational": 5}
 
@@ -159,6 +159,7 @@ def scan_repo(
     if max_files is not None:
         kwargs["max_files"] = max_files
 
+    taint_sources: list[tuple[str, str]] = []
     file: SourceFile
     for file in iter_source_files(root, **kwargs):
         try:
@@ -168,13 +169,16 @@ def scan_repo(
         result.secret_findings.extend(secrets.scan_text(file.relpath, text))
         result.routes.extend(extract_routes(file.relpath, text))
         result.sink_findings.extend(scan_sinks(file.relpath, text))
-        result.taint_findings.extend(analyze_taint(file.relpath, text))
         result.idor_findings.extend(analyze_access_control(file.relpath, text))
         result.misconfig_findings.extend(scan_misconfig(file.relpath, text))
         result.logging_findings.extend(scan_logging(file.relpath, text))
+        if file.relpath.endswith((".py", *JS_EXTENSIONS)):
+            taint_sources.append((file.relpath, text))
         if is_lockfile(file.relpath):
             result.dependencies.extend(parse_dependencies(file.relpath, text))
 
+    # Taint runs once over the whole project so flow can cross files.
+    result.taint_findings = analyze_taint_project(taint_sources)
     result.route_findings = route_findings(result.routes)
     _dedupe_sinks_superseded_by_taint(result)
 

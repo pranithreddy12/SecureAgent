@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-08 (A09 logging checks; OWASP Top-10 static coverage ~complete; Phases 4–5 blocked)
+Last updated: 2026-10-08 (cross-file taint; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -328,11 +328,13 @@ changelog.
 - SCA matches declared lockfile versions to OSV advisories; it does not yet resolve
   transitive ranges beyond what the lockfile pins, nor yarn.lock. OSV detail fetch is
   capped (MAX_DETAIL_FETCHES=150) and needs network (skipped/graceful otherwise).
-- Taint is now interprocedural **within a file** (Python) and flow-insensitive; it does
-  not follow taint across files/modules, through class attributes or return values, and
-  it does not model sanitizers (can over-report). JS taint is a file-scoped regex
-  heuristic (no JS AST), coarser than the Python analysis. Honest status reflects this
-  (likely/suspicious, never confirmed).
+- Taint (Python) is interprocedural **within and across files** (import-resolved call
+  graph, bounded depth) and flow-insensitive; it does not follow taint through class
+  attributes or return values, resolves cross-file callees heuristically (import hint /
+  unique name; ambiguous names without a hint are skipped), and does not model
+  sanitizers (can over-report). The whole project's py/js source is held in memory for
+  the taint pass (fine for typical repos). JS taint is a file-scoped regex heuristic.
+  Honest status reflects this (likely/suspicious, never confirmed).
 - IDOR detection is heuristic/intraprocedural: ownership enforced via middleware, a
   base queryset, or a helper call is invisible, so it can over-report (low/medium
   confidence, suspicious). `.get()` on an ORM-like receiver (query/session/db/objects/
@@ -346,7 +348,10 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 134 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 143 passed + 1 skipped (PDF).
+  Cross-file tests (test_taint_crossfile.py, 6): cross-file SQLi reported at the sink
+  file, parameterised-safe, name-collision resolved by import, constant-arg safe,
+  scan_repo integration, within-file preserved.
   A09 logging tests (test_logging.py, 8): sensitive-in-log variants, non-sensitive &
   non-logger not flagged, swallowed vs handled except, scan+report.
   Framework tests (test_frameworks.py, 15): DRF function views + permission_classes/
@@ -449,12 +454,12 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-08: Added A09 (Security Logging & Monitoring Failures) checks
-(`app/analysis/logging_checks.py`): sensitive data in logs (CWE-532) and swallowed
-exceptions (CWE-778). Wired into scanner/CLI/report. 134 static/report tests pass
-(+1 PDF skip). **The static engine now covers OWASP Top 10 A01–A03, A05–A10** (A04
-insecure-design partially via IDOR + the business-logic design in ADR-008). Real run
-flagged a logged password and a swallowed exception.
-**Next unblocked:** cross-file taint, Django settings misconfig + class-based IDOR, a
-demo fixtures pack, or deeper reporting (severity tuning). Live web pipeline still
-needs Phases 4–5 (blocked); `backend/app/schemas/target.py` untracked.
+2026-10-08: Added cross-file (project-wide) taint. `taint.analyze_taint_project` builds
+a project function map + per-file imports and follows taint from handlers into helper
+functions in other modules (resolved via imports), reporting sinks at the callee file.
+`scanner.scan_repo` now runs taint once over all py/js sources. 143 static/report tests
+pass (+1 PDF skip; 27 DB errors only because the test Postgres container was down). Real
+run: SQLi where input in views.py reaches a sink in db_utils.py.
+**Next unblocked:** Django settings misconfig + class-based IDOR, return-value taint, a
+demo fixtures pack, or report polish. Live web pipeline still needs Phases 4–5 (blocked);
+`backend/app/schemas/target.py` untracked.

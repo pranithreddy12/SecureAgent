@@ -114,6 +114,109 @@ def analyze_taint(relpath: str, text: str) -> list[TaintFinding]:
     return []
 
 
+def analyze_taint_project(sources: list[tuple[str, str]]) -> list[TaintFinding]:
+    """Project-wide taint: intra/within-file per file plus cross-file flow from a handler
+    into helper functions defined in other imported modules."""
+    parsed: list[tuple[str, ast.AST, list[str], dict[str, ast.AST], dict[str, str]]] = []
+    gfuncs: dict[str, list[tuple[ast.AST, str, list[str]]]] = {}
+    imports_by_file: dict[str, dict[str, str]] = {}
+    findings: list[TaintFinding] = []
+
+    for relpath, text in sources:
+        if relpath.endswith(JS_EXTENSIONS):
+            findings += _js_taint(relpath, text)
+            continue
+        if not relpath.endswith(".py"):
+            continue
+        try:
+            tree = ast.parse(text)
+        except (SyntaxError, ValueError):
+            continue
+        lines = text.splitlines()
+        funcs = {
+            n.name: n
+            for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        imports = _collect_imports(tree)
+        parsed.append((relpath, tree, lines, funcs, imports))
+        imports_by_file[relpath] = imports
+        for name, node in funcs.items():
+            gfuncs.setdefault(name, []).append((node, relpath, lines))
+        findings += _python_taint_tree(tree, relpath, lines, funcs)  # intra + within-file
+
+    # Cross-file: from each handler, follow calls that resolve to other modules.
+    for relpath, _tree, _lines, funcs, _imports in parsed:
+        for func in funcs.values():
+            if _is_handler(func):
+                tainted = _function_tainted(func, _handler_param_taint(func))
+                findings += _propagate_cross(
+                    func, relpath, tainted, gfuncs, imports_by_file, 0, set()
+                )
+
+    unique: dict[tuple, TaintFinding] = {}
+    for f in findings:
+        unique[(f.relpath, f.line, f.vuln_type, f.sink)] = f
+    return list(unique.values())
+
+
+def _resolve_callee(call, caller_imports, gfuncs):
+    name = _dotted(call.func) or ""
+    simple = name.rsplit(".", 1)[-1]
+    base = name.rsplit(".", 1)[0] if "." in name else None
+    candidates = gfuncs.get(simple, [])
+    if not candidates:
+        return None
+    hint = base or caller_imports.get(simple)
+    if hint:
+        want = hint.rsplit(".", 1)[-1]
+        for node, rel, lines in candidates:
+            stem = rel.rsplit("/", 1)[-1].removesuffix(".py")
+            if stem == want:
+                return node, rel, lines
+    if len(candidates) == 1:
+        return candidates[0]
+    return None  # ambiguous name with no import hint: stay conservative
+
+
+def _propagate_cross(func, relpath, tainted, gfuncs, imports_by_file, depth, visited):
+    if depth >= MAX_CALL_DEPTH:
+        return []
+    caller_imports = imports_by_file.get(relpath, {})
+    out: list[TaintFinding] = []
+    for call in ast.walk(func):
+        if not isinstance(call, ast.Call):
+            continue
+        resolved = _resolve_callee(call, caller_imports, gfuncs)
+        if resolved is None:
+            continue
+        callee, crel, clines = resolved
+        passed = _tainted_params_for_call(call, tainted, callee)
+        if not passed:
+            continue
+        key = (crel, getattr(callee, "name", ""), frozenset(passed))
+        if key in visited:
+            continue
+        visited.add(key)
+        ctaint = _function_tainted(callee, passed)
+        out += _sinks_in_function(callee, ctaint, crel, clines)
+        out += _propagate_cross(callee, crel, ctaint, gfuncs, imports_by_file, depth + 1, visited)
+    return out
+
+
+def _collect_imports(tree) -> dict[str, str]:
+    """local name -> module string (for `from mod import name` and `import mod [as x]`)."""
+    imports: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                imports[a.asname or a.name.split(".")[0]] = a.name
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for a in node.names:
+                imports[a.asname or a.name] = node.module
+    return imports
+
+
 # --------------------------------------------------------------------------- Python
 
 
@@ -123,28 +226,28 @@ def _python_taint(relpath: str, text: str) -> list[TaintFinding]:
     except (SyntaxError, ValueError):
         return []
     lines = text.splitlines()
-    functions: dict[str, ast.AST] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            functions[node.name] = node
-
-    findings: list[TaintFinding] = []
-    # Intraprocedural: every function; handlers seed their params as sources.
-    for func in functions.values():
-        init = _handler_param_taint(func) if _is_handler(func) else set()
-        tainted = _function_tainted(func, init)
-        findings += _sinks_in_function(func, tainted, relpath, lines)
-    # Interprocedural: follow taint from each handler into local callees.
-    for func in functions.values():
-        if _is_handler(func):
-            tainted = _function_tainted(func, _handler_param_taint(func))
-            findings += _propagate(func, tainted, functions, relpath, lines, 0, set())
-
-    # Deduplicate (a helper reachable from several handlers, or intra+inter overlap).
+    functions = {
+        n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    findings = _python_taint_tree(tree, relpath, lines, functions)
     unique: dict[tuple, TaintFinding] = {}
     for f in findings:
         unique[(f.relpath, f.line, f.vuln_type, f.sink)] = f
     return list(unique.values())
+
+
+def _python_taint_tree(tree, relpath: str, lines: list[str], functions: dict) -> list[TaintFinding]:
+    """Intra + within-file interprocedural taint for one parsed module."""
+    findings: list[TaintFinding] = []
+    for func in functions.values():
+        init = _handler_param_taint(func) if _is_handler(func) else set()
+        tainted = _function_tainted(func, init)
+        findings += _sinks_in_function(func, tainted, relpath, lines)
+    for func in functions.values():
+        if _is_handler(func):
+            tainted = _function_tainted(func, _handler_param_taint(func))
+            findings += _propagate(func, tainted, functions, relpath, lines, 0, set())
+    return findings
 
 
 def _propagate(func, tainted, functions, relpath, lines, depth, visited) -> list[TaintFinding]:
