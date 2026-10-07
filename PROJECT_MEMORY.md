@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-08 (SARIF output for GitHub code scanning; Phases 4–5 blocked)
+Last updated: 2026-10-08 (UML diagrams + docs matching real code; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -149,6 +149,11 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   dep findings default to line 1. GH Action example updated to upload-sarif +
   fail-on-high gate. Verified real SARIF (version 2.1.0, rules, result level/severity/
   location).
+  **Academic docs:** 7 Mermaid UML diagrams in `docs/diagrams/` (use case, class,
+  activity, sequence, system architecture, agent workflow, DB ER) — validated as
+  parsing via in-browser mermaid; implemented vs designed clearly separated
+  (agent/LangGraph pipeline marked not-implemented). `docs/static-analysis.md` documents
+  the implemented engine (detectors, pipeline, OWASP coverage, limits).
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -265,7 +270,8 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
 | Static engine (secrets + deps/OSV + sinks + taint + IDOR + misconfig + routes/authz + report) | ✅ Done 2026-10-06 (standalone CLI + HTML/PDF) |
 | 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
-| 15–20 | Not started |
+| 20 Documentation (UML + static-analysis docs) | 🟡 Diagrams + engine docs done (match code) |
+| 15–19 | Not started |
 
 ## 14. Architecture Decisions
 
