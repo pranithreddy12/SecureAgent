@@ -74,6 +74,12 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
 
+    if result.ordered_logging_findings:
+        lines.append("\nLogging & monitoring:")
+        for f in result.ordered_logging_findings:
+            lines.append(f"  {_tag(f.severity, color)} {f.rule}")
+            lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
+
     if result.ordered_idor_findings:
         lines.append("\nBroken object-level authorization (possible IDOR):")
         for f in result.ordered_idor_findings:
@@ -143,6 +149,19 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
                 "evidence": f.evidence,
             }
             for f in result.ordered_misconfig_findings
+        ],
+        "logging_findings": [
+            {
+                "category": f.category,
+                "rule": f.rule,
+                "severity": f.severity,
+                "confidence": f.confidence,
+                "relpath": f.relpath,
+                "line": f.line,
+                "cwe": f.cwe,
+                "owasp": f.owasp,
+            }
+            for f in result.ordered_logging_findings
         ],
         "idor_findings": [
             {

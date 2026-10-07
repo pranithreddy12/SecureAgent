@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-08 (frameworks: Django + NestJS routes/authz; Phases 4–5 blocked)
+Last updated: 2026-10-08 (A09 logging checks; OWASP Top-10 static coverage ~complete; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -162,6 +162,7 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   `@Public()` override). `_is_handler` now also recognises `@api_view`, so taint + IDOR
   cover DRF function views (URL kwargs tainted). Real run flagged a DRF IDOR
   (Account.objects.get(pk=pk)) and NestJS/Django unprotected endpoints.
+  **A09 logging & monitoring:** `app/analysis/logging_checks.py` flags CWE-532/CWE-778.
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -345,7 +346,9 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 126 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 134 passed + 1 skipped (PDF).
+  A09 logging tests (test_logging.py, 8): sensitive-in-log variants, non-sensitive &
+  non-logger not flagged, swallowed vs handled except, scan+report.
   Framework tests (test_frameworks.py, 15): DRF function views + permission_classes/
   AllowAny, CBV methods + mixins/permission_classes, DRF taint via URL kwarg, NestJS
   method/class guard/@Public/prefix joining.
@@ -446,12 +449,12 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-08: Added Django and NestJS support to route/authorization extraction
-(`app/analysis/routes.py`): DRF `@api_view` function views, Django class-based views
-(permission_classes / mixins / DRF action→method), and NestJS controllers
-(`@Controller`+`@Get/@Post`, `@UseGuards`, `@Public`). Extended `_is_handler` so taint
-and IDOR also cover DRF function views (URL kwargs tainted). 126 static/report tests
-pass (+1 PDF skip). Real run flagged a DRF IDOR and NestJS/Django unprotected endpoints.
-**Next unblocked:** A09 logging checks, cross-file taint, Django settings misconfig,
-or a demo fixtures pack. Live web pipeline still needs Phases 4–5 (blocked);
-`backend/app/schemas/target.py` untracked.
+2026-10-08: Added A09 (Security Logging & Monitoring Failures) checks
+(`app/analysis/logging_checks.py`): sensitive data in logs (CWE-532) and swallowed
+exceptions (CWE-778). Wired into scanner/CLI/report. 134 static/report tests pass
+(+1 PDF skip). **The static engine now covers OWASP Top 10 A01–A03, A05–A10** (A04
+insecure-design partially via IDOR + the business-logic design in ADR-008). Real run
+flagged a logged password and a swallowed exception.
+**Next unblocked:** cross-file taint, Django settings misconfig + class-based IDOR, a
+demo fixtures pack, or deeper reporting (severity tuning). Live web pipeline still
+needs Phases 4–5 (blocked); `backend/app/schemas/target.py` untracked.

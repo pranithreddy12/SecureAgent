@@ -39,6 +39,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R32 | Business-logic flaw detection (BOLA/IDOR, authz, workflow, client-trust, limits, state) | ADR-008 | routes.py (function-level authz done); rest planned | In Progress |
 | R33 | Hardcoded-secret detection (redacted) | ADR-008 | backend/app/analysis/secrets.py + app/cli.py | Implemented + Tested |
 | R41 | SARIF 2.1.0 output for GitHub code scanning | project (integration) | backend/app/analysis/sarif.py | Implemented + Tested |
+| R42 | Logging & monitoring checks (A09: sensitive data in logs, swallowed exceptions) | OWASP A09 | backend/app/analysis/logging_checks.py | Implemented + Tested |
 | R40 | CI adoption: baseline, --fail-on, installable `secureagent` CLI, GitHub Action | project (usability) | backend/app/analysis/baseline.py, app/cli.py, pyproject.toml, docs/ci/ | Implemented + Tested |
 | R39 | Security-misconfiguration detection (debug, CORS, JWT, CSRF, autoescape, hosts, cookies) | ADR-008 (OWASP A05) | backend/app/analysis/misconfig.py | Implemented + Tested |
 | R38 | IDOR / object-level authorization analysis | ADR-008 (OWASP A01, CWE-639) | backend/app/analysis/access_control.py | Implemented + Tested |

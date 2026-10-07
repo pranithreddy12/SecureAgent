@@ -367,3 +367,17 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Django class-based-view IDOR and Django settings misconfiguration remain future work.
+
+## 2026-10-08 (A09: Security Logging & Monitoring Failures)
+
+### Added
+- `app/analysis/logging_checks.py` — sensitive data in logs (CWE-532) and swallowed
+  exceptions (`except: pass`/`...`, CWE-778). Wired into scanner (`logging_findings`),
+  CLI (text + JSON), and the report (status likely).
+
+### Tests
+- test_logging.py (8). Full static + report suite: 134 passed, 1 skipped (PDF).
+- Real run flagged a logged password and a swallowed exception.
+
+### Notes
+- Static engine now covers OWASP A01–A03 and A05–A10 (A04 partial). No new deps.

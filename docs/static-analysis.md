@@ -38,6 +38,7 @@ Exit codes: `0` clean / gate passed, `1` findings (or new findings ≥ `--fail-o
 | `taint.py` | **Injection via data flow** (SQLi, command, code, SSRF, path traversal, open redirect) — interprocedural within a file (Python) + JS/TS heuristic | A03/A10/A01 |
 | `access_control.py` | IDOR / missing object-level authorization | CWE-639 / A01 |
 | `misconfig.py` | Debug on, permissive CORS, disabled JWT verification, CSRF off, autoescape off, wildcard hosts, insecure cookies | A05/A07 |
+| `logging_checks.py` | Sensitive data in logs (CWE-532), swallowed exceptions (CWE-778) | A09 |
 | `routes.py` | HTTP routes + endpoints lacking a visible authorization guard | CWE-862 / A01 |
 
 Orchestration: `scanner.py` (`scan_repo` → `ScanResult`); `reporting.py`
@@ -56,7 +57,7 @@ gating); `sarif.py` (SARIF 2.1.0); `app/reports/renderer.py` (HTML/PDF).
 | A06 Vulnerable Components | ✅ OSV |
 | A07 Identification & Auth Failures | ✅ JWT verification |
 | A08 Software & Data Integrity | ✅ insecure deserialization |
-| A09 Logging & Monitoring Failures | ✗ not yet |
+| A09 Logging & Monitoring Failures | ✅ sensitive data in logs, swallowed exceptions |
 | A10 SSRF | ✅ data-flow taint |
 
 ## Honesty model
