@@ -273,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     scan = sub.add_parser("scan", help="Static scan of a source tree.")
     scan.add_argument("path", help="Directory to scan (you must be authorized to analyse it).")
-    scan.add_argument("--format", choices=["text", "json"], default="text")
+    scan.add_argument("--format", choices=["text", "json", "sarif"], default="text")
     scan.add_argument("--output", help="Write the text/JSON result to this file instead of stdout.")
     scan.add_argument("--report", help="Write a professional HTML report to this path.")
     scan.add_argument("--pdf", help="Write a PDF report to this path (needs WeasyPrint libs).")
@@ -318,7 +318,11 @@ def main(argv: list[str] | None = None) -> int:
     suppressed = len(items) - len(new_items)
 
     color = (not args.no_color) and sys.stdout.isatty() and args.format == "text"
-    if args.format == "json":
+    if args.format == "sarif":
+        from app.analysis.sarif import to_sarif
+
+        report = json.dumps(to_sarif([f for _, f in items]), indent=2)
+    elif args.format == "json":
         report = _render_json(result, items, baseline)
     else:
         report = _render_text(result, color)

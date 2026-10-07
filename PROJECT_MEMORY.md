@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-08 (CI adoption: baseline + fail-on + installable CLI; Phases 4–5 blocked)
+Last updated: 2026-10-08 (SARIF output for GitHub code scanning; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -142,6 +142,13 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   (`pip install -e backend`; deps jinja2+pydantic; report templates as package-data).
   `docs/ci/github-actions-example.yml`. Verified end-to-end: first scan exit 1 →
   write-baseline → baselined scan exit 0 → new vuln + --fail-on high → exit 1.
+  **SARIF output:** `app/analysis/sarif.py` emits SARIF 2.1.0 (`--format sarif`) for
+  GitHub code scanning — one rule per finding type, result level (critical/high→error,
+  medium→warning, low/info→note) + `security-severity` property (9.5/8.0/5.5/3.0/1.0),
+  partialFingerprints (our stable fingerprint), CWE helpUri, posix-normalised paths,
+  dep findings default to line 1. GH Action example updated to upload-sarif +
+  fail-on-high gate. Verified real SARIF (version 2.1.0, rules, result level/severity/
+  location).
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -324,7 +331,9 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 110 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 114 passed + 1 skipped (PDF).
+  SARIF tests (test_sarif.py, 8): skeleton, result fields/location, level mapping,
+  Windows path normalisation, CWE helpUri, one-rule-per-type, CLI sarif output.
   Baseline tests (test_baseline.py, 10): fingerprint stability across line moves,
   baseline roundtrip, --write-baseline/--baseline/--fail-on exit codes, JSON summary.
   Deep-taint tests (test_taint_deep.py, 12): interprocedural one/two hops, constant-arg
@@ -420,14 +429,11 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-08: Consolidated the static engine for real CI adoption. Added a baseline
-(`app/analysis/baseline.py`) with line-independent fingerprints so a team accepts
-today's findings and the build fails only on NEW ones; `--baseline`, `--write-baseline`
-and `--fail-on <severity>` CLI flags; a unified JSON findings list with fingerprints
-and a summary. Made it pip-installable as the `secureagent` command (pyproject
-[project]/[scripts]); added a GitHub Actions example. Verified the full gate workflow
-end-to-end. 110 static/report tests pass (+1 PDF skip); 27 DB tests error only because
-the test Postgres container was down (environment, not code).
+2026-10-08: Added SARIF 2.1.0 output (`app/analysis/sarif.py`, `--format sarif`) so
+findings appear natively in GitHub's Security tab via upload-sarif. One rule per type,
+severity→level + security-severity, stable partialFingerprints, CWE helpUri. Updated
+the GitHub Action example to upload SARIF and gate on new high/critical. 114 static/
+report tests pass (+1 PDF skip). Verified real SARIF output.
 **Next unblocked:** more frameworks (Django/NestJS), A09 logging checks, cross-file
-taint, or SARIF output for GitHub code-scanning. Live web pipeline still needs
-Phases 4–5 (blocked); `backend/app/schemas/target.py` untracked.
+taint. Live web pipeline still needs Phases 4–5 (blocked);
+`backend/app/schemas/target.py` untracked.

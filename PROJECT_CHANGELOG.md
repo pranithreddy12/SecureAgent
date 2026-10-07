@@ -337,3 +337,16 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Baseline affects CI gating and the JSON summary; the text/JSON detail still lists
   all findings (transparency) with a suppressed count.
+
+## 2026-10-08 (SARIF output for GitHub code scanning)
+
+### Added
+- `app/analysis/sarif.py` — SARIF 2.1.0 conversion; `secureagent scan --format sarif`.
+  One rule per finding type; result level from severity; `security-severity` property;
+  `partialFingerprints` (stable fingerprint); CWE `helpUri`; posix paths.
+- GitHub Action example updated to upload SARIF (github/codeql-action/upload-sarif)
+  and gate on new high/critical findings; README SARIF usage.
+
+### Tests
+- test_sarif.py (8). Full static + report suite: 114 passed, 1 skipped (PDF).
+- Verified real SARIF (version 2.1.0, rules, result level/severity/location).

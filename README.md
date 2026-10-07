@@ -35,6 +35,7 @@ Install it as a command and gate CI on **new** findings only:
 pip install -e backend                 # provides the `secureagent` command
 secureagent scan . --write-baseline .secureagent-baseline.json   # accept today's findings
 secureagent scan . --baseline .secureagent-baseline.json --fail-on high   # fail on new high+
+secureagent scan . --format sarif --output secureagent.sarif             # GitHub code scanning
 ```
 
 See [docs/ci/github-actions-example.yml](docs/ci/github-actions-example.yml) for a workflow.

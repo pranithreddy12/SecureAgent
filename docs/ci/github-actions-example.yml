@@ -25,16 +25,19 @@ jobs:
       - name: Install SecureAgent
         run: pip install git+https://github.com/pranithreddy12/SecureAgent.git#subdirectory=backend
 
-      - name: Run static security scan
+      # SARIF for the GitHub Security tab (code scanning). Does not fail the build.
+      - name: Static security scan (SARIF)
+        run: secureagent scan . --format sarif --output secureagent.sarif || true
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: secureagent.sarif
+
+      # Gate the build on NEW high/critical findings only (commit the baseline first).
+      - name: Fail on new high/critical findings
         run: >
           secureagent scan .
           --baseline .secureagent-baseline.json
           --fail-on high
-          --format json --output secureagent-findings.json
-
-      - name: Upload findings
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: secureagent-findings
-          path: secureagent-findings.json
