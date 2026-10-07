@@ -101,24 +101,26 @@ def _python_routes(relpath: str, text: str) -> list[Route]:
         return []
     routes: list[Route] = []
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        guard = _python_handler_guard(node)
-        for dec in node.decorator_list:
-            for method, path, dec_guard in _python_route_decorator(dec):
-                g = guard or dec_guard
-                routes.append(
-                    Route(
-                        method=method,
-                        path=path,
-                        framework="python",
-                        relpath=relpath,
-                        line=node.lineno,
-                        handler=node.name,
-                        protected=g is not None,
-                        guard=g,
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            guard = _python_handler_guard(node)
+            for dec in node.decorator_list:
+                for method, path, dec_guard in _python_route_decorator(dec):
+                    g = guard or dec_guard
+                    routes.append(
+                        Route(
+                            method,
+                            path,
+                            "python",
+                            relpath,
+                            node.lineno,
+                            node.name,
+                            g is not None,
+                            g,
+                        )
                     )
-                )
+            routes.extend(_drf_function_routes(node, relpath))
+        elif isinstance(node, ast.ClassDef):
+            routes.extend(_django_cbv_routes(node, relpath))
     return routes
 
 
@@ -142,6 +144,122 @@ def _python_route_decorator(dec: ast.expr):
             yield m.upper(), path, dec_guard
     else:
         yield attr.upper(), path, dec_guard
+
+
+# --------------------------------------------------------------------------- Django
+
+# Django/DRF class-based view bases and the method names that handle requests.
+_CBV_BASE_HINTS = ("APIView", "ViewSet", "GenericAPIView", "View", "ListView", "DetailView")
+_CBV_METHOD_MAP = {
+    "get": "GET",
+    "post": "POST",
+    "put": "PUT",
+    "patch": "PATCH",
+    "delete": "DELETE",
+    "head": "HEAD",
+    "options": "OPTIONS",
+    # DRF ViewSet actions:
+    "list": "GET",
+    "create": "POST",
+    "retrieve": "GET",
+    "update": "PUT",
+    "partial_update": "PATCH",
+    "destroy": "DELETE",
+}
+_AUTH_DECORATOR = re.compile(r"(?i)(login_required|permission_required|user_passes_test)")
+
+
+def _str_list(node: ast.expr | None) -> list[str]:
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return [
+            e.value for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)
+        ]
+    return []
+
+
+def _drf_function_routes(func, relpath: str):
+    """DRF function views: @api_view(['POST', ...]) with optional permission decorators."""
+    routes: list[Route] = []
+    for dec in func.decorator_list:
+        if not (isinstance(dec, ast.Call) and (_dotted_name(dec.func) or "").endswith("api_view")):
+            continue
+        methods = _str_list(dec.args[0]) if dec.args else ["GET"]
+        guard = _drf_function_guard(func)
+        for m in methods:
+            routes.append(
+                Route(
+                    m.upper(),
+                    f"/{func.name}",
+                    "django",
+                    relpath,
+                    func.lineno,
+                    func.name,
+                    guard is not None,
+                    guard,
+                )
+            )
+    return routes
+
+
+def _drf_function_guard(func) -> str | None:
+    for dec in func.decorator_list:
+        name = _dotted_name(dec.func if isinstance(dec, ast.Call) else dec) or ""
+        if _AUTH_DECORATOR.search(name):
+            return name
+        if isinstance(dec, ast.Call) and name.endswith(
+            ("permission_classes", "authentication_classes")
+        ):
+            classes = _str_cls_names(dec.args[0]) if dec.args else []
+            if classes and not all(c.endswith("AllowAny") for c in classes):
+                return name
+    return None
+
+
+def _django_cbv_routes(cls: ast.ClassDef, relpath: str):
+    bases = [_dotted_name(b) or "" for b in cls.bases]
+    if not any(b.endswith(_CBV_BASE_HINTS) for b in bases):
+        return []
+    protected, guard = _cbv_protection(cls, bases)
+    routes: list[Route] = []
+    for item in cls.body:
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            method = _CBV_METHOD_MAP.get(item.name.lower())
+            if method:
+                routes.append(
+                    Route(
+                        method,
+                        f"/{cls.name}/{item.name}",
+                        "django",
+                        relpath,
+                        item.lineno,
+                        f"{cls.name}.{item.name}",
+                        protected,
+                        guard,
+                    )
+                )
+    return routes
+
+
+def _cbv_protection(cls: ast.ClassDef, bases: list[str]) -> tuple[bool, str | None]:
+    if any(b.endswith(("LoginRequiredMixin", "PermissionRequiredMixin")) for b in bases):
+        return True, "LoginRequiredMixin"
+    for item in cls.body:
+        if isinstance(item, ast.Assign):
+            for t in item.targets:
+                if isinstance(t, ast.Name) and t.id in {
+                    "permission_classes",
+                    "authentication_classes",
+                }:
+                    classes = _str_cls_names(item.value)
+                    if classes and not all(c.endswith("AllowAny") for c in classes):
+                        return True, t.id
+    return False, None
+
+
+def _str_cls_names(node: ast.expr | None) -> list[str]:
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return [n for e in node.elts if (n := _dotted_name(e))]
+    return []
 
 
 def _flask_methods(dec: ast.Call) -> list[str]:
@@ -231,6 +349,56 @@ def _js_routes(relpath: str, text: str) -> list[Route]:
                 handler="",
                 protected=guard is not None,
                 guard=guard,
+            )
+        )
+    routes.extend(_nest_routes(relpath, text))
+    return routes
+
+
+# NestJS: @Controller('prefix') on a class, @Get()/@Post('x')/... on methods, auth via
+# @UseGuards(...) (class- or method-level) unless @Public() overrides it.
+_NEST_CONTROLLER = re.compile(r"@Controller\(\s*['\"`]?([^'\"`)]*)")
+_NEST_METHOD = re.compile(r"@(Get|Post|Put|Patch|Delete|All)\(\s*(?:['\"`]([^'\"`]*)['\"`])?\s*\)")
+
+
+def _nest_routes(relpath: str, text: str) -> list[Route]:
+    if "@Controller" not in text and not _NEST_METHOD.search(text):
+        return []
+    lines = text.splitlines()
+    cm = _NEST_CONTROLLER.search(text)
+    prefix = (cm.group(1).strip("/") if cm else "") or ""
+    controller_line = text.count("\n", 0, cm.start()) + 1 if cm else 0
+    # Class-level guard appears between @Controller and the first route decorator.
+    first_method = _NEST_METHOD.search(text)
+    first_method_line = (
+        text.count("\n", 0, first_method.start()) + 1 if first_method else len(lines)
+    )
+    class_guarded = any(
+        "@UseGuards" in lines[i]
+        for i in range(max(controller_line - 1, 0), min(first_method_line, len(lines)))
+    )
+
+    routes: list[Route] = []
+    for m in _NEST_METHOD.finditer(text):
+        verb = m.group(1).upper()
+        method = "ANY" if verb == "ALL" else verb
+        sub = (m.group(2) or "").strip("/")
+        path = "/" + "/".join(p for p in (prefix, sub) if p)
+        line = text.count("\n", 0, m.start()) + 1
+        window = "\n".join(lines[max(line - 6, 0) : line])  # decorators just above the method
+        method_guarded = "@UseGuards" in window
+        public = "@Public" in window
+        protected = (method_guarded or (class_guarded and not public)) and not public
+        routes.append(
+            Route(
+                method,
+                path,
+                "nestjs",
+                relpath,
+                line,
+                "",
+                protected,
+                "@UseGuards" if protected else None,
             )
         )
     return routes

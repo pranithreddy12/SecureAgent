@@ -368,6 +368,9 @@ def _is_handler(func) -> bool:
         f = dec.func if isinstance(dec, ast.Call) else dec
         if isinstance(f, ast.Attribute) and f.attr.lower() in HTTP_METHODS | {"route"}:
             return True
+        # Django REST Framework function view: @api_view([...]).
+        if isinstance(f, ast.Name) and f.id == "api_view":
+            return True
     return False
 
 

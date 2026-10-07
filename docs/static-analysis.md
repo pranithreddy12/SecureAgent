@@ -71,8 +71,9 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 - Python taint is interprocedural **within a file**, flow-insensitive, and does not
   model sanitizers (can over-report; may miss cross-file flows).
 - JS/TS analysis is a file-scoped regex heuristic (no JS AST), coarser than Python.
-- Route/IDOR/misconfig cover FastAPI/Flask/Express idioms; Django/NestJS are future
-  work. Global/middleware-level auth is invisible, so those findings are low-confidence.
+- Route extraction covers FastAPI/Flask, Express, Django (DRF + class-based views)
+  and NestJS. IDOR/taint cover FastAPI/Flask + DRF function views; Django class-based
+  IDOR is future work. Global/middleware auth is invisible, so those are low-confidence.
 - OSV matching uses declared lockfile versions (no transitive range resolution);
   requires network (graceful offline skip).
 

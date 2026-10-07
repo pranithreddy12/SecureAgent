@@ -350,3 +350,20 @@ Append-only. Never rewrite past entries.
 ### Tests
 - test_sarif.py (8). Full static + report suite: 114 passed, 1 skipped (PDF).
 - Verified real SARIF (version 2.1.0, rules, result level/severity/location).
+
+## 2026-10-08 (More frameworks: Django + NestJS)
+
+### Added
+- Django route/authz: DRF `@api_view([...])` function views (auth via permission_classes
+  / login_required; AllowAny = public) and class-based views (APIView/ViewSet/View; DRF
+  action→HTTP method; protected by permission_classes or Login/PermissionRequired mixins).
+- NestJS route/authz: `@Controller` prefix + `@Get/@Post/@Put/@Patch/@Delete` methods;
+  auth via class- or method-level `@UseGuards`, with `@Public()` override.
+- `_is_handler` recognises `@api_view`, so taint + IDOR cover DRF function views.
+
+### Tests
+- test_frameworks.py (15). Full static + report suite: 126 passed, 1 skipped (PDF).
+- Real run flagged a DRF IDOR and NestJS/Django unprotected endpoints.
+
+### Notes
+- Django class-based-view IDOR and Django settings misconfiguration remain future work.

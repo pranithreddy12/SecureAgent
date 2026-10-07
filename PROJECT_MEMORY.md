@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-08 (UML diagrams + docs matching real code; Phases 4–5 blocked)
+Last updated: 2026-10-08 (frameworks: Django + NestJS routes/authz; Phases 4–5 blocked)
 
 ## 1. Project Identity
 
@@ -154,6 +154,14 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   parsing via in-browser mermaid; implemented vs designed clearly separated
   (agent/LangGraph pipeline marked not-implemented). `docs/static-analysis.md` documents
   the implemented engine (detectors, pipeline, OWASP coverage, limits).
+  **Frameworks (Django + NestJS):** `routes.py` now extracts Django DRF function views
+  (`@api_view([...])`, auth via permission_classes/login_required; AllowAny = public)
+  and class-based views (APIView/ViewSet/View + DRF action→method map; protected by
+  permission_classes/LoginRequired/PermissionRequired mixins), and NestJS controllers
+  (`@Controller` prefix + `@Get/@Post/...` methods, auth via class/method `@UseGuards`,
+  `@Public()` override). `_is_handler` now also recognises `@api_view`, so taint + IDOR
+  cover DRF function views (URL kwargs tainted). Real run flagged a DRF IDOR
+  (Account.objects.get(pk=pk)) and NestJS/Django unprotected endpoints.
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -337,7 +345,10 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 114 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 126 passed + 1 skipped (PDF).
+  Framework tests (test_frameworks.py, 15): DRF function views + permission_classes/
+  AllowAny, CBV methods + mixins/permission_classes, DRF taint via URL kwarg, NestJS
+  method/class guard/@Public/prefix joining.
   SARIF tests (test_sarif.py, 8): skeleton, result fields/location, level mapping,
   Windows path normalisation, CWE helpUri, one-rule-per-type, CLI sarif output.
   Baseline tests (test_baseline.py, 10): fingerprint stability across line moves,
@@ -435,11 +446,12 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-08: Added SARIF 2.1.0 output (`app/analysis/sarif.py`, `--format sarif`) so
-findings appear natively in GitHub's Security tab via upload-sarif. One rule per type,
-severity→level + security-severity, stable partialFingerprints, CWE helpUri. Updated
-the GitHub Action example to upload SARIF and gate on new high/critical. 114 static/
-report tests pass (+1 PDF skip). Verified real SARIF output.
-**Next unblocked:** more frameworks (Django/NestJS), A09 logging checks, cross-file
-taint. Live web pipeline still needs Phases 4–5 (blocked);
+2026-10-08: Added Django and NestJS support to route/authorization extraction
+(`app/analysis/routes.py`): DRF `@api_view` function views, Django class-based views
+(permission_classes / mixins / DRF action→method), and NestJS controllers
+(`@Controller`+`@Get/@Post`, `@UseGuards`, `@Public`). Extended `_is_handler` so taint
+and IDOR also cover DRF function views (URL kwargs tainted). 126 static/report tests
+pass (+1 PDF skip). Real run flagged a DRF IDOR and NestJS/Django unprotected endpoints.
+**Next unblocked:** A09 logging checks, cross-file taint, Django settings misconfig,
+or a demo fixtures pack. Live web pipeline still needs Phases 4–5 (blocked);
 `backend/app/schemas/target.py` untracked.
