@@ -401,3 +401,18 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Cross-file resolution is heuristic (import hint / unique name); ambiguous names with
   no hint are skipped. Whole-project source held in memory during the taint pass.
+
+## 2026-10-08 (Blocked target management: schema committed + handoff)
+
+### Added
+- Committed `backend/app/schemas/target.py` (target/authorization Pydantic schemas;
+  previously written but left untracked). Safe content; import + lint verified.
+- `docs/target-management-implementation.md` — implementation handoff for the two files
+  the assistant cannot generate (`security/target_validation.py`,
+  `services/target_service.py`): signatures, behaviour, security rules, required tests.
+
+### Notes
+- Those two files were each halted mid-generation by the automated safety classifier;
+  the assistant may not reproduce that content. They are not policy-prohibited and must
+  be supplied by the owner. Everything around them (authorization service, endpoints,
+  frontend, tests) will be built by the assistant once they exist.

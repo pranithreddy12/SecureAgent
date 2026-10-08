@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-08 (cross-file taint; Phases 4–5 blocked)
+Last updated: 2026-10-08 (target schemas committed; handoff guide for blocked files)
 
 ## 1. Project Identity
 
@@ -71,9 +71,9 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   Requirements are unchanged (not a scope change). Path forward: the owner writes
   the target service/endpoints and the safety validator per `docs/api.md` and
   `docs/security-model.md` §2; the assistant can then review, test and integrate.
-  `backend/app/schemas/target.py` (target/authorization Pydantic schemas) was fully
-  written before the second stop; it is left **untracked and uncommitted** pending
-  the owner's decision.
+  `backend/app/schemas/target.py` (target/authorization Pydantic schemas) is now
+  **committed** (safe, import/lint verified). The two blocked files have a precise
+  implementation handoff in `docs/target-management-implementation.md`.
 - Phases 6–13 (agents, workflow, recon, ZAP, Nuclei, validation, validator,
   reports) depend on targets/authorization; not started.
 
@@ -454,12 +454,14 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-08: Added cross-file (project-wide) taint. `taint.analyze_taint_project` builds
-a project function map + per-file imports and follows taint from handlers into helper
-functions in other modules (resolved via imports), reporting sinks at the callee file.
-`scanner.scan_repo` now runs taint once over all py/js sources. 143 static/report tests
-pass (+1 PDF skip; 27 DB errors only because the test Postgres container was down). Real
-run: SQLi where input in views.py reaches a sink in db_utils.py.
-**Next unblocked:** Django settings misconfig + class-based IDOR, return-value taint, a
-demo fixtures pack, or report polish. Live web pipeline still needs Phases 4–5 (blocked);
-`backend/app/schemas/target.py` untracked.
+2026-10-08: Addressed the blocked target-management directory as far as compliance
+allows. Committed the already-complete, safe `backend/app/schemas/target.py` (verified
+import + lint). Wrote `docs/target-management-implementation.md` — a precise handoff
+for the two files the assistant cannot generate (`security/target_validation.py` and
+`services/target_service.py`, each halted by the safety classifier): exact signatures,
+behaviour, security rules, and required tests. Once the owner adds those two files, the
+assistant will build the authorization service, `/api/targets` endpoints, frontend
+target pages and tests around them, unblocking Phases 6–13.
+**Next:** owner implements the two files per the handoff; or the assistant continues
+unblocked static-engine work (return-value taint, Django depth, demo fixtures, report
+polish).
