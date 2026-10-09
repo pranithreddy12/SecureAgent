@@ -6,7 +6,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
-from app.schemas.report import ReportContext
+from app.schemas.report import NO_CVE, NO_CVSS, ReportContext
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -31,6 +31,7 @@ def _env() -> Environment:
     )
     env.filters["dt"] = _dt
     env.filters["pct"] = _pct
+    env.globals.update(no_cve=NO_CVE, no_cvss=NO_CVSS)
     return env
 
 

@@ -40,6 +40,23 @@
   .grid { display: flex; gap: 10px; flex-wrap: wrap; }
   .stat { flex: 1 1 120px; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
   .stat b { display: block; font-size: 16pt; }
+  .toc { columns: 2; column-gap: 28px; font-size: 9pt; margin: 14px 0 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); }
+  .toc a { color: var(--ink); text-decoration: none; display: block; padding: 1px 0; }
+  .glance { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 10px 0 14px; break-inside: avoid; }
+  .risk { display: inline-block; padding: 3px 14px; border-radius: 4px; font-weight: 700; font-size: 12pt; color: #fff; letter-spacing: .03em; }
+  .risk-critical { background: var(--critical); } .risk-high { background: var(--high); }
+  .risk-moderate { background: var(--medium); } .risk-low { background: var(--low); }
+  .risk-informational, .risk-none-identified { background: var(--informational); }
+  .tiles { display: flex; gap: 8px; margin: 10px 0; }
+  .tile { flex: 1; text-align: center; border-radius: 6px; padding: 6px 4px; color: #fff; }
+  .tile b { display: block; font-size: 15pt; line-height: 1.1; }
+  .tile span { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .05em; }
+  .fixfirst li { margin: 0 0 5px; }
+  .small { font-size: 8.5pt; }
+  .kv2 th { width: 12%; text-transform: none; font-size: 8.5pt; letter-spacing: 0; }
+  .kv2 td { width: 38%; font-size: 9pt; word-break: break-word; }
+  .finding { padding: 9px 12px; margin: 0 0 10px; }
+  .finding p { margin: 4px 0; }
 </style>
 </head>
 <body>
@@ -54,11 +71,45 @@
   {% endif %}
 </header>
 
-<h2>1. Executive Summary</h2>
+<nav class="toc" aria-label="Contents">
+  <a href="#s1">1. Executive Summary</a><a href="#s2">2. Target Information</a>
+  <a href="#s3">3. Audit Information</a><a href="#s4">4. Authorization Information</a>
+  <a href="#s5">5. Methodology</a><a href="#s6">6. Attack Surface Summary</a>
+  <a href="#s7">7. Technology Stack Detected</a><a href="#s8">8. Findings Summary</a>
+  <a href="#s9">9. Severity Distribution</a><a href="#s10">10–11. Detailed Findings &amp; Evidence</a>
+  <a href="#s12">12. OWASP Top 10 Mapping</a><a href="#s13">13. CWE Mapping</a>
+  <a href="#s14">14. CVE Information</a><a href="#s15">15. CVSS Information</a>
+  <a href="#s16">16. Remediation</a><a href="#s17">17. Validation Status</a>
+  <a href="#s18">18. Limitations</a><a href="#s19">19. Audit Timeline</a>
+</nav>
+
+<h2 id="s1">1. Executive Summary</h2>
 <p>{{ r.executive_summary or r.default_executive_summary() }}</p>
 {% if not r.executive_summary %}<p class="muted">AI narrative unavailable; deterministic summary used.</p>{% endif %}
 
-<h2>2. Target Information</h2>
+<div class="glance">
+  <div><span class="risk risk-{{ r.risk_rating | lower | replace(' ', '-') }}">{{ r.risk_rating }}</span>
+       <span class="muted small">&nbsp;overall risk — {{ r.risk_basis }}</span></div>
+  <div class="tiles">
+    {% for sev, n in r.severity_counts.items() %}<div class="tile sev-{{ sev.value }}"><b>{{ n }}</b><span>{{ sev.value }}</span></div>{% endfor %}
+  </div>
+  {% if r.finding_groups %}
+  <b>Fix first</b> <span class="muted small">(most severe and most trustworthy first; each item consolidates every location)</span>
+  <ol class="fixfirst">
+    {% for g in r.finding_groups[:5] %}
+    <li><span class="badge sev-{{ g.worst_severity.value }}">{{ g.worst_severity.value }}</span>
+        <b>{{ g.label }}</b> — {{ g.count }} location{{ "s" if g.count != 1 else "" }}
+        <span class="muted">({{ g.best_status.value }}{% if g.cwe %} · {{ g.cwe }}{% endif %})</span><br>
+        <span class="small">{{ g.remediation or "See remediation section." }}</span></li>
+    {% endfor %}
+  </ol>
+  {% if r.finding_groups | length > 5 %}<p class="muted small">+ {{ r.finding_groups | length - 5 }} more finding type(s); see section 16.</p>{% endif %}
+  {% set spots = r.hotspots(3) %}
+  {% if spots %}<p class="small"><b>Hotspots</b> (most findings): {% for name, n in spots %}{{ name }} ({{ n }}){{ ", " if not loop.last else "" }}{% endfor %}</p>{% endif %}
+  {% endif %}
+</div>
+
+<h2 id="s2">2. Target Information</h2>
 <table class="kv">
   <tr><th>Name</th><td>{{ r.target_name }}</td></tr>
   <tr><th>URL</th><td>{{ r.target_url }}</td></tr>
@@ -67,7 +118,7 @@
   <tr><th>Scope – paths</th><td>{{ (r.scope.get("path_prefixes") or []) | join(", ") or "—" }}</td></tr>
 </table>
 
-<h2>3. Audit Information</h2>
+<h2 id="s3">3. Audit Information</h2>
 <table class="kv">
   <tr><th>Audit ID</th><td>{{ r.audit_id }}</td></tr>
   <tr><th>Status</th><td>{{ r.audit_status }}</td></tr>
@@ -76,17 +127,17 @@
   <tr><th>Mode</th><td>{{ "Demo (simulated)" if r.is_demo else "Live" }}</td></tr>
 </table>
 
-<h2>4. Authorization Information</h2>
+<h2 id="s4">4. Authorization Information</h2>
 <table class="kv">
   <tr><th>Confirmed by</th><td>{{ r.authorized_by }}</td></tr>
   <tr><th>Confirmed at</th><td>{{ r.authorized_at | dt }}</td></tr>
   <tr><th>Statement</th><td>“{{ r.authorization_statement }}”</td></tr>
 </table>
 
-<h2>5. Methodology</h2>
+<h2 id="s5">5. Methodology</h2>
 {% if r.methodology %}<ol>{% for step in r.methodology %}<li>{{ step }}</li>{% endfor %}</ol>{% else %}<p class="muted">Not recorded.</p>{% endif %}
 
-<h2>6. Attack Surface Summary</h2>
+<h2 id="s6">6. Attack Surface Summary</h2>
 <div class="grid">
   <div class="stat"><b>{{ r.endpoints | length }}</b>Endpoints</div>
   <div class="stat"><b>{{ r.api_endpoints | length }}</b>API endpoints</div>
@@ -95,10 +146,10 @@
 </div>
 {% if r.interesting_paths %}<h3>Interesting paths</h3><ul>{% for p in r.interesting_paths %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
 
-<h2>7. Technology Stack Detected</h2>
+<h2 id="s7">7. Technology Stack Detected</h2>
 {% if r.technologies %}<ul>{% for t in r.technologies %}<li>{{ t }}</li>{% endfor %}</ul>{% else %}<p class="muted">No technologies identified.</p>{% endif %}
 
-<h2>8. Findings Summary</h2>
+<h2 id="s8">8. Findings Summary</h2>
 {% if r.reportable_findings %}
 <table>
   <tr><th>Severity</th><th>Title</th><th>Endpoint</th><th>Status</th><th>Confidence</th></tr>
@@ -108,7 +159,7 @@
 </table>
 {% else %}<p class="muted">No reportable findings.</p>{% endif %}
 
-<h2>9. Severity Distribution</h2>
+<h2 id="s9">9. Severity Distribution</h2>
 {% set total = r.reportable_findings | length %}
 <table>
   {% for sev, n in r.severity_counts.items() %}
@@ -117,21 +168,16 @@
   {% endfor %}
 </table>
 
-<h2>10. Detailed Findings &amp; 11. Evidence</h2>
+<h2 id="s10">10. Detailed Findings &amp; 11. Evidence</h2>
 {% for f in r.reportable_findings %}
 <div class="finding">
   <h3><span class="badge sev-{{ f.severity.value }}">{{ f.severity.value }}</span> {{ f.title }}</h3>
-  <table class="kv">
-    <tr><th>Type</th><td>{{ f.type }}</td></tr>
-    <tr><th>Endpoint</th><td>{{ f.endpoint }}</td></tr>
-    <tr><th>Parameter</th><td>{{ f.parameter or "—" }}</td></tr>
-    <tr><th>Status</th><td><span class="status">{{ f.status.value }}</span> {{ f.status_reason or "" }}</td></tr>
-    <tr><th>Confidence</th><td>{{ f.confidence | pct }}</td></tr>
-    <tr><th>Detected by</th><td>{{ f.sources | join(", ") or "—" }}</td></tr>
-    <tr><th>OWASP</th><td>{{ f.owasp_category or "Unmapped" }}</td></tr>
-    <tr><th>CWE</th><td>{{ f.cwe or "Unmapped" }}</td></tr>
-    <tr><th>CVE</th><td>{{ f.cve_display }}</td></tr>
-    <tr><th>CVSS</th><td>{{ f.cvss_display }}</td></tr>
+  <table class="kv2">
+    <tr><th>Location</th><td>{{ f.endpoint }}</td><th>Parameter</th><td>{{ f.parameter or "—" }}</td></tr>
+    <tr><th>Status</th><td><span class="status">{{ f.status.value }}</span> {{ f.status_reason or "" }}</td><th>Confidence</th><td>{{ f.confidence | pct }}</td></tr>
+    <tr><th>OWASP</th><td>{{ f.owasp_category or "Unmapped" }}</td><th>CWE</th><td>{{ f.cwe or "Unmapped" }}</td></tr>
+    <tr><th>CVE</th><td>{{ f.cve_display }}</td><th>CVSS</th><td>{{ f.cvss_display }}</td></tr>
+    <tr><th>Type</th><td>{{ f.type }}</td><th>Detected by</th><td>{{ f.sources | join(", ") or "—" }}</td></tr>
   </table>
   {% if f.description %}<p><b>Description.</b> {{ f.description }}</p>{% endif %}
   {% if f.impact %}<p><b>Impact.</b> {{ f.impact }}</p>{% endif %}
@@ -141,35 +187,51 @@
 </div>
 {% else %}<p class="muted">No reportable findings.</p>{% endfor %}
 
-<h2>12. OWASP Top 10 Mapping</h2>
+<h2 id="s12">12. OWASP Top 10 Mapping</h2>
 {% set by_owasp = r.grouped_by("owasp_category") %}
-{% if by_owasp %}<table><tr><th>Category</th><th>Findings</th></tr>
-{% for cat, items in by_owasp.items() %}<tr><td>{{ cat }}</td><td>{{ items | map(attribute="title") | join("; ") }}</td></tr>{% endfor %}
+{% if by_owasp %}<table><tr><th>Category</th><th style="width:7%">#</th><th>Findings</th></tr>
+{% for cat, items in by_owasp.items() %}<tr><td>{{ cat }}</td><td>{{ items | length }}</td><td>{{ items | map(attribute="title") | join("; ") }}</td></tr>{% endfor %}
 </table>{% else %}<p class="muted">No findings to map.</p>{% endif %}
 
-<h2>13. CWE Mapping</h2>
+<h2 id="s13">13. CWE Mapping</h2>
 {% set by_cwe = r.grouped_by("cwe") %}
 {% if by_cwe %}<table><tr><th>CWE</th><th>Findings</th></tr>
 {% for cwe, items in by_cwe.items() %}<tr><td>{{ cwe }}</td><td>{{ items | map(attribute="title") | join("; ") }}</td></tr>{% endfor %}
 </table>{% else %}<p class="muted">No findings to map.</p>{% endif %}
 
-<h2>14. CVE Information</h2>
-{% if r.reportable_findings %}<table><tr><th>Finding</th><th>CVE</th></tr>
-{% for f in r.reportable_findings %}<tr><td>{{ f.title }}</td><td>{{ f.cve_display }}</td></tr>{% endfor %}
-</table>{% else %}<p class="muted">No findings.</p>{% endif %}
-
-<h2>15. CVSS Information</h2>
-{% if r.reportable_findings %}<table><tr><th>Finding</th><th>CVSS</th></tr>
-{% for f in r.reportable_findings %}<tr><td>{{ f.title }}</td><td>{{ f.cvss_display }}</td></tr>{% endfor %}
-</table>
-<p class="muted">CVSS values are reported only when supplied by a reliable source (tool or advisory metadata); they are never estimated.</p>
+<h2 id="s14">14. CVE Information</h2>
+{% if r.with_cve %}<table><tr><th>Finding</th><th>CVE</th></tr>
+{% for f in r.with_cve %}<tr><td>{{ f.title }}</td><td>{{ f.cve }}</td></tr>{% endfor %}
+</table>{% endif %}
+{% if r.reportable_findings %}{% set n_none = (r.reportable_findings | length) - (r.with_cve | length) %}
+<p class="muted">{{ n_none }} of {{ r.reportable_findings | length }} finding(s): {{ no_cve }}</p>
 {% else %}<p class="muted">No findings.</p>{% endif %}
 
-<h2>16. Remediation</h2>
-{% if r.reportable_findings %}<ol>{% for f in r.reportable_findings %}<li><b>{{ f.title }}</b> ({{ f.severity.value }}): {{ f.remediation or "No remediation guidance recorded." }}</li>{% endfor %}</ol>
+<h2 id="s15">15. CVSS Information</h2>
+{% if r.with_cvss %}<table><tr><th>Finding</th><th>CVSS</th></tr>
+{% for f in r.with_cvss %}<tr><td>{{ f.title }}</td><td>{{ f.cvss_display }}</td></tr>{% endfor %}
+</table>{% endif %}
+{% if r.reportable_findings %}{% set n_nocvss = (r.reportable_findings | length) - (r.with_cvss | length) %}
+<p class="muted">{{ n_nocvss }} of {{ r.reportable_findings | length }} finding(s): {{ no_cvss }}
+CVSS values are reported only when supplied by a reliable source (tool or advisory metadata); they are never estimated.</p>
+{% else %}<p class="muted">No findings.</p>{% endif %}
+
+<h2 id="s16">16. Remediation</h2>
+{% if r.finding_groups %}
+<p class="muted small">Grouped by finding type, in priority order. Fixing the class of problem once resolves every listed location.</p>
+<table>
+  <tr><th style="width:4%">#</th><th>Issue</th><th style="width:9%">Severity</th><th>Remediation</th><th>Where</th></tr>
+  {% for g in r.finding_groups %}
+  <tr><td>{{ loop.index }}</td>
+      <td><b>{{ g.label }}</b><br><span class="muted small">{{ g.count }} location{{ "s" if g.count != 1 else "" }} · {{ g.best_status.value }}{% if g.cwe %} · {{ g.cwe }}{% endif %}</span></td>
+      <td><span class="badge sev-{{ g.worst_severity.value }}">{{ g.worst_severity.value }}</span></td>
+      <td>{{ g.remediation or "No remediation guidance recorded." }}</td>
+      <td class="small">{% for loc in g.locations[:6] %}{{ loc }}<br>{% endfor %}{% if g.locations | length > 6 %}<span class="muted">+ {{ g.locations | length - 6 }} more</span>{% endif %}</td></tr>
+  {% endfor %}
+</table>
 {% else %}<p class="muted">No remediation required for reported findings.</p>{% endif %}
 
-<h2>17. Validation Status</h2>
+<h2 id="s17">17. Validation Status</h2>
 <table><tr><th>Status</th><th>Count</th></tr>
 {% for st, n in r.status_counts.items() %}<tr><td>{{ st.value }}</td><td>{{ n }}</td></tr>{% endfor %}
 </table>
@@ -177,7 +239,7 @@
 {% for f in r.false_positives %}<li>{{ f.title }} — {{ f.endpoint }}{% if f.status_reason %}: {{ f.status_reason }}{% endif %}</li>{% endfor %}
 </ul>{% endif %}
 
-<h2>18. Limitations</h2>
+<h2 id="s18">18. Limitations</h2>
 <ul>
   {% if r.is_demo %}<li>This is a demonstration report about a bundled, deliberately vulnerable sample application; it does not describe a real system.</li>{% endif %}
   <li>Automated testing covers only the authorized scope and the checks performed; absence of findings does not prove absence of vulnerabilities.</li>
@@ -185,7 +247,7 @@
   {% for l in r.limitations %}<li>{{ l }}</li>{% endfor %}
 </ul>
 
-<h2>19. Audit Timeline</h2>
+<h2 id="s19">19. Audit Timeline</h2>
 {% if r.timeline %}<table><tr><th>Stage</th><th>Status</th><th>Started</th><th>Completed</th><th>Notes</th></tr>
 {% for t in r.timeline %}<tr><td>{{ t.stage }}</td><td>{{ t.status }}</td><td>{{ t.started_at | dt }}</td><td>{{ t.completed_at | dt }}</td><td>{{ t.note or "" }}</td></tr>{% endfor %}
 </table>{% else %}<p class="muted">No timeline recorded.</p>{% endif %}
