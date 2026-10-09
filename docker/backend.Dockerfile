@@ -9,8 +9,10 @@ RUN apt-get -o Acquire::Retries=5 update \
        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the exact pinned set (backend/requirements.lock, generated on python:3.12-slim);
+# requirements.txt documents the intended top-level dependencies.
+COPY backend/requirements.txt backend/requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
 
 COPY backend/ .
 RUN useradd --create-home appuser && mkdir -p /app/reports && chown appuser /app/reports

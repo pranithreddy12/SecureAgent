@@ -35,3 +35,7 @@ Thumbs.db
 *.egg-info/
 build/
 dist/
+
+# tool-generated assistant instruction files (recreated by `next dev`)
+frontend/AGENTS.md
+frontend/CLAUDE.md

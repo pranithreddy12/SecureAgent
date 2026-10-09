@@ -1,0 +1,5 @@
+# Paths SecureAgent skips when scanning this repository.
+#
+# Test code deliberately contains fake credentials, forged JWTs and vulnerable snippets as
+# fixtures. They are not application code and are not reachable at runtime.
+backend/tests/
