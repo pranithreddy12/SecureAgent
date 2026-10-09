@@ -112,7 +112,7 @@ redaction everywhere, read-only scanning, escaped reports.
 ```bash
 make testdb                      # throwaway PostgreSQL (needs Docker)
 cd backend && python -m pytest -q    # 253 tests (252 pass, 1 skipped); ~93% coverage
-cd frontend && npm run lint && npx tsc --noEmit && npm run build
+cd frontend && npm run lint && npm run typecheck && npm run build
 ```
 
 ## Known limitations

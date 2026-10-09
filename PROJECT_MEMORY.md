@@ -208,8 +208,10 @@ changelog.
 - **PPT not provided**: `SPECIFICATION.md` sections marked PENDING stay unfilled; conflicts with the PPT
   are unknown. Provide the PPT and reconcile.
 - **Target management blocked** (see §3) — the single dependency for the live audit pipeline.
-- **CI workflow has never run on GitHub**; pushing `.github/workflows/*` may require a token with the
-  `workflow` scope.
+- **CI**: first GitHub run (2026-10-09, commit 0539485) passed backend and failed frontend + self-scan for
+  real reasons, now fixed (see §17); a second run is needed to confirm green. Accepted advisory:
+  `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm; OSV lists **no patched version**; transitive dev-only dependency of
+  eslint-config-next) is recorded in `.secureagent-baseline.json` so CI gates only on NEW high/critical findings.
 - **No `LICENSE`** — a licensing decision for the owner.
 - **No login rate limiting / account lockout; no admin bootstrap** (every user is an `auditor`).
 - **Frontend has 0 automated tests**; only manual browser verification.
@@ -233,6 +235,12 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Backend dependencies were unpinned (`>=`), so SCA saw none; now pinned in `requirements.lock`.
 - Documentation drift: stale traceability rows, a missing changelog entry (UML diagrams), bloated §3.
 - Missing required docs (testing, deployment), incomplete README.
+- First CI run found: frontend `tsc` failed on a clean checkout (Next generates the global `LayoutProps` type;
+  fixed with `npm run typecheck` = `next typegen && tsc --noEmit`); self-scan gate failed on the real `braces`
+  advisory (accepted via baseline, no patch exists).
+- **Correction**: the 2026-10-09 close-out claimed `frontend/AGENTS.md` / `CLAUDE.md` were untracked, but a
+  later `git reset` (used to split commits) silently restored them; they were truly untracked in the follow-up
+  commit. Lesson: verify against `git ls-tree HEAD` after the final commit, not before.
 
 ## 18. Testing Status
 - **Backend: 253 tests collected, 252 pass, 1 skipped, 0 fail; 93% line coverage.** The skipped test is
@@ -307,7 +315,7 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
   the CLI, `.lock` files never scanned, handler-name collisions, two secret false positives; added
   `--exclude`, `.secureagentignore` and inline `secureagent: ignore`; pinned backend dependencies.
 - Added missing required docs (`testing.md`, `deployment.md`), a complete README, the repo CI workflow
-  (unrun), an env-contract test, `docs/PROJECT_CLOSEOUT.md`; untracked tool-generated agent files per the
+  (first run found two real failures, fixed), an env-contract test, `docs/PROJECT_CLOSEOUT.md`; untracked tool-generated agent files per the
   owner's "no Claude traces" preference; corrected stale traceability/changelog entries.
 - Honest state: the project delivers a working, tested static-analysis security scanner plus a web skeleton;
   the live multi-agent audit pipeline (and therefore acceptance criteria 5-10, 14, 22-23, 27) is **not built**

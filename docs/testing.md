@@ -25,7 +25,7 @@ docker compose run --rm --no-deps backend python -m pytest tests/test_reports.py
 ```
 
 Quality gates (also run in CI): `ruff check`, `ruff format --check`, and for the frontend
-`npm run lint`, `npx tsc --noEmit`, `npm run build`.
+`npm run lint`, `npm run typecheck`, `npm run build`.
 
 ## What is tested, by area
 

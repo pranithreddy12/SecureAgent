@@ -1,6 +1,6 @@
 # SecureAgent – Project Close-out Audit
 
-Date: 2026-10-09 · Repository state: `main` · Backend tests: **253 collected, 252 pass, 1 skipped
+Date: 2026-10-09 · Repository state: `main` · First CI run found and led to fixing two failures · Backend tests: **253 collected, 252 pass, 1 skipped
 (PDF; passes in Docker), 0 fail** · Coverage: **93%** · Lint/format/types: clean.
 
 This is an audit of the project against the original brief — what is finished, what is not, why,
@@ -76,7 +76,8 @@ found defects 200+ unit tests had not:
 | Swallowed exception in the CLI (flagged by its own A09 check) | Low | `contextlib.suppress` |
 | Documentation drift: stale traceability rows, missing changelog entry, 200-line memory §3 | Medium (breaks "context across sessions") | Corrected; memory restructured |
 | Missing required docs (`testing.md`, `deployment.md`), partial README, no repo CI | Medium | Written; CI workflow added |
-| `frontend/AGENTS.md`, `frontend/CLAUDE.md` tracked (tool-generated) | Low (owner asked for no Claude traces) | Untracked + git-ignored |
+| `frontend/AGENTS.md`, `frontend/CLAUDE.md` tracked (tool-generated) | Low (owner asked for no Claude traces) | Untracked + git-ignored (first attempt was silently undone by a `git reset`; redone and verified against HEAD) |
+| First GitHub CI run: frontend `tsc` failed on a clean checkout; self-scan gate failed on `braces` | Medium (CI red) | `npm run typecheck`; baseline for the unpatched dev-only advisory |
 
 Report polish delivered in the same pass: risk rating, "Fix first" priorities, hotspots, ToC,
 consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages).
@@ -91,8 +92,10 @@ consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages
 3. **Choose a `LICENSE`** (none exists; this is the owner's call).
 4. **Provide the PPT** so the PENDING sections of `SPECIFICATION.md` can be filled and any conflicts
    with this implementation surfaced.
-5. **Push and watch the CI workflow** (`.github/workflows/ci.yml`) — it was validated as YAML but has
-   never executed; pushing workflow files may need a token with the `workflow` scope.
+5. **Confirm CI is green.** First run (2026-10-09): backend passed; frontend and self-scan failed on real
+   issues (Next route types before `tsc`; the `braces` advisory) — both fixed and re-pushed; check the
+   Actions tab for the second run. `braces 3.0.3` has **no patched version** (OSV `last_affected: 3.0.3`),
+   is a dev-only transitive dependency, and is accepted in `.secureagent-baseline.json`; revisit when a fix ships.
 
 ### B. Assistant can build once A1 exists (in order)
 1. Authorization service + `/api/targets`, `/authorize`, `/validate` + tests (the security-restriction tests the brief requires).

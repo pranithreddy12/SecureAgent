@@ -29,7 +29,7 @@ test:
 
 lint:
 	cd backend && .venv/Scripts/ruff check . && .venv/Scripts/ruff format --check .
-	cd frontend && npm run lint && npx tsc --noEmit
+	cd frontend && npm run lint && npm run typecheck
 
 build:
 	cd frontend && npm run build

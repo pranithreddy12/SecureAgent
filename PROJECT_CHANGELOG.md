@@ -518,3 +518,17 @@ Append-only. Never rewrite past entries.
 
 ### Tests
 - Backend 253 collected: 252 passed, 1 skipped (PDF; passes in Docker); coverage 93%. Live OSV scan of the backend lock: no known vulnerabilities; frontend: `braces` (dev-only).
+
+## 2026-10-09 (First CI run: failures found and fixed)
+
+### Fixed
+- Frontend CI failed: `tsc` ran before Next generated its global route types (`LayoutProps`). Added
+  `npm run typecheck` (`next typegen && tsc --noEmit`) and use it in CI, Makefile and docs.
+- Self-scan CI failed on a real advisory: `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm). OSV lists no patched
+  version; it is a transitive dev-only dependency of eslint-config-next. Accepted explicitly in
+  `.secureagent-baseline.json`; CI now runs `--baseline ... --fail-on high` so only new findings fail.
+- `frontend/AGENTS.md` and `frontend/CLAUDE.md` were still tracked: the earlier `git rm --cached` was undone
+  by a `git reset` and the close-out summary wrongly reported it as done. Untracked for real.
+
+### Notes
+- Backend job (lint + 253 tests with PostgreSQL service + PDF libraries) passed on GitHub.
