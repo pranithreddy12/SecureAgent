@@ -69,6 +69,7 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 
 ## Known limitations
 
+- Python taint also follows **return values** of local helpers (within a file).
 - Python taint is interprocedural **within a file**, flow-insensitive, and does not
   model sanitizers (can over-report; may miss cross-file flows).
 - JS/TS analysis is a file-scoped regex heuristic (no JS AST), coarser than Python.

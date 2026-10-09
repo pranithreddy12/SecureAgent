@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-08 (target schemas committed; handoff guide for blocked files)
+Last updated: 2026-10-09 (return-value taint; target mgmt handoff for blocked files)
 
 ## 1. Project Identity
 
@@ -163,6 +163,14 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   cover DRF function views (URL kwargs tainted). Real run flagged a DRF IDOR
   (Account.objects.get(pk=pk)) and NestJS/Django unprotected endpoints.
   **A09 logging & monitoring:** `app/analysis/logging_checks.py` flags CWE-532/CWE-778.
+  **Return-value taint:** a local helper that returns attacker-influenced data now
+  taints its call result (`x = helper(); sink(x)`, also `sink(helper())`). `_Ctx`
+  (functions, depth, memo cache) is threaded through the taint helpers; a call is
+  tainted if the callee's `return` expression is tainted given the tainted args passed
+  (covers helpers that read `request` themselves and multi-hop return chains).
+  Depth-bounded by MAX_CALL_DEPTH; the cache is pre-seeded False so recursion
+  terminates. Within-file only (cross-file return flow is not modelled). A helper that
+  returns a constant is correctly NOT tainted.
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -348,7 +356,10 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 143 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 147 passed + 1 skipped (PDF).
+  Return-value taint tests (test_taint_retval.py, 7): helper reads request, taint via
+  return value, constant return safe, two-hop chain, call used directly as sink arg,
+  recursion terminates, sink-line reporting.
   Cross-file tests (test_taint_crossfile.py, 6): cross-file SQLi reported at the sink
   file, parameterised-safe, name-collision resolved by import, constant-arg safe,
   scan_repo integration, within-file preserved.
@@ -454,14 +465,12 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-08: Addressed the blocked target-management directory as far as compliance
-allows. Committed the already-complete, safe `backend/app/schemas/target.py` (verified
-import + lint). Wrote `docs/target-management-implementation.md` — a precise handoff
-for the two files the assistant cannot generate (`security/target_validation.py` and
-`services/target_service.py`, each halted by the safety classifier): exact signatures,
-behaviour, security rules, and required tests. Once the owner adds those two files, the
-assistant will build the authorization service, `/api/targets` endpoints, frontend
-target pages and tests around them, unblocking Phases 6–13.
-**Next:** owner implements the two files per the handoff; or the assistant continues
-unblocked static-engine work (return-value taint, Django depth, demo fixtures, report
-polish).
+2026-10-09: Added return-value taint (`x = helper(); sink(x)`): a local helper that
+returns attacker-influenced data now taints its call result, including helpers that
+read request input themselves and multi-hop return chains; constant-returning helpers
+stay clean and recursion terminates. 147 static/report tests pass (+1 PDF skip).
+Target-management Phases 4-5 remain blocked for the assistant (the two files the safety
+classifier halted); `docs/target-management-implementation.md` is the owner handoff and
+`schemas/target.py` is committed.
+**Next unblocked:** Django settings misconfig + class-based IDOR, cross-file return
+taint, a labelled demo fixtures pack, or report polish.

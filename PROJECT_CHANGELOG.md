@@ -416,3 +416,22 @@ Append-only. Never rewrite past entries.
   the assistant may not reproduce that content. They are not policy-prohibited and must
   be supplied by the owner. Everything around them (authorization service, endpoints,
   frontend, tests) will be built by the assistant once they exist.
+
+## 2026-10-09 (Return-value taint)
+
+### Added
+- Return-value taint (Python, within a file): a local helper that returns
+  attacker-influenced data taints its call result, for assignments and for calls used
+  directly as a sink argument. Covers helpers that read request input themselves and
+  multi-hop return chains.
+
+### Changed
+- Taint helpers take an optional `_Ctx` (functions, depth, memo cache); defaults keep
+  `access_control.py` and other callers working unchanged.
+
+### Tests
+- test_taint_retval.py (7). Static + report suite: 147 passed, 1 skipped (PDF).
+
+### Notes
+- Within-file only; cross-file return flow is not modelled. Constant returns are not
+  tainted; recursion is guarded by depth bound + cache pre-seed.

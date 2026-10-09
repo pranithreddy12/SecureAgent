@@ -239,18 +239,21 @@ def _python_taint(relpath: str, text: str) -> list[TaintFinding]:
 def _python_taint_tree(tree, relpath: str, lines: list[str], functions: dict) -> list[TaintFinding]:
     """Intra + within-file interprocedural taint for one parsed module."""
     findings: list[TaintFinding] = []
+    ctx = _Ctx(functions, 0, {})
     for func in functions.values():
         init = _handler_param_taint(func) if _is_handler(func) else set()
-        tainted = _function_tainted(func, init)
-        findings += _sinks_in_function(func, tainted, relpath, lines)
+        tainted = _function_tainted(func, init, ctx)
+        findings += _sinks_in_function(func, tainted, relpath, lines, ctx)
     for func in functions.values():
         if _is_handler(func):
-            tainted = _function_tainted(func, _handler_param_taint(func))
-            findings += _propagate(func, tainted, functions, relpath, lines, 0, set())
+            tainted = _function_tainted(func, _handler_param_taint(func), ctx)
+            findings += _propagate(func, tainted, functions, relpath, lines, 0, set(), ctx)
     return findings
 
 
-def _propagate(func, tainted, functions, relpath, lines, depth, visited) -> list[TaintFinding]:
+def _propagate(
+    func, tainted, functions, relpath, lines, depth, visited, ctx: _Ctx | None = None
+) -> list[TaintFinding]:
     if depth >= MAX_CALL_DEPTH:
         return []
     findings: list[TaintFinding] = []
@@ -261,30 +264,32 @@ def _propagate(func, tainted, functions, relpath, lines, depth, visited) -> list
         callee = functions.get(callee_name)
         if callee is None:
             continue
-        passed = _tainted_params_for_call(call, tainted, callee)
+        passed = _tainted_params_for_call(call, tainted, callee, ctx)
         if not passed:
             continue
         key = (callee_name, frozenset(passed))
         if key in visited:
             continue
         visited.add(key)
-        callee_tainted = _function_tainted(callee, passed)
-        findings += _sinks_in_function(callee, callee_tainted, relpath, lines)
+        callee_tainted = _function_tainted(callee, passed, ctx)
+        findings += _sinks_in_function(callee, callee_tainted, relpath, lines, ctx)
         findings += _propagate(
-            callee, callee_tainted, functions, relpath, lines, depth + 1, visited
+            callee, callee_tainted, functions, relpath, lines, depth + 1, visited, ctx
         )
     return findings
 
 
-def _tainted_params_for_call(call: ast.Call, caller_tainted: set[str], callee) -> set[str]:
+def _tainted_params_for_call(
+    call: ast.Call, caller_tainted: set[str], callee, ctx: _Ctx | None = None
+) -> set[str]:
     positional = [a.arg for a in [*getattr(callee.args, "posonlyargs", []), *callee.args.args]]
     passed: set[str] = set()
     for i, arg in enumerate(call.args):
-        if i < len(positional) and _expr_tainted(arg, caller_tainted):
+        if i < len(positional) and _expr_tainted(arg, caller_tainted, ctx):
             passed.add(positional[i])
     names = set(positional) | {a.arg for a in callee.args.kwonlyargs}
     for kw in call.keywords:
-        if kw.arg in names and _expr_tainted(kw.value, caller_tainted):
+        if kw.arg in names and _expr_tainted(kw.value, caller_tainted, ctx):
             passed.add(kw.arg)
     return passed
 
@@ -296,14 +301,14 @@ def _handler_param_taint(func) -> set[str]:
     }
 
 
-def _function_tainted(func, initial: set[str]) -> set[str]:
+def _function_tainted(func, initial: set[str], ctx: _Ctx | None = None) -> set[str]:
     tainted = set(initial)
     assigns = _collect_assignments(func)
     changed = True
     while changed:
         changed = False
         for targets, value in assigns:
-            if _expr_tainted(value, tainted):
+            if _expr_tainted(value, tainted, ctx):
                 for t in targets:
                     if t not in tainted:
                         tainted.add(t)
@@ -312,14 +317,14 @@ def _function_tainted(func, initial: set[str]) -> set[str]:
 
 
 def _sinks_in_function(
-    func, tainted: set[str], relpath: str, lines: list[str]
+    func, tainted: set[str], relpath: str, lines: list[str], ctx: _Ctx | None = None
 ) -> list[TaintFinding]:
     out: list[TaintFinding] = []
     seen: set[tuple[str, int]] = set()
     for call in ast.walk(func):
         if not isinstance(call, ast.Call):
             continue
-        hit = _check_sink(call, tainted)
+        hit = _check_sink(call, tainted, ctx)
         if hit and (hit[0], call.lineno) not in seen:
             seen.add((hit[0], call.lineno))
             vuln_type, sink = hit
@@ -332,34 +337,38 @@ def _sinks_in_function(
     return out
 
 
-def _check_sink(call: ast.Call, tainted: set[str]) -> tuple[str, str] | None:
+def _check_sink(
+    call: ast.Call, tainted: set[str], ctx: _Ctx | None = None
+) -> tuple[str, str] | None:
     name = _dotted(call.func) or ""
     last = name.rsplit(".", 1)[-1]
     args = call.args
     kw = {k.arg: k.value for k in call.keywords if k.arg}
     a0 = args[0] if args else None
 
-    if last in {"execute", "executemany", "executescript", "raw"} and _tainted(a0, tainted):
+    if last in {"execute", "executemany", "executescript", "raw"} and _tainted(a0, tainted, ctx):
         return "sql_injection", name
-    if last == "text" and _tainted(a0, tainted):
+    if last == "text" and _tainted(a0, tainted, ctx):
         return "sql_injection", name
     if (name in {"os.system", "os.popen"} or last in {"system", "popen", "getoutput"}) and any(
-        _tainted(a, tainted) for a in args
+        _tainted(a, tainted, ctx) for a in args
     ):
         return "command_injection", name
     if (
         "subprocess" in name
         and _is_true(kw.get("shell"))
-        and any(_tainted(a, tainted) for a in args)
+        and any(_tainted(a, tainted, ctx) for a in args)
     ):
         return "command_injection", f"{name}(shell=True)"
-    if name in {"eval", "exec", "builtins.eval", "builtins.exec"} and _tainted(a0, tainted):
+    if name in {"eval", "exec", "builtins.eval", "builtins.exec"} and _tainted(a0, tainted, ctx):
         return "code_injection", name
-    if _is_http_call(name, last) and (_tainted(a0, tainted) or _tainted(kw.get("url"), tainted)):
+    if _is_http_call(name, last) and (
+        _tainted(a0, tainted, ctx) or _tainted(kw.get("url"), tainted, ctx)
+    ):
         return "ssrf", name
     if (
         name == "open" or last in {"send_file", "send_from_directory", "FileResponse"}
-    ) and _tainted(a0, tainted):
+    ) and _tainted(a0, tainted, ctx):
         return "path_traversal", name
     return None
 
@@ -500,17 +509,59 @@ def _target_names(targets) -> list[str]:
     return names
 
 
-def _tainted(node: ast.expr | None, tainted: set[str]) -> bool:
-    return node is not None and _expr_tainted(node, tainted)
+@dataclass
+class _Ctx:
+    """Return-value taint context: the file's functions, recursion depth, and a memo cache
+    (pre-seeded False per key, which also breaks recursive call cycles)."""
+
+    functions: dict
+    depth: int = 0
+    cache: dict | None = None
 
 
-def _expr_tainted(node: ast.expr, tainted: set[str]) -> bool:
+def _tainted(node: ast.expr | None, tainted: set[str], ctx: _Ctx | None = None) -> bool:
+    return node is not None and _expr_tainted(node, tainted, ctx)
+
+
+def _expr_tainted(node: ast.expr, tainted: set[str], ctx: _Ctx | None = None) -> bool:
     for sub in ast.walk(node):
         if isinstance(sub, ast.Name) and sub.id in tainted:
             return True
         if _is_source(sub):
             return True
+        if (
+            ctx is not None
+            and isinstance(sub, ast.Call)
+            and _call_returns_tainted(sub, tainted, ctx)
+        ):
+            return True
     return False
+
+
+def _call_returns_tainted(call: ast.Call, tainted: set[str], ctx: _Ctx) -> bool:
+    """True if a call to a function defined in this file returns attacker-influenced data,
+    either derived from tainted arguments or read from request input inside the callee."""
+    if ctx.depth >= MAX_CALL_DEPTH:
+        return False
+    callee = ctx.functions.get((_dotted(call.func) or "").rsplit(".", 1)[-1])
+    if callee is None:
+        return False
+    passed = _tainted_params_for_call(call, tainted, callee, ctx)
+    cache = ctx.cache if ctx.cache is not None else {}
+    key = (id(callee), frozenset(passed))
+    if key in cache:
+        return cache[key]
+    cache[key] = False  # in-progress guard: recursion resolves to False
+    inner = _Ctx(ctx.functions, ctx.depth + 1, cache)
+    callee_tainted = _function_tainted(callee, passed, inner)
+    result = any(
+        isinstance(n, ast.Return)
+        and n.value is not None
+        and _expr_tainted(n.value, callee_tainted, inner)
+        for n in ast.walk(callee)
+    )
+    cache[key] = result
+    return result
 
 
 def _is_source(node: ast.expr) -> bool:
