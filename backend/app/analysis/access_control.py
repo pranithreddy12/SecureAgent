@@ -24,6 +24,7 @@ from app.analysis.taint import (
     _expr_tainted,
     _injected_params,
     _is_handler,
+    mark_view_handlers,
 )
 
 # ORM-ish receivers for a by-id lookup (reduces false hits on dict/cache .get()).
@@ -73,6 +74,7 @@ def analyze_access_control(relpath: str, text: str) -> list[IdorFinding]:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
         return []
+    mark_view_handlers(tree)
     findings: list[IdorFinding] = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_handler(node):
@@ -210,7 +212,7 @@ def _scoped_to_user(call: ast.Call) -> bool:
 
 
 def _ownership_scoped(func) -> bool:
-    if _has_admin_guard(func):
+    if _has_admin_guard(func) or getattr(func, "_sa_scoped", False):
         return True
     for node in ast.walk(func):
         if isinstance(node, ast.Call) and _scoped_to_user(node):

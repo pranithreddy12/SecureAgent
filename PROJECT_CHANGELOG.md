@@ -435,3 +435,20 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Within-file only; cross-file return flow is not modelled. Constant returns are not
   tainted; recursion is guarded by depth bound + cache pre-seed.
+
+## 2026-10-09 (Django depth)
+
+### Added
+- Django settings checks: SESSION/CSRF cookie Secure flags and SESSION_COOKIE_HTTPONLY
+  set False, CORS_ALLOW_ALL_ORIGINS / CORS_ORIGIN_ALLOW_ALL True (medium), MIDDLEWARE
+  list missing CsrfViewMiddleware.
+- Class-based-view handlers (APIView/ViewSet/View + DRF actions) for taint and IDOR via
+  `taint.mark_view_handlers`; `get_queryset` filtering by request.user counts as
+  ownership scoping.
+
+### Fixed
+- Handlers sharing a method name across classes (`get`, `post`) were collapsed by a
+  name->node dict and some were never analysed; handler loops now walk all function nodes.
+
+### Tests
+- test_django_depth.py (14). Static + report suite: 161 passed, 1 skipped (PDF).

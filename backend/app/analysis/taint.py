@@ -17,7 +17,7 @@ import ast
 import re
 from dataclasses import dataclass
 
-from app.analysis.routes import HTTP_METHODS
+from app.analysis.routes import _CBV_BASE_HINTS, _CBV_METHOD_MAP, HTTP_METHODS
 
 SOURCE_ROOTS = {"request", "req"}
 SAFE_PARAM_NAMES = {"self", "cls", "db", "session", "request", "req", "current_user", "user"}
@@ -132,6 +132,7 @@ def analyze_taint_project(sources: list[tuple[str, str]]) -> list[TaintFinding]:
             tree = ast.parse(text)
         except (SyntaxError, ValueError):
             continue
+        mark_view_handlers(tree)
         lines = text.splitlines()
         funcs = {
             n.name: n
@@ -146,8 +147,8 @@ def analyze_taint_project(sources: list[tuple[str, str]]) -> list[TaintFinding]:
         findings += _python_taint_tree(tree, relpath, lines, funcs)  # intra + within-file
 
     # Cross-file: from each handler, follow calls that resolve to other modules.
-    for relpath, _tree, _lines, funcs, _imports in parsed:
-        for func in funcs.values():
+    for relpath, ptree, _lines, _funcs, _imports in parsed:
+        for func in _all_function_nodes(ptree):
             if _is_handler(func):
                 tainted = _function_tainted(func, _handler_param_taint(func))
                 findings += _propagate_cross(
@@ -225,6 +226,7 @@ def _python_taint(relpath: str, text: str) -> list[TaintFinding]:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
         return []
+    mark_view_handlers(tree)
     lines = text.splitlines()
     functions = {
         n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -240,11 +242,12 @@ def _python_taint_tree(tree, relpath: str, lines: list[str], functions: dict) ->
     """Intra + within-file interprocedural taint for one parsed module."""
     findings: list[TaintFinding] = []
     ctx = _Ctx(functions, 0, {})
-    for func in functions.values():
+    all_funcs = _all_function_nodes(tree)
+    for func in all_funcs:
         init = _handler_param_taint(func) if _is_handler(func) else set()
         tainted = _function_tainted(func, init, ctx)
         findings += _sinks_in_function(func, tainted, relpath, lines, ctx)
-    for func in functions.values():
+    for func in all_funcs:
         if _is_handler(func):
             tainted = _function_tainted(func, _handler_param_taint(func), ctx)
             findings += _propagate(func, tainted, functions, relpath, lines, 0, set(), ctx)
@@ -475,7 +478,47 @@ def _is_depends(node) -> bool:
     }
 
 
+def mark_view_handlers(tree: ast.AST) -> None:
+    """Mark request-handling methods of Django/DRF class-based views so the taint and IDOR
+    analysers treat them as handlers. Methods of a view whose ``get_queryset`` filters by
+    the requesting user are additionally marked ``_sa_scoped`` (ownership enforced there)."""
+    for cls in ast.walk(tree):
+        if not isinstance(cls, ast.ClassDef):
+            continue
+        bases = [_dotted(b) or "" for b in cls.bases]
+        if not any(b.endswith(_CBV_BASE_HINTS) for b in bases):
+            continue
+        scoped = _get_queryset_scopes_to_user(cls)
+        for item in cls.body:
+            if (
+                isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and item.name.lower() in _CBV_METHOD_MAP
+            ):
+                item._sa_handler = True  # type: ignore[attr-defined]
+                item._sa_scoped = scoped  # type: ignore[attr-defined]
+
+
+def _get_queryset_scopes_to_user(cls: ast.ClassDef) -> bool:
+    for item in cls.body:
+        if (
+            isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and item.name == "get_queryset"
+        ):
+            for node in ast.walk(item):
+                if isinstance(node, (ast.Attribute, ast.Name)) and "request.user" in (
+                    _dotted(node) or ""
+                ):
+                    return True
+    return False
+
+
+def _all_function_nodes(tree: ast.AST) -> list:
+    return [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+
+
 def _is_handler(func) -> bool:
+    if getattr(func, "_sa_handler", False):  # class-based view method (see mark_view_handlers)
+        return True
     for dec in func.decorator_list:
         f = dec.func if isinstance(dec, ast.Call) else dec
         if isinstance(f, ast.Attribute) and f.attr.lower() in HTTP_METHODS | {"route"}:

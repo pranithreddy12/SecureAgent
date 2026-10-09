@@ -141,6 +141,13 @@ class _Visitor(ast.NodeVisitor):
             self._add("allowed_hosts_wildcard", "ALLOWED_HOSTS = ['*']", line)
         elif key in {"WTF_CSRF_ENABLED", "CSRF_ENABLED"} and _is_false(value):
             self._add("csrf_disabled", f"{key} = False", line)
+        # --- Django settings ---
+        elif key in _DJANGO_COOKIE_FLAGS and _is_false(value):
+            self._add("insecure_cookie", f"{key} = False", line)
+        elif key in {"CORS_ALLOW_ALL_ORIGINS", "CORS_ORIGIN_ALLOW_ALL"} and _is_true(value):
+            self._add("permissive_cors", f"{key} = True", line, "medium")
+        elif key == "MIDDLEWARE" and _csrf_middleware_missing(value):
+            self._add("csrf_disabled", "CsrfViewMiddleware missing from MIDDLEWARE", line)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
         self._check_decorators(node)
@@ -196,6 +203,21 @@ class _Visitor(ast.NodeVisitor):
 
 
 # --------------------------------------------------------------------------- helpers
+
+
+_DJANGO_COOKIE_FLAGS = {"SESSION_COOKIE_SECURE", "CSRF_COOKIE_SECURE", "SESSION_COOKIE_HTTPONLY"}
+
+
+def _csrf_middleware_missing(value: ast.expr) -> bool:
+    """A Django MIDDLEWARE list that is clearly a real settings list (it names other
+    Django middleware) but omits CsrfViewMiddleware."""
+    if not isinstance(value, (ast.List, ast.Tuple)):
+        return False
+    names = [
+        e.value for e in value.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)
+    ]
+    looks_like_django = any("django.middleware" in n or "SessionMiddleware" in n for n in names)
+    return looks_like_django and not any("CsrfViewMiddleware" in n for n in names)
 
 
 def _target_key(t: ast.expr) -> str | None:
