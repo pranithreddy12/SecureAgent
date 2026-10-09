@@ -477,3 +477,44 @@ Append-only. Never rewrite past entries.
 ### Tests
 - Static + report suite: 171 passed, 1 skipped (PDF). Verified a non-editable install ships
   the fixtures and `demo` runs from the installed copy.
+
+## 2026-10-08 (correction: entry omitted at the time)
+
+### Added
+- `docs/diagrams/` — 7 Mermaid UML diagrams matching the implementation (use case, class, activity,
+  sequence, system architecture, multi-agent workflow [marked designed/not implemented], database ER)
+  and `docs/static-analysis.md`. All diagram blocks were validated as parsing. (This entry was missing
+  from the log; recorded late during the 2026-10-09 close-out. Commit 2986cc5.)
+
+## 2026-10-09 (Report polish)
+
+### Added
+- Report: overall risk rating (highest reportable severity, with an honest 'unverified' caveat), 'Fix first' top priorities, file hotspots, table of contents with anchors, findings consolidated by type with grouped remediation, acronym-aware labels.
+
+### Changed
+- Sections 14/15 list only findings that actually have a CVE/CVSS plus one counted honesty note, instead of one 'Not applicable' line per finding; per-finding detail is a compact 4-column grid. Demo PDF 33 -> 25 pages. Finding order now severity, then status trust, then confidence.
+
+### Tests
+- test_report_polish.py (16).
+
+## 2026-10-09 (Close-out audit)
+
+### Added
+- `--exclude PATTERN`, `<root>/.secureagentignore`, inline `secureagent: ignore`; suppression is counted in text/JSON output. Repo-level `.secureagentignore` (test fixtures) and annotated public-by-design auth routes so `secureagent scan .` is clean (exit 0).
+- `backend/requirements.lock` (45 pins, generated on python:3.12-slim); Docker backend image installs it.
+- Recognition of `requirements/<name>.txt`, `requirements*.lock` layouts.
+- Tests: test_suppression.py (25), test_env_contract.py (3), test_cli_standalone.py (4); dependency ingestion regression.
+- Docs: `docs/testing.md`, `docs/deployment.md`, `docs/PROJECT_CLOSEOUT.md`, ADR-009; complete README.
+- `.github/workflows/ci.yml` (backend lint+tests with PostgreSQL service, frontend lint/types/build, SecureAgent self-scan + demo smoke test). Not yet run on GitHub.
+
+### Fixed
+- Installed `secureagent scan` crashed on a clean machine (ORM import via shared enums): enums moved to `app/core/enums.py` (re-exported from `app/models/enums.py`); regression test added.
+- `poetry.lock` / `Pipfile.lock` were never scanned (`.lock` treated as binary).
+- Secret false positives: format placeholders (`{X}`), fetch option values (`same-origin`...); one key reported twice (provider + generic).
+- Swallowed exception in the CLI replaced with `contextlib.suppress`.
+
+### Changed
+- Memory file restructured (508 -> ~316 lines); stale traceability rows corrected; `frontend/AGENTS.md` and `frontend/CLAUDE.md` untracked and git-ignored (tool-generated; owner prefers no Claude traces in the repo).
+
+### Tests
+- Backend 253 collected: 252 passed, 1 skipped (PDF; passes in Docker); coverage 93%. Live OSV scan of the backend lock: no known vulnerabilities; frontend: `braces` (dev-only).

@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-09 (demo fixtures pack: `secureagent demo`)
+Last updated: 2026-10-09 (close-out audit; memory restructured)
 
 ## 1. Project Identity
 
@@ -22,202 +22,58 @@ existing system, hardware requirements, PPT references) are marked PENDING. When
 PPT arrives: fill PENDING sections only and log any conflicts in §16.
 
 ## 3. Current Scope
-
 ### Implemented
-- Phase 0: specification, memory, changelog, traceability, design docs, ADR-001…005,
-  `.gitignore`, `.env.example`, README stub, git init.
-- Phase 1: backend skeleton (`backend/app/main.py` app factory, `core/config.py`
-  Settings covering every `.env.example` variable, `GET /api/health`), pytest + ruff;
-  Next.js 16 frontend (App Router, TS, Tailwind v4, standalone output, `/api/*`
-  rewrite to backend); `docker/backend.Dockerfile`, `docker/frontend.Dockerfile`,
-  `docker-compose.yml` (postgres, zap, backend, frontend, `lab` profile juice-shop),
-  Makefile, `.gitattributes` (LF), `.dockerignore`.
-- Phase 2: SQLAlchemy 2 models for all 8 tables (`backend/app/models/`: user, target
-  [+AuthorizationRecord], audit [+ReconnaissanceResult, AuditLog], finding
-  [Vulnerability], report, enums, base); async engine/session + `get_db` dependency
-  (`app/core/database.py`); Alembic (async template, URL from settings) with initial
-  migration `afb3ff51caae`; backend container runs `alembic upgrade head` on start.
-- Phase 3: authentication (ADR-006) — `app/core/security.py` (Argon2id, JWT),
-  `app/schemas/auth.py`, `app/services/user_service.py`, `app/api/deps.py`
-  (`DbSession`, `CurrentUser`, `require_admin`), `app/api/auth.py`
-  (register/login/logout/me). Compose: backend healthcheck; frontend waits for it.
-- Phase 14 (part 1): frontend foundation — dark design tokens (`app/globals.css`,
-  incl. severity colours), `lib/api.ts` (same-origin fetch wrapper, `ApiError`,
-  `safeNextPath` open-redirect guard), `types/api.ts`, `services/auth.ts`,
-  `proxy.ts` (Next 16 replacement for middleware: cookie-presence redirect to
-  `/login?next=`), `hooks/useCurrentUser.ts` (401 → login), `components/ui.tsx`,
-  `AuthShell`, `Sidebar` (unbuilt sections shown disabled "soon", never fake pages),
-  `SystemStatus`; pages `/login`, `/register` (auto-login), `/dashboard` (live
-  health + honest empty state, no simulated metrics), `/settings` (account + status),
-  `/` → `/dashboard`.
-- Phase 13 (rendering layer, ADR-007): `app/schemas/report.py` (`ReportContext`,
-  `ReportFinding`, `CvssScore`, `TimelineEntry`; derived views: reportable findings
-  sorted by severity, false-positive split, severity/status counts, OWASP/CWE
-  grouping, deterministic executive summary; `NO_CVE`/`NO_CVSS` fallback strings),
-  `app/reports/templates/report.html` (all 19 sections, A4 print CSS, page numbers,
-  DEMO watermark/banner), `app/reports/renderer.py` (`render_html` autoescaped +
-  StrictUndefined; `render_pdf` via WeasyPrint, lazy import). Not yet wired to the
-  DB or an API — the Report Agent (which builds `ReportContext` from an audit) and
-  `/api/audits/{id}/report*` endpoints come once audits exist.
+
+**Static-analysis engine + CLI** (`backend/app/analysis/`, `backend/app/cli.py`; full detail in
+`docs/static-analysis.md`, history in `PROJECT_CHANGELOG.md`)
+- Read-only ingestion with limits; `--exclude` / `.secureagentignore`; inline `secureagent: ignore`
+  (all suppression is counted in the output, never silent).
+- Detectors: hardcoded secrets (redacted); dependencies + OSV (requirements*/Pipfile.lock/poetry.lock/
+  package-lock.json); dangerous sinks; taint (within function, within file, **cross-file**,
+  **return-value**, JS/TS heuristic); IDOR; misconfiguration (Flask/FastAPI/Django); logging (A09);
+  route + authorization extraction (FastAPI, Flask, Express, Django/DRF incl. class-based views, NestJS).
+- Output: text, JSON, SARIF 2.1.0, HTML, PDF; baseline (`--baseline`, `--write-baseline`) and
+  `--fail-on` CI gating; `secureagent demo` (bundled deliberately vulnerable sample + a safe-code file).
+- Installable `secureagent` command needing only jinja2 + pydantic (`pdf` extra for WeasyPrint);
+  guarded by `tests/test_cli_standalone.py` (runs with SQLAlchemy/FastAPI imports poisoned).
+- Honesty model: static findings are never `confirmed`; heuristic ones are `suspicious`; CVE only from
+  real advisories; CVSS only when supplied (currently never populated for OSV findings).
+
+**Reporting** (`app/schemas/report.py`, `app/reports/`, `app/analysis/reporting.py`): 19-section
+HTML/PDF report with table of contents, risk rating, "Fix first" priorities, hotspots, findings
+consolidated by type, grouped remediation, compact CVE/CVSS sections; DEMO labelling.
+
+**Web app (skeleton)**: FastAPI app factory + settings; Argon2id/JWT-cookie authentication
+(`/api/auth/*`, ADR-006); 8 SQLAlchemy models + Alembic migration `afb3ff51caae`; Next.js 16 frontend
+(login, register, dashboard shell with live health, settings, route protection); Docker Compose
+(postgres, zap, backend, frontend, `lab` juice-shop); backend image pinned to `requirements.lock`.
+
+**Project infrastructure**: SPECIFICATION (PPT sections still PENDING), memory, changelog, 8 ADRs,
+traceability, 7 validated UML diagrams, docs (architecture, agent-workflow, security-model, database, api,
+static-analysis, business-logic-engine, testing, deployment, demo-guide, closeout), README, repo CI
+workflow (`.github/workflows/ci.yml`, **not yet run on GitHub**), GitHub Action example.
 
 ### In Progress
-- Phase 14 frontend: auth pages + app shell done; data pages wait on their APIs.
+- Nothing. The 2026-10-09 close-out pass is complete; see `docs/PROJECT_CLOSEOUT.md`.
 
 ### Blocked
-- **Phases 4–5 (target management, safety validation, authorization)** — 2026-10-03:
-  two attempts to generate this code (`backend/app/security/target_validation.py`,
-  then `backend/app/services/target_service.py`) were stopped by an automated safety
-  classifier during generation. The assistant may not regenerate that content.
-  Requirements are unchanged (not a scope change). Path forward: the owner writes
-  the target service/endpoints and the safety validator per `docs/api.md` and
-  `docs/security-model.md` §2; the assistant can then review, test and integrate.
-  `backend/app/schemas/target.py` (target/authorization Pydantic schemas) is now
-  **committed** (safe, import/lint verified). The two blocked files have a precise
-  implementation handoff in `docs/target-management-implementation.md`.
-- Phases 6–13 (agents, workflow, recon, ZAP, Nuclei, validation, validator,
-  reports) depend on targets/authorization; not started.
+- **Phases 4-5 (target management, network-safety validation, authorization)** — the generation of
+  `backend/app/security/target_validation.py` and `backend/app/services/target_service.py` was stopped
+  twice by an automated safety classifier; the assistant may not regenerate that content. Requirements
+  are unchanged. Hand-off spec: `docs/target-management-implementation.md`; the schemas
+  (`app/schemas/target.py`) are committed. Once the owner supplies the two files the assistant can
+  build the authorization service, `/api/targets` endpoints, frontend pages and tests around them.
+- Phases 6-12 and 15 (reconnaissance, ZAP, Nuclei, safe validation, validator, report agent, LangGraph
+  workflow, audit runner, progress) depend on targets/authorization; **not started**.
 
 ### Planned
-- Phases 4–20 per brief (§36). Next: Phase 4 target management.
-- Backend packages (`models`, `schemas`, `services`, `agents`, `tools`, `workflows`,
-  `security`, `reports`, `demo`) are created in the phase that first puts code in them,
-  not as empty placeholders.
-- **Grey-box business-logic engine (ADR-008, `docs/business-logic-engine.md`)** —
-  designed 2026-10-03; phases BL-1…BL-7. Most phases depend on Phases 4–5.
-  **BL-1 + BL-3 built & tested (static, standalone, no DB/web needed):**
-  `app/analysis/ingest.py` (read-only repo walk; skips vendored/VCS/binary; size &
-  file-count limits; never executes repo code), `app/analysis/secrets.py` (provider
-  signatures + generic secret-keyword/entropy detection; redaction + fingerprint,
-  full value never stored), `app/analysis/scanner.py`, `app/cli.py`
-  (`python -m app.cli scan <dir>`, text/JSON, exit 1 on findings → CI-gating).
-  `make scan DIR=...`. Verified on the project's own tree.
-  **BL-2 built & tested:** `app/analysis/routes.py` extracts HTTP routes (Python via
-  stdlib `ast` for FastAPI/Flask-style; JS/TS via regex for Express-style) and flags
-  state-changing or privileged endpoints with no detected auth
-  dependency/decorator/middleware → `missing_function_level_authorization` findings
-  (deliberately 0.4 confidence / status `suspicious`, since global middleware is
-  invisible to static analysis; never `confirmed`). **Report wiring built:**
-  `app/analysis/reporting.py` maps a `ScanResult` → the Phase-13 `ReportContext`;
-  CLI `--report out.html` / `--pdf out.pdf` produce the 19-section professional
-  report from a pure source scan. Real run on our own `app/`: 5 routes found, 3
-  unauthenticated POSTs flagged for review (correct — login/register are public).
-  **Dependency/SCA built & tested:** `app/analysis/dependencies.py` parses
-  requirements.txt / Pipfile.lock / poetry.lock / package-lock.json (PyPI + npm);
-  `app/analysis/osv.py` queries the public OSV database (osv.dev, no key, stdlib
-  urllib; injectable fetch for offline tests) for known advisories on declared
-  versions. Findings → A06/CWE-1104, status `likely`, CVE only when the advisory id
-  is a real CVE (never invented). CLI `--no-osv` for offline; graceful on network
-  failure. Real run: flagged PyYAML 5.1 (critical) and requests 2.19.0 (high).
-  **Batch #1 dangerous-sink pack built & tested:** `app/analysis/sinks.py` (Python via
-  `ast` with import-alias resolution; JS/TS via regex) detects insecure
-  deserialization (pickle/yaml.load/marshal → CWE-502/A08), command execution
-  (os.system, subprocess shell=True → CWE-78/A03), code execution (eval/exec → CWE-95),
-  weak hashing (md5/sha1 → CWE-327/A02), disabled TLS verification (verify=False →
-  CWE-295), insecure temp files (mktemp → CWE-377), XXE-prone XML parsing (CWE-611),
-  and JS innerHTML XSS sinks (CWE-79). Honest status: definite misconfig (weak crypto,
-  TLS) → likely; input-dependent sinks → suspicious; never confirmed. Wired into
-  scanner/CLI/report. Real run flagged all 6 planted sinks correctly; safe variants
-  (yaml.safe_load, sha256, argv subprocess, verify=True) not flagged.
-  **Batch #2 taint-lite built & tested:** `app/analysis/taint.py` — intraprocedural,
-  flow-insensitive (fixpoint) Python taint. Sources: web-handler params (route-
-  decorated funcs; excludes self/cls, Depends-injected, and safe names like db/
-  current_user) and `request.*` accesses. Sinks: SQL execute/text (query arg only →
-  parameterised queries are safe), os.system/popen/subprocess(shell=True), eval/exec,
-  outbound HTTP (requests/httpx/urllib/aiohttp → SSRF), open/send_file (path
-  traversal). Findings: sql_injection(CWE-89), command_injection(78),
-  code_injection(95), ssrf(918/A10), path_traversal(22). Status likely for
-  sql/cmd/code, suspicious for ssrf/path; never confirmed. Bare sinks superseded by a
-  taint finding at the same line are de-duplicated. Real run correctly flagged the
-  concatenated SQL query but NOT the parameterised one.
-  **Deepened (#1):** Python taint is now interprocedural within a file (handler → local
-  callees, bounded MAX_CALL_DEPTH=4, cycle-guarded, sink reported at the callee line,
-  deduped). Added JS/TS taint over req.query/params/body/cookies/headers → SQL/command/
-  code/SSRF/path + res.redirect open_redirect (CWE-601/A01). Real run caught command
-  injection inside a helper and JS SQLi + open redirect.
-  **Consolidation for adoption:** `app/analysis/baseline.py` (line-independent finding
-  fingerprint; load/write baseline; severity threshold). CLI: `--write-baseline`,
-  `--baseline` (suppress accepted findings → gate on NEW only), `--fail-on
-  critical|high|medium|low`; JSON now has a unified `findings` list with fingerprints +
-  `summary`. Installable: pyproject `[project]` + `[project.scripts] secureagent=app.cli:main`
-  (`pip install -e backend`; deps jinja2+pydantic; report templates as package-data).
-  `docs/ci/github-actions-example.yml`. Verified end-to-end: first scan exit 1 →
-  write-baseline → baselined scan exit 0 → new vuln + --fail-on high → exit 1.
-  **SARIF output:** `app/analysis/sarif.py` emits SARIF 2.1.0 (`--format sarif`) for
-  GitHub code scanning — one rule per finding type, result level (critical/high→error,
-  medium→warning, low/info→note) + `security-severity` property (9.5/8.0/5.5/3.0/1.0),
-  partialFingerprints (our stable fingerprint), CWE helpUri, posix-normalised paths,
-  dep findings default to line 1. GH Action example updated to upload-sarif +
-  fail-on-high gate. Verified real SARIF (version 2.1.0, rules, result level/severity/
-  location).
-  **Academic docs:** 7 Mermaid UML diagrams in `docs/diagrams/` (use case, class,
-  activity, sequence, system architecture, agent workflow, DB ER) — validated as
-  parsing via in-browser mermaid; implemented vs designed clearly separated
-  (agent/LangGraph pipeline marked not-implemented). `docs/static-analysis.md` documents
-  the implemented engine (detectors, pipeline, OWASP coverage, limits).
-  **Frameworks (Django + NestJS):** `routes.py` now extracts Django DRF function views
-  (`@api_view([...])`, auth via permission_classes/login_required; AllowAny = public)
-  and class-based views (APIView/ViewSet/View + DRF action→method map; protected by
-  permission_classes/LoginRequired/PermissionRequired mixins), and NestJS controllers
-  (`@Controller` prefix + `@Get/@Post/...` methods, auth via class/method `@UseGuards`,
-  `@Public()` override). `_is_handler` now also recognises `@api_view`, so taint + IDOR
-  cover DRF function views (URL kwargs tainted). Real run flagged a DRF IDOR
-  (Account.objects.get(pk=pk)) and NestJS/Django unprotected endpoints.
-  **A09 logging & monitoring:** `app/analysis/logging_checks.py` flags CWE-532/CWE-778.
-  **Return-value taint:** a local helper that returns attacker-influenced data now
-  taints its call result (`x = helper(); sink(x)`, also `sink(helper())`). `_Ctx`
-  (functions, depth, memo cache) is threaded through the taint helpers; a call is
-  tainted if the callee's `return` expression is tainted given the tainted args passed
-  (covers helpers that read `request` themselves and multi-hop return chains).
-  Depth-bounded by MAX_CALL_DEPTH; the cache is pre-seeded False so recursion
-  terminates. Within-file only (cross-file return flow is not modelled). A helper that
-  returns a constant is correctly NOT tainted.
-  **Django depth:** `misconfig.py` now flags Django settings (SESSION_COOKIE_SECURE /
-  CSRF_COOKIE_SECURE / SESSION_COOKIE_HTTPONLY = False -> insecure_cookie; CORS_ALLOW_ALL_
-  ORIGINS / CORS_ORIGIN_ALLOW_ALL = True -> permissive_cors (medium); a real-looking
-  MIDDLEWARE list without CsrfViewMiddleware -> csrf_disabled). Class-based-view methods
-  (APIView/ViewSet/View + DRF action names) are now marked as handlers by
-  `taint.mark_view_handlers(tree)` (sets `_sa_handler` / `_sa_scoped` attributes on AST
-  nodes), so taint (URL kwargs, request.data/GET) and IDOR cover them. A view whose
-  `get_queryset` references `request.user` is treated as ownership-scoped (no IDOR).
-  Handler iteration now walks every function node (not the name->node dict), so methods
-  sharing a name (`get`/`post` in several views) are no longer dropped.
-  **Demo pack:** `secureagent demo` (`cli._run_demo`) scans a bundled, deliberately
-  vulnerable sample app (`app/demo/demo_fixtures/vulnerable_shop/`: app.py, config.py,
-  safe_routes.py [correct code, must yield 0 findings], server.js, requirements.txt) with the
-  real engine, offline by default (`--online` adds OSV). Prints a DEMO banner; `--report/--pdf`
-  produce reports with `is_demo=True` (DEMO / SIMULATED SECURITY AUDIT banner + watermark;
-  banner text says the *subject* is a fixture, since the scan itself is real). Exit code 0
-  (showcase, not a gate). `scan_to_report_context(demo=True)`. `demo_fixtures` is in
-  ingest.IGNORED_DIRS (ordinary scans/CI skip it; the demo root is exempt from pruning) and
-  excluded from ruff; shipped via package-data `app.demo`. Fixtures avoid provider-format
-  tokens (GitHub push protection): only AWS's documented example key + generic fake secrets.
-  `tests/test_demo.py` (11) pins: all planted classes found, safe file clean, placeholder
-  ignored, AWS key reported once, never `confirmed`, report labelled + redacted, banner/exit
-  code, ordinary scans exclude fixtures. Demo = 25 findings offline. `docs/demo-guide.md`.
-  Also fixed: the generic-credential rule no longer re-reports a value a provider rule already
-  matched on the same line. NOTE: this is the static-engine demo; the spec's fixture demo of
-  the multi-agent live pipeline (recon/ZAP/Nuclei) is still not built (blocked on targets).
-  **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
-  flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
-  Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
-  with no ownership scoping. Suppressed when the query is scoped to the current user
-  (filter by current_user/user_id), an ownership comparison exists (record.user_id !=
-  current_user.id), or an admin guard is present. Reuses taint sources. Finding: idor
-  (CWE-639/A01), status suspicious, confidence 0.4 if current_user referenced else 0.6.
-  Real run flagged the unscoped handler but not the user-scoped one.
-  **Batch #4 security misconfiguration built & tested:** `app/analysis/misconfig.py`
-  (AST) detects debug mode (DEBUG=True / app.debug / app.run(debug=True) /
-  config['DEBUG']=True → CWE-489), permissive CORS (wildcard origin + credentials →
-  CWE-942, high; wildcard alone medium), disabled JWT verification / alg 'none'
-  (jwt.decode verify=False / options verify_signature False / algorithms ['none'] →
-  CWE-347), CSRF disabled (@csrf_exempt / WTF_CSRF_ENABLED=False → CWE-352), template
-  autoescape off (Environment(autoescape=False) → CWE-79), wildcard ALLOWED_HOSTS
-  (CWE-16), insecure cookies (set_cookie secure/httponly False → CWE-614). Status
-  likely (setting is present). Safe variants (DEBUG=False, specific origins,
-  algorithms=['HS256'], autoescape=True) not flagged. Real run flagged all 4 planted.
+- Everything blocked above; frontend pages for targets/audits/findings/reports/activity; dashboard data;
+  structured per-audit logging; optional LLM reasoning; frontend tests; login rate limiting; admin bootstrap.
+- Grey-box business-logic engine beyond what exists (ADR-008): workflow-order and client-trusted-value
+  detection, developer-intent input, Application Model persistence.
 
 ### Deferred
-- Continuous / scheduled audits, CI/CD integration (architecture extensible only).
+- Continuous / scheduled audits and CI/CD-triggered audits (architecture is extensible only).
 
 ### Removed
 - None.
@@ -300,21 +156,24 @@ ALLOW_PRIVATE_TARGETS, TARGET_ALLOWLIST, DEMO_MODE, REPORTS_DIR). Dev machine
 Container images will pin Python 3.12 for library-wheel compatibility.
 
 ## 13. Development Progress
-
 | Phase | Status |
 |---|---|
-| 0 Requirements & architecture | ✅ Done 2026-10-02 |
-| 1 Repository structure | ✅ Done 2026-10-03 |
-| 2 Database & migrations | ✅ Done 2026-10-03 |
-| 3 Authentication | ✅ Done 2026-10-03 |
-| 4 Target management | ⛔ Blocked (see §3) |
-| 5 Authorization & restrictions | ⛔ Blocked (see §3) |
-| 6–13 | Not started (depend on 4–5) |
-| 13 Report generation | 🟡 Rendering layer done (HTML+PDF); agent/API pending audits |
-| Static engine (secrets + deps/OSV + sinks + taint + IDOR + misconfig + routes/authz + report) | ✅ Done 2026-10-06 (standalone CLI + HTML/PDF) |
-| 14 Frontend | 🟡 Part 1 done (auth pages, shell) |
-| 20 Documentation (UML + static-analysis docs) | 🟡 Diagrams + engine docs done (match code) |
-| 15–19 | Not started |
+| 0 Requirements & architecture | Done |
+| 1 Repository structure | Done |
+| 2 Database & migrations | Done |
+| 3 Authentication | Done |
+| 4 Target management | **Blocked** (see §3) |
+| 5 Authorization & restrictions | **Blocked** (see §3) |
+| 6-12 Agents, workflow, recon, ZAP, Nuclei, validation, validator | Not started (depend on 4-5) |
+| 13 Report generation | Rendering layer + polish done; Report *agent* pending audits |
+| 14 Frontend | Auth pages + shell done; data pages pending their APIs |
+| 15 Audit progress | Not started |
+| 16 Demo mode | Static-engine demo done; fixture demo of the agent pipeline pending |
+| 17 Testing | 253 backend tests, 93% coverage; no frontend/e2e tests |
+| 18 Docker integration | Compose + images build and run; pipeline services unused |
+| 19 End-to-end | Not done |
+| 20 Documentation | Done for what exists (UML, guides, closeout) |
+| Extra: grey-box static engine, CLI, CI gating, SARIF | Done (beyond the original phase list; scope change 2026-10-03b) |
 
 ## 14. Architecture Decisions
 
@@ -328,6 +187,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-006 | Argon2id + HS256 JWT in httpOnly SameSite=Lax cookie (+ Bearer) | Accepted |
 | ADR-007 | Report: Pydantic context → Jinja2 HTML → WeasyPrint PDF | Accepted |
 | ADR-008 | Grey-box: source-code analysis + dev intent for business-logic flaws | Accepted |
+| ADR-009 | Scanner CLI is dependency-light; independent of the web stack | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -345,120 +205,57 @@ changelog.
 | 2026-10-03b | Black-box (DAST) auditor only | **Grey-box**: also ingest the app's source repo + developer description, build an Application Model, and detect business-logic flaws (BOLA/IDOR, function-level & inconsistent authz, workflow bypass, client-trusted values, missing limits, hardcoded secrets, insecure state change). Dynamic scanning retained; source optional but recommended. | Owner's primary goal is finding complex business-logic vulns in developers' own apps; scanners can't infer intended rules. | New agents (Code Intelligence, Business-Logic Reasoning), Application Model artifact, repo-ingestion tool, DB additions (`source_artifacts`, `application_models`, `code_locations`/`detection_source` on vulnerabilities), new deps (tree-sitter, git/zip). Designed in ADR-008 + `docs/business-logic-engine.md`. | Designed; not implemented (prereq: Phases 4–5) |
 
 ## 16. Open Issues
-
-- PPT not yet provided (affects SPECIFICATION.md PENDING sections).
-- No admin bootstrap: every registration is `auditor`. Need a CLI/seed command to
-  promote a user to `admin` before any admin-only feature ships.
-- No login rate limiting / lockout yet (not in brief; consider before deployment).
-- Local dev DB contains test users (`smoke*@example.com`, `uitest@example.com`) from
-  manual checks.
-- Secret scanner is regex+entropy (gitleaks-class), not dataflow; may miss obfuscated
-  secrets and flag test fixtures. Tune rules as real repos are scanned.
-- Route/authz detection is per-handler; it cannot see **global** middleware/router-level
-  guards, so unprotected-endpoint findings are low-confidence "review" items by design.
-  FastAPI `Annotated[User, Depends(...)]` annotations aren't yet parsed as guards
-  (only signature defaults + decorators + `dependencies=`); acceptable (such routes
-  are usually GET and unflagged). Add annotation parsing when tuning.
-- SCA matches declared lockfile versions to OSV advisories; it does not yet resolve
-  transitive ranges beyond what the lockfile pins, nor yarn.lock. OSV detail fetch is
-  capped (MAX_DETAIL_FETCHES=150) and needs network (skipped/graceful otherwise).
-- Taint (Python) is interprocedural **within and across files** (import-resolved call
-  graph, bounded depth) and flow-insensitive; it does not follow taint through class
-  attributes or return values, resolves cross-file callees heuristically (import hint /
-  unique name; ambiguous names without a hint are skipped), and does not model
-  sanitizers (can over-report). The whole project's py/js source is held in memory for
-  the taint pass (fine for typical repos). JS taint is a file-scoped regex heuristic.
-  Honest status reflects this (likely/suspicious, never confirmed).
-- IDOR detection is heuristic/intraprocedural: ownership enforced via middleware, a
-  base queryset, or a helper call is invisible, so it can over-report (low/medium
-  confidence, suspicious). `.get()` on an ORM-like receiver (query/session/db/objects/
-  repo) may still FP on a cache named 'db'. Python only.
-- `npm audit`: 5 high advisories in **dev-only** build tooling (`braces`, via
-  eslint/tailwind toolchain); production deps report 0. Re-check on upgrades.
+- **PPT not provided**: `SPECIFICATION.md` sections marked PENDING stay unfilled; conflicts with the PPT
+  are unknown. Provide the PPT and reconcile.
+- **Target management blocked** (see §3) — the single dependency for the live audit pipeline.
+- **CI workflow has never run on GitHub**; pushing `.github/workflows/*` may require a token with the
+  `workflow` scope.
+- **No `LICENSE`** — a licensing decision for the owner.
+- **No login rate limiting / account lockout; no admin bootstrap** (every user is an `auditor`).
+- **Frontend has 0 automated tests**; only manual browser verification.
+- **No detector accuracy benchmark** on public corpora; false-positive/negative rates are unmeasured.
+- CVSS is never populated for OSV findings (reported as "not determined"); advisory CVSS vectors are not
+  parsed to a score.
+- Local dev DB contains test users (`smoke*@example.com`, `uitest@example.com`).
+- `npm audit`: 5 high advisories in dev-only tooling (`braces`); production dependencies report 0;
+  OSV flags `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm).
 
 ## 17. Resolved Issues
-
-- None yet.
+Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 2026-10-09 close-out:
+- **Installed `secureagent scan` crashed on a clean machine** (scanner path imported the ORM package ->
+  SQLAlchemy). Fixed by moving enums to `app/core/enums.py`; regression test `test_cli_standalone.py`.
+- **`poetry.lock` / `Pipfile.lock` were never scanned** (`.lock` was treated as a binary extension). Fixed;
+  regression test goes through real file ingestion.
+- Handlers sharing a method name across classes (`get`/`post`) were collapsed by a name->node dict.
+- Secret scanner: duplicate report of one key (provider + generic rule); format placeholders
+  (`{FAKE}`) and option values (`credentials: "same-origin"`) reported as secrets.
+- CLI crashed printing non-ASCII to a Windows cp1252 console.
+- Backend dependencies were unpinned (`>=`), so SCA saw none; now pinned in `requirements.lock`.
+- Documentation drift: stale traceability rows, a missing changelog entry (UML diagrams), bloated §3.
+- Missing required docs (testing, deployment), incomplete README.
 
 ## 18. Testing Status
-
-- Backend: static-analysis + report tests (no DB): 171 passed + 1 skipped (PDF).
-  Demo tests (test_demo.py, 11). Packaging verified: a non-editable install ships the
-  fixtures + report template and `demo` runs from the installed copy (25 findings).
-  Django depth tests (test_django_depth.py, 14): settings cookies/CORS/CSRF middleware,
-  CBV taint (URL kwarg + request.data), CBV IDOR, get_queryset + inline owner-filter
-  suppression, same-method-name collision, project pass, non-view class not a handler.
-  Return-value taint tests (test_taint_retval.py, 7): helper reads request, taint via
-  return value, constant return safe, two-hop chain, call used directly as sink arg,
-  recursion terminates, sink-line reporting.
-  Cross-file tests (test_taint_crossfile.py, 6): cross-file SQLi reported at the sink
-  file, parameterised-safe, name-collision resolved by import, constant-arg safe,
-  scan_repo integration, within-file preserved.
-  A09 logging tests (test_logging.py, 8): sensitive-in-log variants, non-sensitive &
-  non-logger not flagged, swallowed vs handled except, scan+report.
-  Framework tests (test_frameworks.py, 15): DRF function views + permission_classes/
-  AllowAny, CBV methods + mixins/permission_classes, DRF taint via URL kwarg, NestJS
-  method/class guard/@Public/prefix joining.
-  SARIF tests (test_sarif.py, 8): skeleton, result fields/location, level mapping,
-  Windows path normalisation, CWE helpUri, one-rule-per-type, CLI sarif output.
-  Baseline tests (test_baseline.py, 10): fingerprint stability across line moves,
-  baseline roundtrip, --write-baseline/--baseline/--fail-on exit codes, JSON summary.
-  Deep-taint tests (test_taint_deep.py, 12): interprocedural one/two hops, constant-arg
-  safe, no duplicate across callers; JS SQLi/command/eval/SSRF/open-redirect/path, .ts.
-  Misconfig tests (test_misconfig.py, 13): debug/CORS/JWT/CSRF/autoescape/ALLOWED_HOSTS/
-  cookie detected, safe variants not flagged, scan+report integration.
-  IDOR tests (test_access_control.py, 10): vuln FastAPI/Flask flagged, scoped query &
-  ownership comparison & admin-only & dict .get & non-handler & constant id not
-  flagged, confidence lowering, scan+report integration.
-  Taint tests (test_taint.py, 12): SQLi flagged, parameterised query safe, cmd/ssrf/
-  path/code injection, constant sinks & non-handler helpers & Depends params not
-  tainted, report status mapping.
-  Sink tests (test_sinks.py, 14): each category detected, safe variants not flagged,
-  alias-resolved XXE, status/severity mapping, report HTML, benign code clean.
-  Dependency/OSV tests (test_dependencies.py, 9): lockfile parsers offline, OSV
-  mapping via injected fake transport, scanner integration, --no-osv, graceful
-  network-failure, CVE-vs-GHSA id handling. No test hits the network.
-  Route tests (test_route_scan.py): FastAPI/Flask/Express guard detection, only
-  unprotected sensitive endpoints flagged, benign GETs ignored, syntax-error files
-  skipped, scan→report HTML renders with honest status and redacted secrets. Secret scanner:
-  10 tests (detection of planted fakes, skips vendored/VCS/binary, placeholders & env
-  refs ignored, full value never leaks, CLI text/JSON/exit codes, clean repo exit 0,
-  bad path exit 2). DB-backed tests (models, auth) require the test Postgres container
-  (`make testdb`); they errored this run only because Docker Desktop was stopped — not
-  a code regression. Full suite last green: 37 passed + 1 skipped (before Docker went down). Auth: hashing, register (normalised email, no hash
-  leak, duplicate case-insensitive 409, validation 422, role injection ignored), login
-  cookie flags, me via cookie and Bearer, indistinguishable login failures, bad
-  tokens (garbage, expired, unknown user, wrong key, alg=none), logout, deleted user.
-- Earlier: health, settings, and DB tests run against real
-  Postgres through the real Alembic migration (downgrade base → upgrade head):
-  full graph round-trip, enum value storage, unique fingerprint, unique email,
-  CHECK constraints (progress, status, confidence, severity), cascade delete,
-  FK enforcement. ruff clean. DB tests need `make testdb` (localhost:55432) or
-  `TEST_DATABASE_URL`.
-- Reports: 8 tests (all 19 sections, false positives excluded from counts but
-  listed, CVE/CVSS never invented, untrusted content escaped, DEMO label only on demo,
-  deterministic summary, empty-audit wording, PDF). Locally 7 pass + PDF skipped (no
-  Pango on Windows); in the backend container all 8 pass. Sample PDF (5 A4 pages)
-  checked: sections, page numbers, DEMO watermark, fallback strings.
-  Container test run: `MSYS_NO_PATHCONV=1 docker compose run --rm --no-deps -e HOME=/tmp
-  -v "$(pwd -W)/backend/tests:/app/tests:ro" backend sh -c "pip install --user pytest
-  anyio httpx && python -m pytest tests/test_reports.py"` (Git Bash rewrites `/tmp`
-  paths unless MSYS_NO_PATHCONV=1).
-- Frontend: eslint, `tsc --noEmit`, `next build` passing. Manually verified in the
-  running stack (browser pane): unauthenticated redirects with `?next=`, register →
-  auto-login → dashboard with live health, settings shows account, wrong password
-  shows the API error, sign-out → /login and `/api/auth/me` 401, auth cookie not
-  readable from JS. No automated frontend tests yet (Phase 17).
-- Docker: backend + frontend images build; postgres+backend+frontend start, migrations
-  apply on boot, `/api/health` reachable directly (8000) and via the frontend proxy
-  (3000). ZAP container not yet started/pulled (Phase 9).
-- Known noise: StarletteDeprecationWarning about httpx in TestClient (upstream).
+- **Backend: 253 tests collected, 252 pass, 1 skipped, 0 fail; 93% line coverage.** The skipped test is
+  PDF rendering, which needs Pango (passes in the backend Docker image). DB-backed tests need
+  `make testdb` (PostgreSQL on :55432); they build the schema via the real Alembic migration.
+- Static-analysis tests use snippets + the pinned demo; OSV is tested through an injected fake transport
+  (a live OSV query was verified manually). Per-area table in `docs/testing.md`.
+- **Not tested / absent**: frontend (0 tests; lint, tsc and build pass), end-to-end, the audit pipeline,
+  target safety validation (does not exist). Lowest coverage: `schemas/target.py` 0% (unused),
+  `core/database.py` 69%, `analysis/dependencies.py` 78%, `analysis/osv.py` 84%.
+- Verified manually: Docker Compose stack runs; auth through the frontend proxy; UI flows in a browser;
+  clean-virtualenv install of the CLI (`scan`, `demo --report`); live OSV scan of this repo's own lockfiles.
 
 ## 19. Known Limitations
-
-- (Design) Single backend replica; running audits interrupted by restart (resumable).
-- (Design) Some real vulnerabilities will remain `likely`/`suspicious` because only
-  non-destructive validation is performed.
+- The live audit pipeline, ZAP/Nuclei integration, LLM reasoning and audit-progress UI do not exist.
+- Single backend replica by design (ADR-005); running audits would be lost on restart (resumable).
+- Static analysis cannot prove exploitability, so findings are never `confirmed`; unprotected-endpoint and
+  IDOR findings cannot see global middleware / base querysets (low confidence by design).
+- Python taint resolves cross-file calls heuristically (import hint / unique name), does not model
+  sanitizers, and does not follow class attributes; JS/TS analysis is regex-based (no AST).
+- OSV matching uses pinned versions in lockfiles (no range resolution); needs network (skipped gracefully).
+- Intraprocedural IDOR heuristic only; workflow-order and client-trusted-value logic flaws are not detected.
+- Some real vulnerabilities will remain `likely`/`suspicious` because only non-destructive validation is intended.
 
 ## 20. Future Improvements
 
@@ -494,15 +291,27 @@ changelog.
   non-ASCII (e.g. the "->" arrow U+2192). Fixed: `_force_utf8_output()` reconfigures
   stdout/stderr to utf-8 with errors=replace at CLI start.
 
-## 22. Current Session Summary
+- **Dogfood the product and test the *installed* artifact.** Scanning this repo and installing into a
+  clean virtualenv found bugs that 200 unit tests missed (clean-install crash, `.lock` never scanned).
+  Unit tests that call a parser directly bypass ingestion; add an end-to-end test per integration seam.
+- Scripted doc edits that fail halfway leave docs partly updated; make edit scripts all-or-nothing
+  (write only at the end) and re-verify with grep afterwards.
+- Prefer a script file over a long shell heredoc for multi-line edits in this environment.
 
-2026-10-09: Built the demo fixtures pack. `secureagent demo` scans a bundled deliberately
-vulnerable sample app (plus a safe-code file that must stay clean) with the real engine,
-offline, and can emit a report honestly labelled DEMO / SIMULATED. Regression-pinned by
-tests/test_demo.py; documented in docs/demo-guide.md (incl. a 5-minute presenter script).
-Fixtures ship in the package and are excluded from ordinary scans and linting. Also fixed a
-duplicate secret report (provider + generic rule on one value). 171 static/report tests pass
-(+1 PDF skip). Target-management Phases 4-5 remain blocked for the assistant; owner handoff
-in docs/target-management-implementation.md.
-**Next unblocked:** report polish (prioritised/consolidated findings view), cross-file
-return-value taint, or a Dockerised `secureagent` image for the demo.
+## 22. Current Session Summary
+2026-10-09 close-out pass (report polish + audit of remaining work):
+- Report polish: risk rating, "Fix first" top priorities, hotspots, table of contents, findings
+  consolidated by type with grouped remediation, compact CVE/CVSS sections, denser finding blocks
+  (demo PDF 33 -> 25 pages).
+- Dogfooding the scanner on this repository found and fixed real bugs (see §17): clean-install crash of
+  the CLI, `.lock` files never scanned, handler-name collisions, two secret false positives; added
+  `--exclude`, `.secureagentignore` and inline `secureagent: ignore`; pinned backend dependencies.
+- Added missing required docs (`testing.md`, `deployment.md`), a complete README, the repo CI workflow
+  (unrun), an env-contract test, `docs/PROJECT_CLOSEOUT.md`; untracked tool-generated agent files per the
+  owner's "no Claude traces" preference; corrected stale traceability/changelog entries.
+- Honest state: the project delivers a working, tested static-analysis security scanner plus a web skeleton;
+  the live multi-agent audit pipeline (and therefore acceptance criteria 5-10, 14, 22-23, 27) is **not built**
+  and is blocked on the two target-management files.
+**Next:** owner supplies the two blocked files (or decides to close the project as static-analysis-centred);
+verify the CI workflow on GitHub; choose a LICENSE; provide the PPT. See `docs/PROJECT_CLOSEOUT.md`.
+

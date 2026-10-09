@@ -45,6 +45,20 @@ Orchestration: `scanner.py` (`scan_repo` → `ScanResult`); `reporting.py`
 (`scan_to_report_context` → shared `ReportContext`); `baseline.py` (fingerprints, CI
 gating); `sarif.py` (SARIF 2.1.0); `app/reports/renderer.py` (HTML/PDF).
 
+## Controlling noise (suppression)
+
+```bash
+secureagent scan . --exclude 'tests/' --exclude '*.min.js'   # glob patterns; 'dir/' excludes a tree
+```
+
+- A `.secureagentignore` file at the scan root holds the same patterns (one per line, `#` comments).
+- A `secureagent: ignore` comment (any comment syntax, case-insensitive) hides findings reported on that
+  line; put the reason in a comment above. The marker must be on the line the finding is reported at.
+- Suppression is never silent: excluded files and inline-ignored findings are counted in the text and
+  JSON output. Use a baseline (`--baseline`) to accept existing findings and gate only on new ones.
+- Lockfiles recognised: `requirements*.txt|.in|.lock`, `requirements/<name>.txt`, `Pipfile.lock`,
+  `poetry.lock`, `package-lock.json`. Pin versions (`==`) so the OSV check has something to match.
+
 ## OWASP Top 10 coverage
 
 | Category | Status |
