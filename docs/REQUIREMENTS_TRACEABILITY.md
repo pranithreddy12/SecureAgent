@@ -51,5 +51,5 @@ Status: Planned → In Progress → Implemented → Tested.
 | R44 | Report polish: risk rating, Fix-first priorities, grouped remediation, ToC | project (report quality) | backend/app/schemas/report.py, reports/templates/report.html | Implemented + Tested |
 | R45 | Dependency-light installable scanner (no web stack required) | ADR-009 | backend/app/core/enums.py, pyproject.toml, tests/test_cli_standalone.py | Implemented + Tested |
 | R46 | Reproducible backend build (pinned lock) | project (supply chain) | backend/requirements.lock, docker/backend.Dockerfile | Implemented |
-| R47 | Repo CI workflow (backend, frontend, self-scan) | project | .github/workflows/ci.yml | Implemented; first run: backend green, two real failures found and fixed; confirm second run |
+| R47 | Repo CI workflow (backend, frontend, self-scan) | project | .github/workflows/ci.yml | Implemented; first run: backend green, two real failures found and fixed; second run green on all jobs |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |

@@ -92,7 +92,7 @@ consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages
 3. **Choose a `LICENSE`** (none exists; this is the owner's call).
 4. **Provide the PPT** so the PENDING sections of `SPECIFICATION.md` can be filled and any conflicts
    with this implementation surfaced.
-5. **Confirm CI is green.** First run (2026-10-09): backend passed; frontend and self-scan failed on real
+5. **CI is green** (second run, commit 64f118b: backend, frontend, self-scan all pass). First run (2026-10-09): backend passed; frontend and self-scan failed on real
    issues (Next route types before `tsc`; the `braces` advisory) — both fixed and re-pushed; check the
    Actions tab for the second run. `braces 3.0.3` has **no patched version** (OSV `last_affected: 3.0.3`),
    is a dev-only transitive dependency, and is accepted in `.secureagent-baseline.json`; revisit when a fix ships.

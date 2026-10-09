@@ -209,7 +209,7 @@ changelog.
   are unknown. Provide the PPT and reconcile.
 - **Target management blocked** (see §3) — the single dependency for the live audit pipeline.
 - **CI**: first GitHub run (2026-10-09, commit 0539485) passed backend and failed frontend + self-scan for
-  real reasons, now fixed (see §17); a second run is needed to confirm green. Accepted advisory:
+  real reasons, fixed (see §17); **second run (commit 64f118b) is green on all three jobs**. Accepted advisory:
   `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm; OSV lists **no patched version**; transitive dev-only dependency of
   eslint-config-next) is recorded in `.secureagent-baseline.json` so CI gates only on NEW high/critical findings.
 - **No `LICENSE`** — a licensing decision for the owner.
