@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from app.analysis import secrets
 from app.analysis.access_control import IdorFinding, analyze_access_control
 from app.analysis.dependencies import Dependency, is_lockfile, parse_dependencies
-from app.analysis.ingest import IngestStats, SourceFile, iter_source_files, read_text
+from app.analysis.ingest import (
+    IngestStats,
+    SourceFile,
+    iter_source_files,
+    load_ignore_file,
+    read_text,
+)
 from app.analysis.logging_checks import LoggingFinding, scan_logging
 from app.analysis.misconfig import MisconfigFinding, scan_misconfig
 from app.analysis.osv import OsvClient, OsvError, Vuln
@@ -17,6 +25,9 @@ from app.analysis.sinks import SinkFinding, scan_sinks
 from app.analysis.taint import JS_EXTENSIONS, TaintFinding, analyze_taint_project
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4, "informational": 5}
+
+# `# secureagent: ignore`, `// secureagent:ignore`, ... on the line a finding is reported at.
+INLINE_IGNORE = re.compile(r"secureagent:\s*ignore", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -53,6 +64,7 @@ class ScanResult:
     dependencies: list[Dependency] = field(default_factory=list)
     dependency_findings: list[DependencyFinding] = field(default_factory=list)
     osv_note: str | None = None
+    inline_ignored: int = 0  # findings hidden by `secureagent: ignore` comments (always reported)
     stats: IngestStats = field(default_factory=IngestStats)
 
     @property
@@ -151,21 +163,31 @@ def scan_repo(
     max_files: int | None = None,
     check_osv: bool = True,
     osv_client: OsvClient | None = None,
+    exclude: Sequence[str] = (),
 ) -> ScanResult:
-    """Ingest ``root`` (read-only) and run all static analysers."""
+    """Ingest ``root`` (read-only) and run all static analysers.
+
+    ``exclude`` patterns (plus any in ``<root>/.secureagentignore``) skip files entirely;
+    a ``secureagent: ignore`` comment hides findings reported on that line. Both are counted
+    in the result so suppression is never silent.
+    """
     stats = IngestStats()
     result = ScanResult(root=str(root), stats=stats)
-    kwargs: dict = {"stats": stats}
+    kwargs: dict = {"stats": stats, "exclude": [*load_ignore_file(root), *exclude]}
     if max_files is not None:
         kwargs["max_files"] = max_files
 
     taint_sources: list[tuple[str, str]] = []
+    ignored_lines: dict[str, set[int]] = {}
     file: SourceFile
     for file in iter_source_files(root, **kwargs):
         try:
             text = read_text(file)
         except OSError:
             continue
+        marked = {i for i, ln in enumerate(text.splitlines(), 1) if INLINE_IGNORE.search(ln)}
+        if marked:
+            ignored_lines[file.relpath] = marked
         result.secret_findings.extend(secrets.scan_text(file.relpath, text))
         result.routes.extend(extract_routes(file.relpath, text))
         result.sink_findings.extend(scan_sinks(file.relpath, text))
@@ -181,6 +203,7 @@ def scan_repo(
     result.taint_findings = analyze_taint_project(taint_sources)
     result.route_findings = route_findings(result.routes)
     _dedupe_sinks_superseded_by_taint(result)
+    _apply_inline_ignores(result, ignored_lines)
 
     if check_osv and result.dependencies:
         _run_osv(result, osv_client or OsvClient())
@@ -188,6 +211,27 @@ def scan_repo(
         result.osv_note = "Known-vulnerability lookup skipped (--no-osv)."
 
     return result
+
+
+def _apply_inline_ignores(result: ScanResult, ignored: dict[str, set[int]]) -> None:
+    """Drop findings reported on a line carrying a `secureagent: ignore` comment."""
+    if not ignored:
+        return
+
+    def kept(relpath: str, line: int) -> bool:
+        return line not in ignored.get(relpath, ())
+
+    before = result.total_findings
+    result.secret_findings = [f for f in result.secret_findings if kept(f.relpath, f.line)]
+    result.sink_findings = [f for f in result.sink_findings if kept(f.relpath, f.line)]
+    result.taint_findings = [f for f in result.taint_findings if kept(f.relpath, f.line)]
+    result.idor_findings = [f for f in result.idor_findings if kept(f.relpath, f.line)]
+    result.misconfig_findings = [f for f in result.misconfig_findings if kept(f.relpath, f.line)]
+    result.logging_findings = [f for f in result.logging_findings if kept(f.relpath, f.line)]
+    result.route_findings = [
+        f for f in result.route_findings if kept(f.route.relpath, f.route.line)
+    ]
+    result.inline_ignored = before - result.total_findings
 
 
 def _dedupe_sinks_superseded_by_taint(result: ScanResult) -> None:

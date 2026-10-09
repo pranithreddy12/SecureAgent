@@ -8,8 +8,9 @@ project's own code. Hard limits bound time and memory on large or hostile inputs
 
 from __future__ import annotations
 
+import fnmatch
 import os
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -100,7 +101,6 @@ BINARY_EXTENSIONS = frozenset(
         ".pyo",
         ".wasm",
         ".node",
-        ".lock",
         ".min.js",
         ".min.css",
         ".map",
@@ -127,12 +127,48 @@ class IngestStats:
     skipped_binary: int = 0
     skipped_too_large: int = 0
     skipped_dirs: int = 0
+    excluded: int = 0  # files skipped by --exclude / .secureagentignore (always reported)
     truncated: bool = False
     notes: list[str] = field(default_factory=list)
 
 
 class IngestError(ValueError):
     pass
+
+
+IGNORE_FILE = ".secureagentignore"
+
+
+def is_excluded(relpath: str, patterns: Sequence[str]) -> bool:
+    """gitignore-lite matching against a posix path relative to the scan root.
+
+    ``dir/`` excludes a whole directory tree; otherwise the pattern is a glob matched against
+    the full path *and* the file name (so ``tests/*`` and ``*.min.js`` both work). ``*`` also
+    crosses ``/``, so ``backend/tests/*`` covers nested files.
+    """
+    name = relpath.rsplit("/", 1)[-1]
+    for raw in patterns:
+        pat = raw.strip().removeprefix("./")
+        if not pat:
+            continue
+        if pat.endswith("/"):
+            if relpath.startswith(pat) or f"/{pat}" in f"/{relpath}":
+                return True
+        elif fnmatch.fnmatch(relpath, pat) or fnmatch.fnmatch(name, pat):
+            return True
+    return False
+
+
+def load_ignore_file(root: str | os.PathLike[str]) -> list[str]:
+    """Patterns from ``<root>/.secureagentignore`` (blank lines and ``#`` comments skipped)."""
+    path = Path(root) / IGNORE_FILE
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return [
+        ln.strip() for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")
+    ]
 
 
 def _looks_binary(sample: bytes) -> bool:
@@ -153,6 +189,7 @@ def iter_source_files(
     max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
     stats: IngestStats | None = None,
+    exclude: Sequence[str] = (),
 ) -> Iterator[SourceFile]:
     """Yield text source files under ``root``, enforcing limits. Read-only."""
     root_path = Path(root).resolve(strict=True)
@@ -169,6 +206,9 @@ def iter_source_files(
         for name in filenames:
             abs_path = Path(dirpath) / name
             if abs_path.is_symlink():  # never follow symlinks out of the tree
+                continue
+            if exclude and is_excluded(abs_path.relative_to(root_path).as_posix(), exclude):
+                st.excluded += 1
                 continue
             if _has_binary_extension(name):
                 st.skipped_binary += 1

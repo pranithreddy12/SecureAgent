@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import FindingStatus, Severity
+from app.core.enums import FindingStatus, Severity
 
 SEVERITY_ORDER = list(Severity)  # critical → informational
 NO_CVE = "Not applicable / no specific CVE identified."

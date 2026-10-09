@@ -1,44 +1,16 @@
-from enum import StrEnum
+"""Re-export of the shared enums so ORM code keeps its import path.
 
+The definitions live in ``app.core.enums`` (no third-party imports) so the command-line scanner,
+which does not need a database, can use them without importing SQLAlchemy.
+"""
 
-class UserRole(StrEnum):
-    ADMIN = "admin"
-    AUDITOR = "auditor"
+from app.core.enums import (
+    AuditStatus,
+    FindingStatus,
+    LogStatus,
+    Severity,
+    TargetStatus,
+    UserRole,
+)
 
-
-class TargetStatus(StrEnum):
-    PENDING = "pending"
-    VALIDATED = "validated"
-    REJECTED = "rejected"
-    ARCHIVED = "archived"
-
-
-class AuditStatus(StrEnum):
-    QUEUED = "queued"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    STOPPED = "stopped"
-
-
-class Severity(StrEnum):
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-    INFORMATIONAL = "informational"
-
-
-class FindingStatus(StrEnum):
-    CONFIRMED = "confirmed"
-    LIKELY = "likely"
-    SUSPICIOUS = "suspicious"
-    FALSE_POSITIVE = "false_positive"
-    INFORMATIONAL = "informational"
-
-
-class LogStatus(StrEnum):
-    INFO = "info"
-    SUCCESS = "success"
-    WARNING = "warning"
-    ERROR = "error"
+__all__ = ["AuditStatus", "FindingStatus", "LogStatus", "Severity", "TargetStatus", "UserRole"]

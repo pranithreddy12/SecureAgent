@@ -41,15 +41,28 @@ class Dependency:
         return (self.ecosystem, self.name, self.version)
 
 
+_REQUIREMENTS_FILE = re.compile(r"^requirements[\w.-]*\.(txt|in|lock)$")
+
+
+def _is_requirements_file(relpath: str) -> bool:
+    """requirements.txt / requirements-dev.txt / requirements.lock, and the common
+    `requirements/<name>.txt` directory layout."""
+    parts = relpath.lower().split("/")
+    base = parts[-1]
+    if _REQUIREMENTS_FILE.match(base):
+        return True
+    return len(parts) > 1 and parts[-2] == "requirements" and base.endswith((".txt", ".in"))
+
+
 def is_lockfile(relpath: str) -> bool:
     base = relpath.rsplit("/", 1)[-1].lower()
-    return base in LOCKFILE_NAMES
+    return base in LOCKFILE_NAMES or _is_requirements_file(relpath)
 
 
 def parse_dependencies(relpath: str, text: str) -> list[Dependency]:
     base = relpath.rsplit("/", 1)[-1].lower()
     try:
-        if base.startswith("requirements") and base.endswith((".txt", ".in")):
+        if _is_requirements_file(relpath):
             return _parse_requirements(relpath, text)
         if base == "pipfile.lock":
             return _parse_pipfile_lock(relpath, text)

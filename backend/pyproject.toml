@@ -5,6 +5,9 @@ description = "Static application-security scanner (SecureAgent)"
 requires-python = ">=3.12"
 dependencies = ["jinja2>=3.1", "pydantic>=2"]
 
+[project.optional-dependencies]
+pdf = ["weasyprint>=63"]  # `secureagent ... --pdf` (needs Pango; present in the Docker image)
+
 [project.scripts]
 secureagent = "app.cli:main"
 

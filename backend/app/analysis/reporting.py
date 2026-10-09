@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime
 
 from app.analysis.scanner import ScanResult
-from app.models.enums import FindingStatus, Severity
+from app.core.enums import FindingStatus, Severity
 from app.schemas.report import ReportContext, ReportFinding
 
 AUTHORIZATION_STATEMENT = (

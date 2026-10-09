@@ -34,7 +34,12 @@ ASSIGNMENT = re.compile(
 _PLACEHOLDER = re.compile(
     r"(?i)^(x+|\*+|\.+|changeme|change_me|your[_-].*|my[_-].*|example.*|sample.*|"
     r"test.*|dummy.*|placeholder.*|none|null|true|false|\d+|redacted|xxx+|"
-    r"\$\{.*\}|<.*>|%.*%)$"
+    r"\$\{.*\}|\{.*\}|<.*>|%.*%|%[sd])$"
+)
+# Literal option values that share a name with secrets (e.g. fetch `credentials: "same-origin"`,
+# OAuth `token_type = "bearer"`); they are configuration words, never credentials.
+_BENIGN_VALUES = frozenset(
+    {"same-origin", "include", "omit", "bearer", "basic", "cors", "no-cors", "anonymous"}
 )
 _ENV_REFERENCE = re.compile(r"(?i)(os\.getenv|os\.environ|process\.env|getenv\(|ENV\[)")
 
@@ -117,7 +122,7 @@ def _fingerprint(value: str) -> str:
 
 def _is_placeholder(value: str) -> bool:
     v = value.strip()
-    if _PLACEHOLDER.match(v) or _ENV_REFERENCE.search(v):
+    if _PLACEHOLDER.match(v) or _ENV_REFERENCE.search(v) or v.lower() in _BENIGN_VALUES:
         return True
     return len(set(v)) <= 2  # e.g. "aaaaaa", "------"
 

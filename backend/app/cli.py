@@ -13,6 +13,7 @@ Exit code is 1 when findings are present (so it can gate CI), 0 when clean, 2 on
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from dataclasses import asdict
@@ -48,6 +49,12 @@ def _render_text(result: ScanResult, color: bool) -> str:
         lines.append("WARNING: scan was truncated by a limit; results are partial.")
     if result.osv_note:
         lines.append(result.osv_note)
+    if result.stats.excluded:
+        lines.append(f"{result.stats.excluded} file(s) excluded by --exclude / .secureagentignore.")
+    if result.inline_ignored:
+        lines.append(
+            f"{result.inline_ignored} finding(s) hidden by inline `secureagent: ignore` comments."
+        )
     lines.append("")
 
     if result.total_findings == 0:
@@ -131,6 +138,8 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
             "skipped_binary": result.stats.skipped_binary,
             "skipped_too_large": result.stats.skipped_too_large,
             "truncated": result.stats.truncated,
+            "excluded_files": result.stats.excluded,
+            "inline_ignored_findings": result.inline_ignored,
         },
         "routes_found": len(result.routes),
         "dependencies_found": len(result.dependencies),
@@ -317,10 +326,8 @@ def _force_utf8_output() -> None:
     # Reports use typographic characters; a legacy console (Windows cp1252) would
     # otherwise raise UnicodeEncodeError. Degrade gracefully if reconfigure is absent.
     for stream in (sys.stdout, sys.stderr):
-        try:
+        with contextlib.suppress(AttributeError, ValueError):
             stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
-        except (AttributeError, ValueError):
-            pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -335,6 +342,14 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--pdf", help="Write a PDF report to this path (needs WeasyPrint libs).")
     scan.add_argument(
         "--max-files", type=int, default=None, help="Cap the number of files scanned."
+    )
+    scan.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="PATTERN",
+        help="Skip files matching a glob (e.g. 'tests/*', '*.min.js', 'fixtures/'). Repeatable. "
+        "Patterns in <path>/.secureagentignore are applied too.",
     )
     scan.add_argument(
         "--no-osv", action="store_true", help="Skip the OSV known-vulnerability lookup (offline)."
@@ -364,7 +379,12 @@ def main(argv: list[str] | None = None) -> int:
         return _run_demo(args)
 
     try:
-        result = scan_repo(args.path, max_files=args.max_files, check_osv=not args.no_osv)
+        result = scan_repo(
+            args.path,
+            max_files=args.max_files,
+            check_osv=not args.no_osv,
+            exclude=args.exclude,
+        )
     except (IngestError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

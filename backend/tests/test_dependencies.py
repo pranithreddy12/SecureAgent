@@ -147,3 +147,42 @@ def test_osv_network_failure_is_graceful(tmp_path: Path) -> None:
 def test_vuln_dataclass_cve_property() -> None:
     assert Vuln("CVE-2021-1", "high", "", "").cve == "CVE-2021-1"
     assert Vuln("GHSA-abcd", "high", "", "").cve is None
+
+
+def test_requirements_layouts_are_recognised() -> None:
+    from app.analysis.dependencies import is_lockfile
+
+    for path in (
+        "requirements.txt",
+        "requirements-dev.txt",
+        "requirements.lock",
+        "requirements-prod.txt",
+        "requirements/base.txt",
+        "app/requirements/production.txt",
+        "Pipfile.lock",
+        "package-lock.json",
+    ):
+        assert is_lockfile(path), path
+    for path in ("notes.txt", "src/requirements_helper.py", "docs/requirements.md", "base.txt"):
+        assert not is_lockfile(path), path
+
+
+def test_requirements_directory_layout_is_parsed() -> None:
+    deps = parse_dependencies("requirements/base.txt", "flask==3.0.0\n")
+    assert [(d.name, d.version) for d in deps] == [("flask", "3.0.0")]
+    assert parse_dependencies("requirements.lock", "pyyaml==6.0.2\n")[0].name == "pyyaml"
+
+
+def test_lockfiles_survive_file_ingestion(tmp_path: Path) -> None:
+    """Regression: `.lock` was once treated as a binary extension, so poetry.lock and
+    Pipfile.lock were skipped by real scans even though the parsers worked in isolation."""
+    (tmp_path / "poetry.lock").write_text(
+        '[[package]]\nname = "requests"\nversion = "2.31.0"\n', encoding="utf-8"
+    )
+    (tmp_path / "Pipfile.lock").write_text(
+        json.dumps({"default": {"flask": {"version": "==3.0.0"}}, "develop": {}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "requirements.lock").write_text("pyyaml==6.0.2\n", encoding="utf-8")
+    result = scan_repo(str(tmp_path), check_osv=False)
+    assert {d.name for d in result.dependencies} == {"requests", "flask", "pyyaml"}

@@ -21,7 +21,7 @@ SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational
 def fingerprint(f: ReportFinding) -> str:
     location = _LINE_SUFFIX.sub("", f.endpoint or "")
     key = "|".join([f.type, location, f.parameter or "", f.title])
-    return hashlib.sha1(key.encode("utf-8", "replace")).hexdigest()[:16]  # noqa: S324 - id, not security
+    return hashlib.sha1(key.encode("utf-8", "replace")).hexdigest()[:16]  # noqa: S324 - id, not security  # secureagent: ignore
 
 
 def load_baseline(path: str) -> set[str]:

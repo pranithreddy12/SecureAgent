@@ -9,16 +9,18 @@ from app.services import user_service
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+# Public by design: this is how a new user creates an account.
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(data: RegisterRequest, db: DbSession):
+async def register(data: RegisterRequest, db: DbSession):  # secureagent: ignore
     try:
         return await user_service.create_user(db, data)
     except user_service.EmailAlreadyRegistered:
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered") from None
 
 
+# Public by design: this is how a caller obtains a session.
 @router.post("/login", response_model=TokenOut)
-async def login(data: LoginRequest, response: Response, db: DbSession):
+async def login(data: LoginRequest, response: Response, db: DbSession):  # secureagent: ignore
     user = await user_service.authenticate(db, data.email, data.password)
     if user is None:
         # Same message for unknown email and wrong password (no account enumeration).
@@ -37,8 +39,9 @@ async def login(data: LoginRequest, response: Response, db: DbSession):
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
+# Needs no authorization: it only clears the caller's own cookie.
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response: Response) -> None:
+async def logout(response: Response) -> None:  # secureagent: ignore
     settings = get_settings()
     response.delete_cookie(
         COOKIE_NAME, path="/", httponly=True, secure=settings.cookie_secure, samesite="lax"
