@@ -144,10 +144,18 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
                     m.group(0),
                 )
 
+        # A specific provider match on this line already explains the value, so the generic
+        # rule must not report the same secret a second time.
+        provider_fps = {
+            _fingerprint(m.group(0)) for rule in PROVIDER_RULES for m in rule.pattern.finditer(line)
+        }
+
         # Generic: a secret-named key assigned a non-placeholder, high-entropy value.
         for m in ASSIGNMENT.finditer(line):
             key, val = m.group("key"), m.group("val")
             if not SECRET_KEYWORD.search(key) or _is_placeholder(val):
+                continue
+            if _fingerprint(val) in provider_fps:
                 continue
             if any(c.isspace() for c in val):
                 continue  # real credentials are tokens, not phrases (cuts natural-language FPs)

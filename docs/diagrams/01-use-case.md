@@ -19,6 +19,7 @@ flowchart LR
         UC7([Create / use a baseline])
         UC8([Gate build on new findings])
         UC9([View dashboard & account])
+        UC13([Run bundled demo scan])
     end
 
     subgraph "Planned (not implemented)"
@@ -27,7 +28,7 @@ flowchart LR
         UC12([Track audit progress]):::planned
     end
 
-    dev --> UC1 & UC2 & UC4 & UC5 & UC6 & UC7 & UC9
+    dev --> UC1 & UC2 & UC4 & UC5 & UC6 & UC7 & UC9 & UC13
     dev -.-> UC10 & UC11 & UC12
     UC2 --> UC3
     ci --> UC2 & UC6 & UC8

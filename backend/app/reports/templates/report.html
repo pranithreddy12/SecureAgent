@@ -50,7 +50,7 @@
   <div>{{ r.target_name }} — <span class="muted">{{ r.target_url }}</span></div>
   <div class="muted">Generated {{ r.generated_at | dt }} · Audit {{ r.audit_id }}</div>
   {% if r.is_demo %}
-  <div class="demo">DEMO / SIMULATED SECURITY AUDIT — results below come from fixture data, not a real scan.</div>
+  <div class="demo">DEMO / SIMULATED SECURITY AUDIT — the subject of this report is a bundled sample (fixture), not a real system.</div>
   {% endif %}
 </header>
 
@@ -179,7 +179,7 @@
 
 <h2>18. Limitations</h2>
 <ul>
-  {% if r.is_demo %}<li>This is a demonstration report generated from fixture data; it does not describe a real system.</li>{% endif %}
+  {% if r.is_demo %}<li>This is a demonstration report about a bundled, deliberately vulnerable sample application; it does not describe a real system.</li>{% endif %}
   <li>Automated testing covers only the authorized scope and the checks performed; absence of findings does not prove absence of vulnerabilities.</li>
   <li>Validation is non-destructive; some real issues may remain classified as likely or suspicious rather than confirmed.</li>
   {% for l in r.limitations %}<li>{{ l }}</li>{% endfor %}

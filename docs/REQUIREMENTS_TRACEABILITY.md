@@ -26,7 +26,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R18 | PostgreSQL schema + migrations | SPEC §9, ADR-002 | backend/app/models/, backend/alembic/ | Implemented + Tested |
 | R19 | Dashboard + charts | SPEC §15 | frontend/app/dashboard | Planned |
 | R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | In Progress (login, register, dashboard shell, settings done) |
-| R21 | Demo mode, clearly labelled | SPEC §15, ADR-004 | backend/app/demo/ | Planned |
+| R21 | Demo mode, clearly labelled | SPEC §15, ADR-004 | backend/app/demo/, cli `demo`, docs/demo-guide.md | In Progress (static-engine demo implemented + tested; fixture demo of the live agent pipeline pending targets) |
 | R22 | Local vulnerable lab target (Juice Shop) | BRIEF §31 | docker-compose `lab` profile | In Progress (service defined) |
 | R23 | Docker Compose deployment | SPEC §15 | docker-compose.yml, docker/ | In Progress (files written, images not yet built) |
 | R24 | Automated tests incl. security restrictions | SPEC §15 | backend/tests/ | Planned |

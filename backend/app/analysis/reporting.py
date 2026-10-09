@@ -204,13 +204,17 @@ def _route_finding(f) -> ReportFinding:
     )
 
 
-def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None) -> ReportContext:
+def scan_to_report_context(
+    result: ScanResult, *, repo_label: str | None = None, demo: bool = False
+) -> ReportContext:
     name = repo_label or os.path.basename(os.path.abspath(result.root)) or result.root
     now = datetime.now(UTC)
     try:
         who = getpass.getuser()
     except Exception:  # noqa: BLE001 - getuser can raise on odd environments
         who = "unknown"
+    if demo:
+        who = "SecureAgent demo (bundled sample application)"
 
     findings = [_secret_finding(f) for f in result.ordered_secrets]
     findings += [_misconfig_finding(f) for f in result.ordered_misconfig_findings]
@@ -233,12 +237,16 @@ def scan_to_report_context(result: ScanResult, *, repo_label: str | None = None)
     return ReportContext(
         audit_id=str(uuid.uuid4()),
         audit_status="completed",
-        is_demo=False,
+        is_demo=demo,
         started_at=now,
         completed_at=now,
         generated_at=now,
         target_name=name,
-        target_url="(static source scan — no live target)",
+        target_url=(
+            "(bundled demo sample — a deliberately vulnerable fake application)"
+            if demo
+            else "(static source scan — no live target)"
+        ),
         authorized_by=who,
         authorized_at=now,
         authorization_statement=AUTHORIZATION_STATEMENT,

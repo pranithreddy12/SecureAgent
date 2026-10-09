@@ -452,3 +452,28 @@ Append-only. Never rewrite past entries.
 
 ### Tests
 - test_django_depth.py (14). Static + report suite: 161 passed, 1 skipped (PDF).
+
+## 2026-10-09 (Demo fixtures pack)
+
+### Added
+- `secureagent demo` — scans a bundled, deliberately vulnerable sample app with the real
+  engine (offline by default; `--online` for OSV; `--report/--pdf` for a report labelled
+  DEMO / SIMULATED SECURITY AUDIT). Sample: `backend/app/demo/demo_fixtures/vulnerable_shop/`
+  (app.py, config.py, safe_routes.py, server.js, requirements.txt).
+- `tests/test_demo.py` (11) pinning the demo's expected findings, the clean safe file, the
+  ignored placeholder, report labelling/redaction and exclusion from ordinary scans.
+- `docs/demo-guide.md` (what is real vs fixture, expected findings, 5-minute walkthrough).
+- `scan_to_report_context(demo=True)`; package-data for the fixtures; ruff exclude.
+
+### Changed
+- `demo_fixtures` added to ingest IGNORED_DIRS (ordinary scans skip it; a demo root is exempt).
+- Report banner now says the subject is a bundled sample (fixture), not a real system, which
+  is accurate for a real scan of fake code.
+
+### Fixed
+- A generic hardcoded-credential finding is no longer emitted for a value that a provider
+  rule (e.g. AWS key id) already reported on the same line.
+
+### Tests
+- Static + report suite: 171 passed, 1 skipped (PDF). Verified a non-editable install ships
+  the fixtures and `demo` runs from the installed copy.

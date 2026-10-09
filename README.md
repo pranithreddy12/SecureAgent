@@ -40,6 +40,15 @@ secureagent scan . --format sarif --output secureagent.sarif             # GitHu
 
 See [docs/ci/github-actions-example.yml](docs/ci/github-actions-example.yml) for a workflow.
 
+Try it with no setup, on a bundled deliberately-vulnerable sample app (works offline):
+
+```bash
+secureagent demo                       # or: python -m app.cli demo
+secureagent demo --report demo.html    # report labelled DEMO / SIMULATED
+```
+
+See [docs/demo-guide.md](docs/demo-guide.md) for what it shows and a presenter walkthrough.
+
 It only reads files — it never executes anything from the scanned project — never
 prints or stores a secret's full value (only a masked preview and a fingerprint), and
 exits non-zero when findings exist, so it can gate CI.

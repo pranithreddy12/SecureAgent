@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-09 (Django depth: settings + class-based-view taint/IDOR)
+Last updated: 2026-10-09 (demo fixtures pack: `secureagent demo`)
 
 ## 1. Project Identity
 
@@ -181,6 +181,22 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
   `get_queryset` references `request.user` is treated as ownership-scoped (no IDOR).
   Handler iteration now walks every function node (not the name->node dict), so methods
   sharing a name (`get`/`post` in several views) are no longer dropped.
+  **Demo pack:** `secureagent demo` (`cli._run_demo`) scans a bundled, deliberately
+  vulnerable sample app (`app/demo/demo_fixtures/vulnerable_shop/`: app.py, config.py,
+  safe_routes.py [correct code, must yield 0 findings], server.js, requirements.txt) with the
+  real engine, offline by default (`--online` adds OSV). Prints a DEMO banner; `--report/--pdf`
+  produce reports with `is_demo=True` (DEMO / SIMULATED SECURITY AUDIT banner + watermark;
+  banner text says the *subject* is a fixture, since the scan itself is real). Exit code 0
+  (showcase, not a gate). `scan_to_report_context(demo=True)`. `demo_fixtures` is in
+  ingest.IGNORED_DIRS (ordinary scans/CI skip it; the demo root is exempt from pruning) and
+  excluded from ruff; shipped via package-data `app.demo`. Fixtures avoid provider-format
+  tokens (GitHub push protection): only AWS's documented example key + generic fake secrets.
+  `tests/test_demo.py` (11) pins: all planted classes found, safe file clean, placeholder
+  ignored, AWS key reported once, never `confirmed`, report labelled + redacted, banner/exit
+  code, ordinary scans exclude fixtures. Demo = 25 findings offline. `docs/demo-guide.md`.
+  Also fixed: the generic-credential rule no longer re-reports a value a provider rule already
+  matched on the same line. NOTE: this is the static-engine demo; the spec's fixture demo of
+  the multi-agent live pipeline (recon/ZAP/Nuclei) is still not built (blocked on targets).
   **Batch #3 IDOR / object-level authz built & tested:** `app/analysis/access_control.py`
   flags route handlers that fetch a record by a request-supplied id (db.query(M).get,
   Model.query.get_or_404, session.get(M,id), filter_by(id=...), filter(M.id==...))
@@ -366,7 +382,9 @@ changelog.
 
 ## 18. Testing Status
 
-- Backend: static-analysis + report tests (no DB): 161 passed + 1 skipped (PDF).
+- Backend: static-analysis + report tests (no DB): 171 passed + 1 skipped (PDF).
+  Demo tests (test_demo.py, 11). Packaging verified: a non-editable install ships the
+  fixtures + report template and `demo` runs from the installed copy (25 findings).
   Django depth tests (test_django_depth.py, 14): settings cookies/CORS/CSRF middleware,
   CBV taint (URL kwarg + request.data), CBV IDOR, get_queryset + inline owner-filter
   suppression, same-method-name collision, project pass, non-view class not a handler.
@@ -478,12 +496,13 @@ changelog.
 
 ## 22. Current Session Summary
 
-2026-10-09: Django depth. Settings misconfig (insecure cookie flags, allow-all CORS,
-missing CsrfViewMiddleware) and class-based-view coverage: CBV methods are now handlers
-for taint and IDOR (URL kwargs and request data are untrusted), with `get_queryset`/
-inline owner filtering recognised as ownership scoping. Fixed handler iteration so
-same-named methods across views are all analysed. 161 static/report tests pass (+1 PDF
-skip). Target-management Phases 4-5 remain blocked for the assistant; the owner handoff
-is `docs/target-management-implementation.md`.
-**Next unblocked:** cross-file return-value taint, a labelled demo fixtures pack, report
-polish (prioritised/consolidated findings view).
+2026-10-09: Built the demo fixtures pack. `secureagent demo` scans a bundled deliberately
+vulnerable sample app (plus a safe-code file that must stay clean) with the real engine,
+offline, and can emit a report honestly labelled DEMO / SIMULATED. Regression-pinned by
+tests/test_demo.py; documented in docs/demo-guide.md (incl. a 5-minute presenter script).
+Fixtures ship in the package and are excluded from ordinary scans and linting. Also fixed a
+duplicate secret report (provider + generic rule on one value). 171 static/report tests pass
+(+1 PDF skip). Target-management Phases 4-5 remain blocked for the assistant; owner handoff
+in docs/target-management-implementation.md.
+**Next unblocked:** report polish (prioritised/consolidated findings view), cross-file
+return-value taint, or a Dockerised `secureagent` image for the demo.

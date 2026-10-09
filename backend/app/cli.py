@@ -258,11 +258,48 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
     return json.dumps(payload, indent=2)
 
 
-def _write_report(result: ScanResult, html_path: str | None, pdf_path: str | None) -> None:
+DEMO_BANNER = (
+    "=" * 72 + "\n"
+    "DEMO MODE -- scanning SecureAgent's bundled, deliberately vulnerable sample app.\n"
+    "This is NOT a real system. The flaws below were planted on purpose; the analysis\n"
+    "itself is the real SecureAgent engine. (safe_routes.py is correct code and should\n"
+    "produce no findings.)\n" + "=" * 72
+)
+
+
+def _run_demo(args) -> int:
+    from app.demo import sample_app_path
+
+    root = sample_app_path()
+    if not root.is_dir():
+        print(f"error: demo sample not found at {root}", file=sys.stderr)
+        return 2
+    result = scan_repo(str(root), check_osv=args.online)
+    if not args.online and result.dependencies:
+        result.osv_note = (
+            "Known-vulnerability lookup skipped in offline demo (use --online to query OSV)."
+        )
+    color = (not args.no_color) and sys.stdout.isatty()
+    print(DEMO_BANNER)
+    print(_render_text(result, color))
+    if args.report or args.pdf:
+        try:
+            _write_report(result, args.report, args.pdf, demo=True)
+        except (OSError, ImportError) as exc:
+            print(f"error: could not render report: {exc}", file=sys.stderr)
+            return 2
+    return 0  # a showcase, not a gate
+
+
+def _write_report(
+    result: ScanResult, html_path: str | None, pdf_path: str | None, demo: bool = False
+) -> None:
     from app.analysis.reporting import scan_to_report_context
     from app.reports.renderer import render_html
 
-    ctx = scan_to_report_context(result)
+    ctx = scan_to_report_context(
+        result, repo_label="Vulnerable Shop (DEMO)" if demo else None, demo=demo
+    )
     html = render_html(ctx)
     if html_path:
         with open(html_path, "w", encoding="utf-8") as fh:
@@ -312,7 +349,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit non-zero only if a new finding at or above this severity remains.",
     )
     scan.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
+
+    demo = sub.add_parser(
+        "demo", help="Scan the bundled deliberately-vulnerable sample app (works offline)."
+    )
+    demo.add_argument("--report", help="Write the demo HTML report (labelled DEMO) to this path.")
+    demo.add_argument("--pdf", help="Write the demo PDF report to this path.")
+    demo.add_argument(
+        "--online", action="store_true", help="Also query OSV for the sample's pinned dependencies."
+    )
+    demo.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
     args = parser.parse_args(argv)
+    if args.command == "demo":
+        return _run_demo(args)
 
     try:
         result = scan_repo(args.path, max_files=args.max_files, check_osv=not args.no_osv)

@@ -46,6 +46,10 @@ IGNORED_DIRS = frozenset(
         "coverage",
         "htmlcov",
         ".terraform",
+        # Deliberately vulnerable demo apps bundled with SecureAgent. Excluded from ordinary
+        # scans (so scanning this repo stays meaningful); `secureagent demo` scans a fixture
+        # as its root, which is exempt from directory pruning.
+        "demo_fixtures",
     }
 )
 
