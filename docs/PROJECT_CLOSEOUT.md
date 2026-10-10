@@ -108,7 +108,9 @@ consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages
 ### C. Independent of the blocker (can be done any time)
 - Frontend tests (component + one Playwright e2e of register→login→dashboard).
 - Login rate limiting / lockout; admin bootstrap command; production cookie/CORS checklist.
-- Detector accuracy benchmark on public vulnerable corpora (the current tests prove intended behaviour, not a measured detection rate).
+- Detector accuracy on **public** vulnerable corpora. A benchmark harness and a small author-written
+  corpus exist (`secureagent benchmark`, `docs/benchmark.md`: 94% precision / 94% recall on that corpus);
+  an independent corpus has not been run.
 - Parse OSV CVSS vectors into scores (so CVSS can be shown when reliably determined).
 - JS AST-based analysis (replace regex heuristics); sanitizer modelling in taint.
 - Workflow-order detector (ADR-008). Client-trusted-value, mass-assignment and the intent spec were built

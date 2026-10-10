@@ -365,6 +365,14 @@ def _check_sink(
         return "command_injection", f"{name}(shell=True)"
     if name in {"eval", "exec", "builtins.eval", "builtins.exec"} and _tainted(a0, tainted, ctx):
         return "code_injection", name
+    if (
+        last
+        in {"redirect", "RedirectResponse", "HttpResponseRedirect", "HttpResponsePermanentRedirect"}
+        and a0 is not None
+        and not (isinstance(a0, ast.Call) and (_dotted(a0.func) or "").endswith("url_for"))
+        and _tainted(a0, tainted, ctx)
+    ):
+        return "open_redirect", name
     if _is_http_call(name, last) and (
         _tainted(a0, tainted, ctx) or _tainted(kw.get("url"), tainted, ctx)
     ):

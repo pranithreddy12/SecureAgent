@@ -266,6 +266,8 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
   sanitizers, and does not follow class attributes; JS/TS analysis is regex-based (no AST).
 - OSV matching uses pinned versions in lockfiles (no range resolution); needs network (skipped gracefully).
 - Intraprocedural IDOR heuristic only (it also flags legitimate by-id lookups of shared catalogue data).
+- Accuracy is measured only on a small author-written corpus (`docs/benchmark.md`, 94%/94%); no
+  independent real-world detection rate exists.
 - Business-logic detectors (ADR-010) are Python-only; they cover client-trusted values, mass assignment and
   declared intent rules, not workflow-order. A serializer or middleware outside the handler can neutralise a
   flagged pattern, so findings stay `suspicious`.

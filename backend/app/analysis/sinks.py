@@ -170,7 +170,10 @@ class _SinkVisitor(ast.NodeVisitor):
 
         # Code execution
         if name in {"eval", "exec", "builtins.eval", "builtins.exec"}:
-            self._add("code_injection", name, node.lineno)
+            # eval("1 + 1") runs fixed code; only dynamic input makes it injectable.
+            first = node.args[0] if node.args else None
+            if not (isinstance(first, ast.Constant) and isinstance(first.value, str)):
+                self._add("code_injection", name, node.lineno)
 
         # Command execution
         if name in {"os.system", "os.popen", "commands.getoutput", "subprocess.getoutput"}:

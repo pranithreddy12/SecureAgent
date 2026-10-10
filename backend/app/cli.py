@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import os
 import sys
 from dataclasses import asdict
 
@@ -291,6 +292,26 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
     return json.dumps(payload, indent=2)
 
 
+def _run_benchmark(args) -> int:
+    from app.analysis.benchmark import format_result, run_benchmark
+
+    if not os.path.isdir(args.path):
+        print(f"error: corpus directory not found: {args.path}", file=sys.stderr)
+        return 2
+    result = run_benchmark(args.path)
+    print(format_result(result))
+    total = result.total
+    below = []
+    if args.min_precision is not None and (total.precision or 0.0) < args.min_precision:
+        below.append(f"precision {total.precision or 0.0:.0%} < {args.min_precision:.0%}")
+    if args.min_recall is not None and (total.recall or 0.0) < args.min_recall:
+        below.append(f"recall {total.recall or 0.0:.0%} < {args.min_recall:.0%}")
+    if below:
+        print("\nBenchmark below threshold: " + "; ".join(below), file=sys.stderr)
+        return 1
+    return 0
+
+
 def _render_matrix(result: ScanResult) -> str:
     from app.analysis.authz_matrix import build_matrix
 
@@ -418,6 +439,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     scan.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
 
+    bench = sub.add_parser(
+        "benchmark",
+        help="Measure precision/recall against a corpus labelled with VULN:<type> markers.",
+    )
+    bench.add_argument("path", help="Corpus directory (e.g. backend/benchmark/corpus).")
+    bench.add_argument("--min-precision", type=float, help="Exit 1 if overall precision is lower.")
+    bench.add_argument("--min-recall", type=float, help="Exit 1 if overall recall is lower.")
+
     demo = sub.add_parser(
         "demo", help="Scan the bundled deliberately-vulnerable sample app (works offline)."
     )
@@ -430,6 +459,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "demo":
         return _run_demo(args)
+    if args.command == "benchmark":
+        return _run_benchmark(args)
 
     try:
         result = scan_repo(

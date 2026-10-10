@@ -563,3 +563,21 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Grouping by first path segment is a heuristic; Django class-based views group per class path. A guard
   applied by global middleware is invisible, so findings need review.
+
+## 2026-10-10 (Detector accuracy benchmark)
+
+### Added
+- `app/analysis/benchmark.py` + `secureagent benchmark <dir> [--min-precision X --min-recall Y]`: a corpus
+  is any directory whose expected findings carry `VULN:<type>` markers; per-type TP/FP/FN, precision, recall.
+- `backend/benchmark/corpus/` (4 files, Python + Express, vulnerable and safe cases, with deliberate known
+  misses and known false positives); `tests/test_benchmark.py` fails below 90% precision/recall.
+- `docs/benchmark.md`.
+
+### Fixed (found by the first benchmark run)
+- Python open redirect was never reported (`redirect(request.args[...])`); added Python redirect sinks.
+- `eval("literal")` / `exec("literal")` were reported as code injection; constants are now skipped.
+
+### Notes
+- Bundled corpus is author-written: result 32 TP / 2 FP / 2 FN (94% / 94%). It guards regressions; it is
+  not a real-world detection rate. Known remaining: second-order SQLi, plain-dict IDOR (misses);
+  allow-listed SSRF host, catalogue lookup flagged as IDOR (false positives).

@@ -102,6 +102,10 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
 
+## Measured accuracy
+
+`secureagent benchmark` scores the detectors against a labelled corpus; see [benchmark.md](benchmark.md).
+
 ## Developer intent spec (business logic)
 
 Put a `secureagent-intent.json` in the repository root (or pass `--intent FILE`) to state what the code
