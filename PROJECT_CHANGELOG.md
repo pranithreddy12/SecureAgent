@@ -581,3 +581,16 @@ Append-only. Never rewrite past entries.
 - Bundled corpus is author-written: result 32 TP / 2 FP / 2 FN (94% / 94%). It guards regressions; it is
   not a real-world detection rate. Known remaining: second-order SQLi, plain-dict IDOR (misses);
   allow-listed SSRF host, catalogue lookup flagged as IDOR (false positives).
+
+## 2026-10-10 (MCP server)
+
+### Added
+- `app/mcp_server.py` + `secureagent-mcp` console script: MCP over stdio (JSON-RPC 2.0, stdlib only).
+  Tools: `scan_snippet`, `scan_path`, `authorization_matrix`.
+- Safety: read-only, path-confined to the working directory or `SECUREAGENT_MCP_ROOTS` (symlinks and
+  `..` resolved), offline unless `include_osv`, snippet size and filename-suffix limits.
+- `tests/test_mcp_server.py` (12 tests incl. a real stdio subprocess round trip); `docs/mcp.md`.
+
+### Notes
+- Tools/transport only (no resources, prompts, HTTP). Implemented by hand to keep ADR-009's dependency
+  set; the official SDK can be added behind an optional extra if more of the protocol is needed.

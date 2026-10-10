@@ -10,6 +10,7 @@ pdf = ["weasyprint>=63"]  # `secureagent ... --pdf` (needs Pango; present in the
 
 [project.scripts]
 secureagent = "app.cli:main"
+secureagent-mcp = "app.mcp_server:main"
 
 [build-system]
 requires = ["setuptools>=68"]

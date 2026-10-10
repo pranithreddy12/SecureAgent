@@ -102,6 +102,10 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
 
+## Use from an AI assistant
+
+The analyser is also exposed as an MCP server (`secureagent-mcp`); see [mcp.md](mcp.md).
+
 ## Measured accuracy
 
 `secureagent benchmark` scores the detectors against a labelled corpus; see [benchmark.md](benchmark.md).
