@@ -33,6 +33,11 @@ EXPECTED_TYPES = {
     "csrf_disabled",
     "permissive_cors",
     "jwt_verification_disabled",
+    # business logic and declared intent
+    "mass_assignment",
+    "client_trusted_privilege",
+    "client_trusted_value",
+    "intent_violation",
     # logging and secrets
     "sensitive_data_in_log",
     "swallowed_exception",
@@ -48,7 +53,14 @@ def demo_findings():
 
 def test_sample_app_ships_with_the_package() -> None:
     root = sample_app_path()
-    for name in ("app.py", "config.py", "safe_routes.py", "server.js", "requirements.txt"):
+    for name in (
+        "app.py",
+        "config.py",
+        "safe_routes.py",
+        "server.js",
+        "requirements.txt",
+        "secureagent-intent.json",
+    ):
         assert (root / name).is_file(), name
 
 

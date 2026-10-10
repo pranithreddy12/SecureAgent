@@ -1,0 +1,16 @@
+{
+  "rules": [
+    {
+      "id": "admin-requires-auth",
+      "type": "require_auth",
+      "paths": ["/admin/*"],
+      "description": "Administrative actions must be authenticated"
+    },
+    {
+      "id": "orders-are-private",
+      "type": "owner_scoped",
+      "paths": ["/orders/*"],
+      "description": "A customer may only read their own orders"
+    }
+  ]
+}

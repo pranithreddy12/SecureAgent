@@ -19,6 +19,7 @@ import sys
 from dataclasses import asdict
 
 from app.analysis.ingest import IngestError
+from app.analysis.intent import IntentError
 from app.analysis.scanner import ScanResult, scan_repo
 
 _COLORS = {
@@ -86,6 +87,12 @@ def _render_text(result: ScanResult, color: bool) -> str:
         for f in result.ordered_logging_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
+
+    if result.ordered_logic_findings:
+        lines.append("\nBusiness-logic flaws (client-trusted values, declared-rule violations):")
+        for f in result.ordered_logic_findings:
+            lines.append(f"  {_tag(f.severity, color)} {f.title}")
+            lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})  confidence: {f.confidence:.0%}")
 
     if result.ordered_idor_findings:
         lines.append("\nBroken object-level authorization (possible IDOR):")
@@ -172,6 +179,23 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
             }
             for f in result.ordered_logging_findings
         ],
+        "logic_findings": [
+            {
+                "category": f.category,
+                "rule": f.rule,
+                "severity": f.severity,
+                "confidence": f.confidence,
+                "handler": f.handler,
+                "field": f.field,
+                "relpath": f.relpath,
+                "line": f.line,
+                "cwe": f.cwe,
+                "owasp": f.owasp,
+                "evidence": f.evidence,
+            }
+            for f in result.ordered_logic_findings
+        ],
+        "intent_rules_evaluated": result.intent_rules,
         "idor_findings": [
             {
                 "severity": f.severity,
@@ -354,6 +378,12 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument(
         "--no-osv", action="store_true", help="Skip the OSV known-vulnerability lookup (offline)."
     )
+    scan.add_argument(
+        "--intent",
+        metavar="FILE",
+        help="Developer intent spec (JSON rules the code must satisfy). "
+        "Defaults to <path>/secureagent-intent.json when present.",
+    )
     scan.add_argument("--baseline", help="Suppress findings listed in this baseline file.")
     scan.add_argument(
         "--write-baseline", help="Write all current findings to this baseline file and exit."
@@ -384,8 +414,9 @@ def main(argv: list[str] | None = None) -> int:
             max_files=args.max_files,
             check_osv=not args.no_osv,
             exclude=args.exclude,
+            intent=args.intent,
         )
-    except (IngestError, FileNotFoundError) as exc:
+    except (IngestError, IntentError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

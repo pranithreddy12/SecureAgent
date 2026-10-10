@@ -532,3 +532,21 @@ Append-only. Never rewrite past entries.
 
 ### Notes
 - Backend job (lint + 253 tests with PostgreSQL service + PDF libraries) passed on GitHub.
+
+## 2026-10-10 (Business-logic detectors and developer intent spec -- ADR-010)
+
+### Added
+- `app/analysis/business_logic.py`: deterministic Python-AST detectors for mass assignment (CWE-915),
+  client-trusted privilege fields (CWE-269) and client-trusted price/amount values (CWE-602). Taint is
+  narrow (request sources only; lookups keyed by client values are server data).
+- `app/analysis/intent.py`: `secureagent-intent.json` / `scan --intent FILE`; rule types `require_auth`,
+  `owner_scoped`, `never_from_client`. JSON (not YAML) to keep ADR-009's dependency rule. A malformed or
+  missing explicit spec fails loudly (exit 2).
+- Findings wired through scanner, report, text/JSON/SARIF output, baseline and inline suppression.
+- Demo fixture: three business-logic flaws, an intent file, and a safe counterpart (zero findings); demo is
+  now 34 findings (was 25).
+- ADR-010; `tests/test_business_logic.py` (17 tests).
+
+### Notes
+- Python only. Workflow-order detection, authorization matrix and finding chaining are not built.
+- Local DB-backed tests could not run (Docker off); the push is verified by CI.

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from app.analysis import secrets
 from app.analysis.access_control import IdorFinding, analyze_access_control
+from app.analysis.business_logic import LogicFinding, analyze_business_logic
 from app.analysis.dependencies import Dependency, is_lockfile, parse_dependencies
 from app.analysis.ingest import (
     IngestStats,
@@ -15,6 +17,12 @@ from app.analysis.ingest import (
     iter_source_files,
     load_ignore_file,
     read_text,
+)
+from app.analysis.intent import (
+    DEFAULT_FILENAME,
+    evaluate_intent,
+    extra_fields,
+    load_intent,
 )
 from app.analysis.logging_checks import LoggingFinding, scan_logging
 from app.analysis.misconfig import MisconfigFinding, scan_misconfig
@@ -61,6 +69,8 @@ class ScanResult:
     idor_findings: list[IdorFinding] = field(default_factory=list)
     misconfig_findings: list[MisconfigFinding] = field(default_factory=list)
     logging_findings: list[LoggingFinding] = field(default_factory=list)
+    logic_findings: list[LogicFinding] = field(default_factory=list)
+    intent_rules: int = 0  # developer intent rules evaluated (0 = no spec supplied)
     dependencies: list[Dependency] = field(default_factory=list)
     dependency_findings: list[DependencyFinding] = field(default_factory=list)
     osv_note: str | None = None
@@ -77,6 +87,7 @@ class ScanResult:
             + len(self.idor_findings)
             + len(self.misconfig_findings)
             + len(self.logging_findings)
+            + len(self.logic_findings)
             + len(self.dependency_findings)
         )
 
@@ -130,6 +141,13 @@ class ScanResult:
         )
 
     @property
+    def ordered_logic_findings(self) -> list[LogicFinding]:
+        return sorted(
+            self.logic_findings,
+            key=lambda f: (SEVERITY_ORDER.get(f.severity, 9), f.relpath, f.line),
+        )
+
+    @property
     def ordered_dependency_findings(self) -> list[DependencyFinding]:
         return sorted(
             self.dependency_findings,
@@ -152,6 +170,8 @@ class ScanResult:
             counts[f.severity] = counts.get(f.severity, 0) + 1
         for f in self.logging_findings:
             counts[f.severity] = counts.get(f.severity, 0) + 1
+        for f in self.logic_findings:
+            counts[f.severity] = counts.get(f.severity, 0) + 1
         for f in self.dependency_findings:
             counts[f.severity] = counts.get(f.severity, 0) + 1
         return counts
@@ -164,18 +184,27 @@ def scan_repo(
     check_osv: bool = True,
     osv_client: OsvClient | None = None,
     exclude: Sequence[str] = (),
+    intent: str | None = None,
 ) -> ScanResult:
     """Ingest ``root`` (read-only) and run all static analysers.
 
     ``exclude`` patterns (plus any in ``<root>/.secureagentignore``) skip files entirely;
     a ``secureagent: ignore`` comment hides findings reported on that line. Both are counted
     in the result so suppression is never silent.
+
+    ``intent`` is a developer intent spec (ADR-010); ``<root>/secureagent-intent.json`` is used
+    when present. A malformed spec raises ``IntentError`` rather than being ignored.
     """
     stats = IngestStats()
     result = ScanResult(root=str(root), stats=stats)
     kwargs: dict = {"stats": stats, "exclude": [*load_ignore_file(root), *exclude]}
     if max_files is not None:
         kwargs["max_files"] = max_files
+
+    intent_path = intent or os.path.join(str(root), DEFAULT_FILENAME)
+    rules = load_intent(intent_path) if (intent or os.path.isfile(intent_path)) else []
+    result.intent_rules = len(rules)
+    custom_fields = extra_fields(rules)
 
     taint_sources: list[tuple[str, str]] = []
     ignored_lines: dict[str, set[int]] = {}
@@ -194,6 +223,7 @@ def scan_repo(
         result.idor_findings.extend(analyze_access_control(file.relpath, text))
         result.misconfig_findings.extend(scan_misconfig(file.relpath, text))
         result.logging_findings.extend(scan_logging(file.relpath, text))
+        result.logic_findings.extend(analyze_business_logic(file.relpath, text, custom_fields))
         if file.relpath.endswith((".py", *JS_EXTENSIONS)):
             taint_sources.append((file.relpath, text))
         if is_lockfile(file.relpath):
@@ -202,6 +232,7 @@ def scan_repo(
     # Taint runs once over the whole project so flow can cross files.
     result.taint_findings = analyze_taint_project(taint_sources)
     result.route_findings = route_findings(result.routes)
+    result.logic_findings.extend(evaluate_intent(rules, result.routes, result.idor_findings))
     _dedupe_sinks_superseded_by_taint(result)
     _apply_inline_ignores(result, ignored_lines)
 
@@ -228,6 +259,7 @@ def _apply_inline_ignores(result: ScanResult, ignored: dict[str, set[int]]) -> N
     result.idor_findings = [f for f in result.idor_findings if kept(f.relpath, f.line)]
     result.misconfig_findings = [f for f in result.misconfig_findings if kept(f.relpath, f.line)]
     result.logging_findings = [f for f in result.logging_findings if kept(f.relpath, f.line)]
+    result.logic_findings = [f for f in result.logic_findings if kept(f.relpath, f.line)]
     result.route_findings = [
         f for f in result.route_findings if kept(f.route.relpath, f.route.line)
     ]

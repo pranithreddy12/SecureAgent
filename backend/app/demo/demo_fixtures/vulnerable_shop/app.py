@@ -75,6 +75,24 @@ def delete_user():  # endpoint with no visible authorization
     return "deleted"
 
 
+# --- Business logic: the server trusting the client -----------------------------------------
+
+
+@app.route("/register", methods=["POST"])
+def register():
+    return str(User(**request.json))  # mass assignment: client can set any model field
+
+
+@app.route("/profile", methods=["POST"])
+def update_profile():
+    user.is_admin = request.json["is_admin"]  # privilege flag taken from the client
+
+
+@app.route("/checkout", methods=["POST"])
+def checkout():
+    return charge(amount=request.json["amount"])  # price decided by the client
+
+
 # --- Cryptography, deserialization, TLS ---------------------------------------------------
 
 

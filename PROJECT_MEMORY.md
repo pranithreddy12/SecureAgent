@@ -69,8 +69,9 @@ workflow (`.github/workflows/ci.yml`, **not yet run on GitHub**), GitHub Action 
 ### Planned
 - Everything blocked above; frontend pages for targets/audits/findings/reports/activity; dashboard data;
   structured per-audit logging; optional LLM reasoning; frontend tests; login rate limiting; admin bootstrap.
-- Grey-box business-logic engine beyond what exists (ADR-008): workflow-order and client-trusted-value
-  detection, developer-intent input, Application Model persistence.
+- Grey-box business-logic engine beyond what exists (ADR-008/010): workflow-order detection, a UI/API for
+  the developer-intent input (the JSON spec + CLI flag exist), Application Model persistence, JS/TS logic
+  detectors, authorization matrix, finding chaining, verified-fix patches.
 
 ### Deferred
 - Continuous / scheduled audits and CI/CD-triggered audits (architecture is extensible only).
@@ -243,7 +244,9 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
   commit. Lesson: verify against `git ls-tree HEAD` after the final commit, not before.
 
 ## 18. Testing Status
-- **Backend: 253 tests collected, 252 pass, 1 skipped, 0 fail; 93% line coverage.** The skipped test is
+- **Backend: 270 tests collected (2026-10-10, after ADR-010; the 17 new tests and all static tests pass locally;
+  the 27 DB-backed tests could not run locally because Docker was off -- CI is the authority).** Last full run
+  with the DB (2026-10-09): 253 collected, 252 pass, 1 skipped, 93% line coverage. The skipped test is
   PDF rendering, which needs Pango (passes in the backend Docker image). DB-backed tests need
   `make testdb` (PostgreSQL on :55432); they build the schema via the real Alembic migration.
 - Static-analysis tests use snippets + the pinned demo; OSV is tested through an injected fake transport
@@ -262,7 +265,10 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Python taint resolves cross-file calls heuristically (import hint / unique name), does not model
   sanitizers, and does not follow class attributes; JS/TS analysis is regex-based (no AST).
 - OSV matching uses pinned versions in lockfiles (no range resolution); needs network (skipped gracefully).
-- Intraprocedural IDOR heuristic only; workflow-order and client-trusted-value logic flaws are not detected.
+- Intraprocedural IDOR heuristic only (it also flags legitimate by-id lookups of shared catalogue data).
+- Business-logic detectors (ADR-010) are Python-only; they cover client-trusted values, mass assignment and
+  declared intent rules, not workflow-order. A serializer or middleware outside the handler can neutralise a
+  flagged pattern, so findings stay `suspicious`.
 - Some real vulnerabilities will remain `likely`/`suspicious` because only non-destructive validation is intended.
 
 ## 20. Future Improvements

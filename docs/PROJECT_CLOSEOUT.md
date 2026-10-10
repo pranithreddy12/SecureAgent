@@ -111,7 +111,8 @@ consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages
 - Detector accuracy benchmark on public vulnerable corpora (the current tests prove intended behaviour, not a measured detection rate).
 - Parse OSV CVSS vectors into scores (so CVSS can be shown when reliably determined).
 - JS AST-based analysis (replace regex heuristics); sanitizer modelling in taint.
-- Workflow-order and client-trusted-value detectors from ADR-008 (the unbuilt part of the business-logic goal).
+- Workflow-order detector (ADR-008). Client-trusted-value, mass-assignment and the intent spec were built
+  on 2026-10-10 (ADR-010, Python only).
 
 ## 6. Two honest ways to close the project
 

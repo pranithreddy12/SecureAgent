@@ -36,7 +36,7 @@ python -m app.cli demo --online              # also look up the sample's pinned 
 Offline by default. The dependency check is the only part that needs the network, so it is
 reported honestly as skipped unless you pass `--online`.
 
-## What you will see (25 findings, offline)
+## What you will see (34 findings, offline)
 
 | Class | Planted flaw | Reported as |
 |---|---|---|
@@ -50,13 +50,16 @@ reported honestly as skipped unless you pass `--online`.
 | | `POST /admin/delete_user`, `POST /admin/reset` with no auth | Missing authorization, CWE-862 |
 | Sinks | `pickle.loads(request.data)`, `verify=False`, `hashlib.md5` | CWE-502, CWE-295, CWE-327 |
 | Misconfiguration | `DEBUG=True`, CSRF off, wildcard CORS **with credentials**, JWT `verify_signature: False` | CWE-489, 352, 942, 347 |
+| Business logic | `User(**request.json)`; `user.is_admin = request.json[...]`; `charge(amount=request.json[...])` | Mass assignment CWE-915; client-trusted privilege CWE-269; client-trusted value CWE-602 |
+| Declared intent | `secureagent-intent.json` says `/admin/*` needs auth and `/orders/*` is owner-scoped | Rule violations (CWE-862 / CWE-639) |
 | Logging | Password written to a log; `except: pass` | CWE-532, CWE-778 |
 | Secrets | AWS key, two high-entropy credentials (redacted: `AK••••••••••LE (len 20)`) | CWE-798 |
 
 ## Just as important: what it does **not** report
 
 - **`safe_routes.py`** contains the *correct* versions of the same operations (parameterised
-  SQL, an argument-list subprocess, an ownership-scoped lookup, SHA-256, `yaml.safe_load`).
+  SQL, an argument-list subprocess, an ownership-scoped lookup, SHA-256, `yaml.safe_load`,
+  a server-side price lookup).
   SecureAgent reports **nothing** there — it tells vulnerable code from correct code.
 - `SECRET_KEY = "load-me-from-the-environment"` is a placeholder and is correctly ignored.
 - `app.get('/account', requireAuth, ...)` is protected and is correctly ignored.

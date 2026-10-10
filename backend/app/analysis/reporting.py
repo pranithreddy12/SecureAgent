@@ -82,6 +82,34 @@ def _logging_finding(f) -> ReportFinding:
     )
 
 
+def _logic_finding(f) -> ReportFinding:
+    intent = f.category == "intent_violation"
+    return ReportFinding(
+        title=f.title,
+        type=f.category,
+        severity=Severity(f.severity),
+        confidence=f.confidence,
+        status=FindingStatus.SUSPICIOUS,
+        status_reason=(
+            "The source does not show a rule the developer declared (secureagent-intent.json)."
+            if intent
+            else "The handler uses a client-controlled value where the server should decide. "
+            "Confirm no serializer/middleware outside the handler neutralises it."
+        ),
+        endpoint=f"{f.relpath}:{f.line}",
+        parameter=f.field,
+        description=f"Handler {f.handler}(): {f.rule}.",
+        impact="A client can tamper with values or privileges the server is meant to control.",
+        evidence=f.evidence,
+        validation_method="static business-logic analysis"
+        + (" (developer intent spec)" if intent else ""),
+        owasp_category=f.owasp,
+        cwe=f.cwe,
+        remediation=f.remediation,
+        sources=["static:business-logic"],
+    )
+
+
 def _misconfig_finding(f) -> ReportFinding:
     return ReportFinding(
         title=f.title,
@@ -219,6 +247,7 @@ def scan_to_report_context(
     findings = [_secret_finding(f) for f in result.ordered_secrets]
     findings += [_misconfig_finding(f) for f in result.ordered_misconfig_findings]
     findings += [_logging_finding(f) for f in result.ordered_logging_findings]
+    findings += [_logic_finding(f) for f in result.ordered_logic_findings]
     findings += [_idor_finding(f) for f in result.ordered_idor_findings]
     findings += [_taint_finding(f) for f in result.ordered_taint_findings]
     findings += [_dependency_finding(f) for f in result.ordered_dependency_findings]
@@ -260,6 +289,7 @@ def scan_to_report_context(
             "Security misconfiguration detection (debug, CORS, JWT, CSRF, autoescape)",
             "Logging & monitoring checks (sensitive data in logs, swallowed exceptions)",
             "Route and authorization extraction",
+            "Business-logic checks (client-trusted values, mass assignment)",
         ],
         technologies=sorted({d.ecosystem for d in result.dependencies}),
         endpoints=endpoints,

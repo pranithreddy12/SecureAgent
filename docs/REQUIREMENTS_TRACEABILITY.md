@@ -46,10 +46,11 @@ Status: Planned → In Progress → Implemented → Tested.
 | R37 | Taint: injection/SSRF/path/open-redirect (interprocedural Python + JS) | ADR-008 (OWASP A03/A10/A01) | backend/app/analysis/taint.py | Implemented + Tested |
 | R36 | Dangerous-sink detection (deserialization, cmd/code exec, weak crypto, TLS, XXE, XSS sink) | ADR-008 (OWASP A02/A03/A05/A08) | backend/app/analysis/sinks.py | Implemented + Tested |
 | R35 | Dependency / known-vulnerability scanning (OSV) | ADR-008 (extends R13 CVE) | backend/app/analysis/dependencies.py, osv.py | Implemented + Tested |
-| R34 | Developer-intent description (roles, workflows, test accounts) | ADR-008 | schema + UI (planned) | Designed |
+| R34 | Developer-intent description (roles, workflows, test accounts) | ADR-008 | JSON rules via `--intent` / `secureagent-intent.json` (intent.py); UI planned | Partially Implemented (rules only; no roles/workflows/test-accounts yet) |
 | R43 | Suppression controls: --exclude, .secureagentignore, inline ignore (always counted) | project (real-world usability) | backend/app/analysis/ingest.py, scanner.py, cli.py | Implemented + Tested |
 | R44 | Report polish: risk rating, Fix-first priorities, grouped remediation, ToC | project (report quality) | backend/app/schemas/report.py, reports/templates/report.html | Implemented + Tested |
 | R45 | Dependency-light installable scanner (no web stack required) | ADR-009 | backend/app/core/enums.py, pyproject.toml, tests/test_cli_standalone.py | Implemented + Tested |
 | R46 | Reproducible backend build (pinned lock) | project (supply chain) | backend/requirements.lock, docker/backend.Dockerfile | Implemented |
 | R47 | Repo CI workflow (backend, frontend, self-scan) | project | .github/workflows/ci.yml | Implemented; first run: backend green, two real failures found and fixed; second run green on all jobs |
+| R48 | Business-logic detectors (mass assignment, client-trusted privilege/value) and developer intent spec | ADR-008, ADR-010 (OWASP A01/A04) | backend/app/analysis/business_logic.py, intent.py, tests/test_business_logic.py | Implemented + Tested (Python only; workflow-order not built) |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |

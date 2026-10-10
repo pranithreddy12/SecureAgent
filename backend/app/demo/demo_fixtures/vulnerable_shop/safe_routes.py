@@ -44,3 +44,10 @@ def checksum(data):
 
 def load_settings(text):
     return yaml.safe_load(text)  # safe loader
+
+
+@app.route("/safe/checkout", methods=["POST"])
+@login_required
+def safe_checkout():
+    # The price comes from the server-side catalogue; the client only names the product.
+    return charge(amount=CATALOG[request.json["product_id"]].price)
