@@ -84,6 +84,7 @@ def _logging_finding(f) -> ReportFinding:
 
 def _logic_finding(f) -> ReportFinding:
     intent = f.category == "intent_violation"
+    sibling = f.category == "inconsistent_authorization"
     return ReportFinding(
         title=f.title,
         type=f.category,
@@ -93,13 +94,19 @@ def _logic_finding(f) -> ReportFinding:
         status_reason=(
             "The source does not show a rule the developer declared (secureagent-intent.json)."
             if intent
+            else "Sibling routes of the same resource are guarded; this one is not."
+            if sibling
             else "The handler uses a client-controlled value where the server should decide. "
             "Confirm no serializer/middleware outside the handler neutralises it."
         ),
         endpoint=f"{f.relpath}:{f.line}",
         parameter=f.field,
         description=f"Handler {f.handler}(): {f.rule}.",
-        impact="A client can tamper with values or privileges the server is meant to control.",
+        impact=(
+            "Callers may reach an action its sibling routes protect."
+            if sibling
+            else "A client can tamper with values or privileges the server is meant to control."
+        ),
         evidence=f.evidence,
         validation_method="static business-logic analysis"
         + (" (developer intent spec)" if intent else ""),

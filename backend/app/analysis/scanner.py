@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from app.analysis import secrets
 from app.analysis.access_control import IdorFinding, analyze_access_control
+from app.analysis.authz_matrix import authz_outliers
 from app.analysis.business_logic import LogicFinding, analyze_business_logic
 from app.analysis.dependencies import Dependency, is_lockfile, parse_dependencies
 from app.analysis.ingest import (
@@ -232,6 +233,7 @@ def scan_repo(
     # Taint runs once over the whole project so flow can cross files.
     result.taint_findings = analyze_taint_project(taint_sources)
     result.route_findings = route_findings(result.routes)
+    result.logic_findings.extend(authz_outliers(result.routes))
     result.logic_findings.extend(evaluate_intent(rules, result.routes, result.idor_findings))
     _dedupe_sinks_superseded_by_taint(result)
     _apply_inline_ignores(result, ignored_lines)

@@ -550,3 +550,16 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Python only. Workflow-order detection, authorization matrix and finding chaining are not built.
 - Local DB-backed tests could not run (Docker off); the push is verified by CI.
+
+## 2026-10-10 (Authorization matrix)
+
+### Added
+- `app/analysis/authz_matrix.py`: routes grouped by resource; an unguarded route among a majority-guarded
+  group (>=3 routes, >=60% guarded; public resources such as login/health excluded) is reported as
+  `inconsistent_authorization` (CWE-862, `suspicious`, confidence 0.6).
+- `secureagent scan --matrix` prints the route x guard grid.
+- Demo: `projects_api.py` (3 of 4 guarded); demo now 36 findings.
+
+### Notes
+- Grouping by first path segment is a heuristic; Django class-based views group per class path. A guard
+  applied by global middleware is invisible, so findings need review.

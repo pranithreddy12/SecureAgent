@@ -53,4 +53,5 @@ Status: Planned → In Progress → Implemented → Tested.
 | R46 | Reproducible backend build (pinned lock) | project (supply chain) | backend/requirements.lock, docker/backend.Dockerfile | Implemented |
 | R47 | Repo CI workflow (backend, frontend, self-scan) | project | .github/workflows/ci.yml | Implemented; first run: backend green, two real failures found and fixed; second run green on all jobs |
 | R48 | Business-logic detectors (mass assignment, client-trusted privilege/value) and developer intent spec | ADR-008, ADR-010 (OWASP A01/A04) | backend/app/analysis/business_logic.py, intent.py, tests/test_business_logic.py | Implemented + Tested (Python only; workflow-order not built) |
+| R49 | Authorization matrix + inconsistent-authorization outliers | ADR-010 (OWASP A01) | backend/app/analysis/authz_matrix.py, tests/test_authz_matrix.py | Implemented + Tested (heuristic; Python and JS route extractors) |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |

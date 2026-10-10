@@ -38,6 +38,7 @@ Exit codes: `0` clean / gate passed, `1` findings (or new findings ≥ `--fail-o
 | `taint.py` | **Injection via data flow** (SQLi, command, code, SSRF, path traversal, open redirect) — interprocedural within a file (Python) + JS/TS heuristic | A03/A10/A01 |
 | `access_control.py` | IDOR / missing object-level authorization | CWE-639 / A01 |
 | `business_logic.py` | Mass assignment, client-trusted privilege/value (ADR-010) | CWE-915, 269, 602 / A01, A04 |
+| `authz_matrix.py` | Route x guard grid by resource; unguarded outliers among guarded siblings (`scan --matrix`) | CWE-862 / A01 |
 | `intent.py` | Developer intent spec (`secureagent-intent.json`) checked against routes + IDOR | CWE-862, 639 / A01 |
 | `misconfig.py` | Debug on, permissive CORS, disabled JWT verification, CSRF off, autoescape off, wildcard hosts, insecure cookies | A05/A07 |
 | `logging_checks.py` | Sensitive data in logs (CWE-532), swallowed exceptions (CWE-778) | A09 |

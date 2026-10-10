@@ -68,6 +68,14 @@ CATEGORY = {
         "high",
         0.55,
     ),
+    "inconsistent_authorization": (
+        "CWE-862",
+        "A01:2021 Broken Access Control",
+        "Apply the same authorization guard as the sibling routes, or document why this route is "
+        "intentionally public.",
+        "high",
+        0.6,
+    ),
     "intent_violation": (
         "CWE-862",
         "A01:2021 Broken Access Control",
@@ -110,6 +118,8 @@ class LogicFinding:
     def title(self) -> str:
         if self.category == "intent_violation":
             return f"Declared rule violated: {self.rule}"
+        if self.category == "inconsistent_authorization":
+            return f"Inconsistent authorization: {self.rule}"
         return f"Business-logic flaw in {self.handler}(): {self.rule}"
 
 

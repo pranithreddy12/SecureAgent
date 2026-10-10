@@ -38,6 +38,7 @@ EXPECTED_TYPES = {
     "client_trusted_privilege",
     "client_trusted_value",
     "intent_violation",
+    "inconsistent_authorization",
     # logging and secrets
     "sensitive_data_in_log",
     "swallowed_exception",
@@ -60,6 +61,7 @@ def test_sample_app_ships_with_the_package() -> None:
         "server.js",
         "requirements.txt",
         "secureagent-intent.json",
+        "projects_api.py",
     ):
         assert (root / name).is_file(), name
 

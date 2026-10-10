@@ -291,6 +291,24 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
     return json.dumps(payload, indent=2)
 
 
+def _render_matrix(result: ScanResult) -> str:
+    from app.analysis.authz_matrix import build_matrix
+
+    groups = build_matrix(result.routes)
+    if not groups:
+        return "Authorization matrix: no routes found."
+    lines = [
+        "Authorization matrix (guarded = an auth dependency/decorator/middleware was detected):"
+    ]
+    for g in groups:
+        lines.append(f"  /{g.resource}  ({g.guarded}/{len(g.routes)} guarded)")
+        for r in g.routes:
+            mark = "guarded " if r.protected else "OPEN    "
+            guard = f"  [{r.guard}]" if r.guard else ""
+            lines.append(f"    {mark} {r.method:<7} {r.path}  -> {r.handler or '?'}{guard}")
+    return "\n".join(lines)
+
+
 DEMO_BANNER = (
     "=" * 72 + "\n"
     "DEMO MODE -- scanning SecureAgent's bundled, deliberately vulnerable sample app.\n"
@@ -393,6 +411,11 @@ def main(argv: list[str] | None = None) -> int:
         choices=["critical", "high", "medium", "low"],
         help="Exit non-zero only if a new finding at or above this severity remains.",
     )
+    scan.add_argument(
+        "--matrix",
+        action="store_true",
+        help="Also print the authorization matrix (route x guard, grouped by resource).",
+    )
     scan.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
 
     demo = sub.add_parser(
@@ -447,6 +470,8 @@ def main(argv: list[str] | None = None) -> int:
         report = _render_text(result, color)
         if args.baseline:
             report += f"\nBaseline: {suppressed} suppressed, {len(new_items)} new."
+        if args.matrix:
+            report += "\n\n" + _render_matrix(result)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:
