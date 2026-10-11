@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import fnmatch
 import os
+import re
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,6 +39,7 @@ IGNORED_DIRS = frozenset(
         ".nuxt",
         ".svelte-kit",
         "dist",
+        "dev-dist",  # vite-plugin-pwa / workbox development output
         "build",
         "out",
         "target",
@@ -126,10 +128,19 @@ class IngestStats:
     bytes_scanned: int = 0
     skipped_binary: int = 0
     skipped_too_large: int = 0
+    skipped_generated: int = 0  # minified / bundled / vendored-by-name files
     skipped_dirs: int = 0
     excluded: int = 0  # files skipped by --exclude / .secureagentignore (always reported)
     truncated: bool = False
     notes: list[str] = field(default_factory=list)
+
+
+# Machine-generated bundles: minified/bundled output and service-worker runtimes. Findings in
+# them are about third-party code, not the project's own.
+_GENERATED_NAME = re.compile(
+    r"(?i)(\.min\.(js|css|mjs)$|\.bundle\.m?js$|\.chunk\.m?js$|^workbox-[0-9a-f]{6,}\.js$|"
+    r"^sw\.js\.map$|\.map$|-[0-9a-f]{8,}\.(js|css)$)"
+)
 
 
 class IngestError(ValueError):
@@ -212,6 +223,9 @@ def iter_source_files(
                 continue
             if _has_binary_extension(name):
                 st.skipped_binary += 1
+                continue
+            if _GENERATED_NAME.search(name):
+                st.skipped_generated += 1
                 continue
             try:
                 size = abs_path.stat().st_size

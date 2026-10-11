@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import ast
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete", "head", "options", "websocket"}
 STATE_CHANGING = {"POST", "PUT", "PATCH", "DELETE"}
@@ -100,12 +100,13 @@ def _python_routes(relpath: str, text: str) -> list[Route]:
     except (SyntaxError, ValueError):
         return []
     routes: list[Route] = []
+    router_guards = _router_guards(tree)
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             guard = _python_handler_guard(node)
             for dec in node.decorator_list:
                 for method, path, dec_guard in _python_route_decorator(dec):
-                    g = guard or dec_guard
+                    g = guard or dec_guard or router_guards.get(_decorator_receiver(dec) or "")
                     routes.append(
                         Route(
                             method,
@@ -299,13 +300,117 @@ def _depends_guard_in(call: ast.Call) -> str | None:
     return None
 
 
+# Dependency names that guard access without containing "auth": verify_cat_owner, check_access,
+# require_member ... Used only for names passed to Depends()/Security().
+DEPENDS_HINT = re.compile(
+    r"(?i)(verify|owner|ownership|access|role|scope|member|principal|identity|tenant|acl|rbac|"
+    r"can_|check_|authoriz)"
+)
+
+
+def _is_guard_dependency(name: str) -> bool:
+    return bool(AUTH_HINT.search(name) or DEPENDS_HINT.search(name))
+
+
 def _depends_name(node: ast.expr | None) -> str | None:
     if isinstance(node, ast.Call) and _dotted_name(node.func) in {"Depends", "Security"}:
         inner = node.args[0] if node.args else None
         name = _dotted_name(inner) if inner is not None else None
-        if name and AUTH_HINT.search(name):
+        if name and _is_guard_dependency(name):
             return name
     return None
+
+
+def _router_guards(tree: ast.AST) -> dict[str, str]:
+    """``router = APIRouter(..., dependencies=[Depends(guard)])`` guards every route on it."""
+    guards: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Call)
+            and (_dotted_name(node.value.func) or "").rsplit(".", 1)[-1] in {"APIRouter", "FastAPI"}
+        ):
+            guard = _depends_guard_in(node.value)
+            if guard:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        guards[target.id] = guard
+    return guards
+
+
+def _decorator_receiver(dec: ast.expr) -> str | None:
+    if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
+        base = dec.func.value
+        return base.id if isinstance(base, ast.Name) else None
+    return None
+
+
+def apply_include_guards(routes: list[Route], sources: list[tuple[str, str]]) -> list[Route]:
+    """``app.include_router(mod.router, dependencies=[Depends(guard)])`` protects the routes
+    defined in that module. Resolved by import path where possible, else by module name."""
+    guards: list[
+        tuple[str, str | None, str]
+    ] = []  # (module path or stem, same-file relpath, guard)
+    for relpath, text in sources:
+        if not relpath.endswith(".py") or "include_router" not in text:
+            continue
+        try:
+            tree = ast.parse(text)
+        except (SyntaxError, ValueError):
+            continue
+        imports: dict[str, str] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                for alias in node.names:
+                    imports[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports[alias.asname or alias.name.split(".")[0]] = alias.name
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "include_router"
+                and node.args
+            ):
+                continue
+            guard = _depends_guard_in(node)
+            if not guard:
+                continue
+            target = node.args[0]
+            if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name):
+                module = imports.get(target.value.id, target.value.id)
+                guards.append((module, None, guard))
+            elif isinstance(target, ast.Name):
+                dotted = imports.get(target.id)
+                if dotted:  # `from pkg.mod import router [as alias]` -> pkg.mod
+                    guards.append((dotted.rsplit(".", 1)[0], None, guard))
+                else:  # router defined in this very file
+                    guards.append(("", relpath, guard))
+    if not guards:
+        return routes
+
+    def matches(route: Route, module: str, same_file: str | None) -> bool:
+        if same_file is not None:
+            return route.relpath == same_file
+        suffix = module.replace(".", "/")
+        stem = module.rsplit(".", 1)[-1]
+        path = route.relpath[:-3] if route.relpath.endswith(".py") else route.relpath
+        return (
+            path.endswith(suffix)
+            or path.endswith(suffix + "/__init__")
+            or path.rsplit("/", 1)[-1] == stem
+        )
+
+    out: list[Route] = []
+    for r in routes:
+        if not r.protected:
+            for module, same_file, guard in guards:
+                if matches(r, module, same_file):
+                    r = replace(r, protected=True, guard=f"include_router(dependencies={guard})")
+                    break
+        out.append(r)
+    return out
 
 
 def _dotted_name(node: ast.expr | None) -> str | None:

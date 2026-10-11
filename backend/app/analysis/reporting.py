@@ -28,14 +28,21 @@ AUTHORIZATION_STATEMENT = (
 
 
 def _secret_finding(f) -> ReportFinding:
+    ignored = getattr(f, "gitignored", False)
     return ReportFinding(
         title=f.title,
         type="hardcoded_secret",
         severity=Severity(f.severity),
         confidence=f.confidence,
         # It is in the source, but whether it is live/active is not proven here.
-        status=FindingStatus.LIKELY,
-        status_reason="Matched a secret pattern in source; value redacted.",
+        status=FindingStatus.INFORMATIONAL if ignored else FindingStatus.LIKELY,
+        status_reason=(
+            "This file is ignored by git (.gitignore), so it is a local file, not committed "
+            "code. The value is still a real secret: keep it out of Docker images, archives, "
+            "backups and shared folders, and rotate it if it was ever copied elsewhere."
+            if ignored
+            else "Matched a secret pattern in source; value redacted."
+        ),
         endpoint=f"{f.relpath}:{f.line}",
         evidence=f"{f.rule} — {f.redacted} (fingerprint {f.fingerprint})",
         validation_method="static source pattern match",

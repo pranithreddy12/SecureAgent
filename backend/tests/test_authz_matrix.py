@@ -99,10 +99,15 @@ def test_report_context_carries_the_matrix(tmp_path):
     assert "Authorization matrix" in render_html(ctx)
 
 
-def test_public_collection_listing_is_not_an_outlier_but_object_access_is():
-    guarded = [r("POST", "/catalog", True, "g"), r("PUT", "/catalog/<id>", True, "g")]
+def test_public_listing_is_not_an_outlier_and_guarded_reads_make_object_reads_one():
+    writes = [r("POST", "/catalog", True, "g"), r("PUT", "/catalog/<id>", True, "g")]
     public_list = r("GET", "/catalog", False)
     public_item = r("GET", "/catalog/<id>", False)
-    assert authz_outliers([*guarded, r("DELETE", "/catalog/<id>", True, "g"), public_list]) == []
-    flagged = authz_outliers([*guarded, r("DELETE", "/catalog/<id>", True, "g"), public_item])
+    delete = r("DELETE", "/catalog/<id>", True, "g")
+    # public reads + guarded writes: a normal "public read, authenticated write" design
+    assert authz_outliers([*writes, delete, public_list]) == []
+    assert authz_outliers([*writes, delete, public_item]) == []
+    # a guarded sibling READ makes the unguarded object read inconsistent
+    guarded_read = r("GET", "/catalog/<id>/history", True, "g")
+    flagged = authz_outliers([*writes, delete, guarded_read, public_item])
     assert len(flagged) == 1 and "/catalog/<id>" in flagged[0].rule

@@ -103,6 +103,20 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
 
+## Real-world calibration
+
+The first independent scan (a developer's own multi-project directory) drove a round of precision fixes
+(see `PROJECT_CHANGELOG.md`, 2026-10-12, and `tests/test_realworld_fp.py`):
+
+- secret key names are matched as **words** (`author` is not `auth`); stand-in values and plain URLs are
+  ignored; files that `.gitignore` excludes are reported as `informational` local secrets, not committed ones;
+  `VITE_/NEXT_PUBLIC_/FIREBASE` Google keys are *low* client-side keys;
+- FastAPI guards are recognised at **router level**, **route level** and via **`include_router(...,
+  dependencies=[...])`**, including names such as `verify_cat_owner`;
+- `Request(url, data=...)` is SSRF only through its URL; JS `exec(` needs `child_process`; stdlib XML parsers
+  are entity-expansion (low), not XXE; generated bundles (`*.min.js`, hashed chunks, `dev-dist/`) are skipped;
+- an unguarded GET is an authorization outlier only when a sibling GET is guarded.
+
 ## Source reconnaissance and rule-based validation
 
 - **Source reconnaissance** (`recon.py`, ADR-015): technologies, inputs read, outbound hosts, environment

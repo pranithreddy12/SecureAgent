@@ -293,6 +293,10 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Workflow-order detection is a handler-local heuristic (Python): a state machine in the model/DB or a helper
   like `order.ship()` is invisible, so findings stay `suspicious` (confidence 0.4-0.5).
 - The MCP server (docs/mcp.md) implements tools over stdio only, by hand; no resources/prompts/HTTP.
+- **First independent real-project scan (2026-10-12): 204 findings, majority false positives** (substring key
+  matching, router-level dependencies, RegExp.exec, vendored bundles, gitignored local files). All classes fixed
+  and covered by `tests/test_realworld_fp.py`; the project owner should re-run to measure the improvement.
+  The author-written benchmark clearly overstated real-world precision.
 - Accuracy is measured only on a small author-written corpus (`docs/benchmark.md`, 97%/95%); no
   independent real-world detection rate exists.
 - Business-logic detectors (ADR-010) are Python-only; they cover client-trusted values, mass assignment and

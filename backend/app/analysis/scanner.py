@@ -5,13 +5,14 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from app.analysis import secrets
 from app.analysis.access_control import IdorFinding, analyze_access_control
 from app.analysis.authz_matrix import authz_outliers
 from app.analysis.business_logic import LogicFinding, analyze_business_logic
 from app.analysis.dependencies import Dependency, is_lockfile, parse_dependencies
+from app.analysis.gitignore import GitIgnore
 from app.analysis.ingest import (
     IngestStats,
     SourceFile,
@@ -29,7 +30,13 @@ from app.analysis.logging_checks import LoggingFinding, scan_logging
 from app.analysis.misconfig import MisconfigFinding, scan_misconfig
 from app.analysis.osv import OsvClient, OsvError, Vuln
 from app.analysis.recon import ApplicationModel
-from app.analysis.routes import Route, RouteFinding, extract_routes, route_findings
+from app.analysis.routes import (
+    Route,
+    RouteFinding,
+    apply_include_guards,
+    extract_routes,
+    route_findings,
+)
 from app.analysis.secrets import SecretFinding
 from app.analysis.sinks import SinkFinding, scan_sinks
 from app.analysis.taint import JS_EXTENSIONS, TaintFinding, analyze_taint_project
@@ -217,6 +224,7 @@ def scan_repo(
     result.intent_rules = len(rules)
     custom_fields = extra_fields(rules)
 
+    gitignore = GitIgnore.from_root(root)
     taint_sources: list[tuple[str, str]] = []
     ignored_lines: dict[str, set[int]] = {}
     file: SourceFile
@@ -228,7 +236,10 @@ def scan_repo(
         marked = {i for i, ln in enumerate(text.splitlines(), 1) if INLINE_IGNORE.search(ln)}
         if marked:
             ignored_lines[file.relpath] = marked
-        result.secret_findings.extend(secrets.scan_text(file.relpath, text))
+        found = secrets.scan_text(file.relpath, text)
+        if found and gitignore and gitignore.is_ignored(file.relpath):
+            found = [replace(f, gitignored=True) for f in found]
+        result.secret_findings.extend(found)
         result.app_model.absorb_file(file.relpath, text)
         result.routes.extend(extract_routes(file.relpath, text))
         result.sink_findings.extend(scan_sinks(file.relpath, text))
@@ -244,6 +255,7 @@ def scan_repo(
 
     # Taint runs once over the whole project so flow can cross files.
     result.taint_findings = analyze_taint_project(taint_sources)
+    result.routes = apply_include_guards(result.routes, taint_sources)
     result.route_findings = route_findings(result.routes)
     for route in result.routes:
         result.app_model.absorb_route_path(route.path)

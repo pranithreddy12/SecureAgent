@@ -374,10 +374,14 @@ def _sinks_in_function(
             seen.add((hit[0], call.lineno))
             vuln_type, sink = hit
             snippet = lines[call.lineno - 1].strip()[:160] if 0 < call.lineno <= len(lines) else ""
+            severity, confidence = SEVERITY[vuln_type], 0.75
+            if vuln_type == "sql_injection" and _is_query_param_passthrough(func, call):
+                # A generic DB wrapper `def run(query, *args): conn.execute(query, *args)`: the
+                # query text is built by the *callers*, which is where the review belongs.
+                severity, confidence = "medium", 0.35
+                snippet = f"{snippet}  [query text arrives from callers via a parameter]"
             out.append(
-                TaintFinding(
-                    vuln_type, SEVERITY[vuln_type], 0.75, relpath, call.lineno, sink, snippet
-                )
+                TaintFinding(vuln_type, severity, confidence, relpath, call.lineno, sink, snippet)
             )
     return out
 
@@ -420,7 +424,7 @@ def _check_sink(
     ):
         return "open_redirect", name
     if _is_http_call(name, last) and (
-        _tainted(a0, tainted, ctx) or _tainted(kw.get("url"), tainted, ctx)
+        _tainted(_url_part(a0), tainted, ctx) or _tainted(kw.get("url"), tainted, ctx)
     ):
         return "ssrf", name
     if (
@@ -451,6 +455,27 @@ def _is_parameterised_orm_expr(node, tainted: set[str], ctx: _Ctx | None) -> boo
         ):
             return False
     return True
+
+
+def _is_query_param_passthrough(func, call: ast.Call) -> bool:
+    """``conn.execute(query, *args)`` inside a non-handler function whose parameter is ``query``."""
+    if _is_handler(func) or not call.args or not isinstance(call.args[0], ast.Name):
+        return False
+    params = {a.arg for a in _all_params(func)}
+    if func.args.vararg is not None:
+        params.add(func.args.vararg.arg)
+    return call.args[0].id in params and (len(call.args) > 1 or bool(call.keywords))
+
+
+def _url_part(node):
+    """The URL expression of an HTTP call argument. ``urlopen(Request(url, data=body))`` has user
+    data in the *body*, which is not SSRF; only the URL decides where the request goes."""
+    if isinstance(node, ast.Call) and (_dotted(node.func) or "").rsplit(".", 1)[-1] == "Request":
+        for kw in node.keywords:
+            if kw.arg == "url":
+                return kw.value
+        return node.args[0] if node.args else None
+    return node
 
 
 def _is_http_call(name: str, last: str) -> bool:
@@ -674,6 +699,16 @@ def _iter_unsanitized(node: ast.expr, sanitize: bool = True):
         n = stack.pop()
         yield n
         if sanitize and isinstance(n, ast.Call) and _is_sanitizer_call(n):
+            continue
+        if isinstance(n, ast.Call) and (_dotted(n.func) or "").rsplit(".", 1)[-1] == "Request":
+            # urllib/requests Request(url, data=..., headers=...): only the URL decides where it
+            # goes; user data in the body or headers does not make the *request object* a URL.
+            stack.append(n.func)
+            url = (
+                n.args[0] if n.args else next((k.value for k in n.keywords if k.arg == "url"), None)
+            )
+            if url is not None:
+                stack.append(url)
             continue
         stack.extend(ast.iter_child_nodes(n))
 

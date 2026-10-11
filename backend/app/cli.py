@@ -71,33 +71,60 @@ def _render_text(result: ScanResult, color: bool) -> str:
         )
         return "\n".join(lines)
 
+    from app.analysis.reporting import scan_to_report_context
+    from app.core.enums import FindingStatus as _Status
+
+    context = scan_to_report_context(result)
+    # Findings the validator reclassified (test/example/dev-only code, gitignored local files) are
+    # not listed here; the HTML report keeps them with the reason.
+    hidden = {f.endpoint for f in context.findings if f.status is _Status.INFORMATIONAL}
+
+    def _visible(items):
+        def key(f):
+            r = getattr(f, "route", f)
+            return f"{r.relpath}:{r.line}"
+
+        return [f for f in items if key(f) not in hidden]
+
+    shown_ordered_secrets = _visible(result.ordered_secrets)
+    shown_ordered_misconfig_findings = _visible(result.ordered_misconfig_findings)
+    shown_ordered_logging_findings = _visible(result.ordered_logging_findings)
+    shown_ordered_logic_findings = _visible(result.ordered_logic_findings)
+    shown_ordered_idor_findings = _visible(result.ordered_idor_findings)
+    shown_ordered_taint_findings = _visible(result.ordered_taint_findings)
+    shown_ordered_sink_findings = _visible(result.ordered_sink_findings)
+    shown_ordered_route_findings = _visible(result.ordered_route_findings)
+
     counts = {k: v for k, v in result.severity_counts().items() if v}
     lines.append(
         f"{result.total_findings} finding(s): " + ", ".join(f"{v} {k}" for k, v in counts.items())
     )
+    if hidden:
+        lines.append(
+            f"{len(hidden)} of them are informational (test/example/dev-only code or files ignored "
+            "by git) and are hidden here; the HTML report lists them with the reason."
+        )
 
-    if result.ordered_secrets:
+    if shown_ordered_secrets:
         lines.append("\nHardcoded secrets:")
-        for f in result.ordered_secrets:
+        for f in shown_ordered_secrets:
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}")
             lines.append(f"      value: {f.redacted}   confidence: {f.confidence:.0%}")
 
-    if result.ordered_misconfig_findings:
+    if shown_ordered_misconfig_findings:
         lines.append("\nSecurity misconfigurations:")
-        for f in result.ordered_misconfig_findings:
+        for f in shown_ordered_misconfig_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
 
-    if result.ordered_logging_findings:
+    if shown_ordered_logging_findings:
         lines.append("\nLogging & monitoring:")
-        for f in result.ordered_logging_findings:
+        for f in shown_ordered_logging_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
 
-    from app.analysis.reporting import scan_to_report_context
-
-    chains = scan_to_report_context(result).attack_chains
+    chains = context.attack_chains
     if chains:
         lines.append("\nAttack chains (findings that combine into a worse outcome):")
         for c in chains:
@@ -105,27 +132,27 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"      {c.summary}")
             lines.append(f"      fix first: {c.fix_first}")
 
-    if result.ordered_logic_findings:
+    if shown_ordered_logic_findings:
         lines.append("\nBusiness-logic flaws (client-trusted values, declared-rule violations):")
-        for f in result.ordered_logic_findings:
+        for f in shown_ordered_logic_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.title}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})  confidence: {f.confidence:.0%}")
 
-    if result.ordered_idor_findings:
+    if shown_ordered_idor_findings:
         lines.append("\nBroken object-level authorization (possible IDOR):")
-        for f in result.ordered_idor_findings:
+        for f in shown_ordered_idor_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.handler}() — lookup via {f.lookup}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})  confidence: {f.confidence:.0%}")
 
-    if result.ordered_taint_findings:
+    if shown_ordered_taint_findings:
         lines.append("\nInjection risks (untrusted input reaches a sink):")
-        for f in result.ordered_taint_findings:
+        for f in shown_ordered_taint_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.vuln_type.replace('_', ' ')} → {f.sink}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
 
-    if result.ordered_sink_findings:
+    if shown_ordered_sink_findings:
         lines.append("\nDangerous code patterns:")
-        for f in result.ordered_sink_findings:
+        for f in shown_ordered_sink_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.category.replace('_', ' ')} — {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
 
@@ -137,11 +164,11 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"  {_tag(f.severity, color)} {d.name} {d.version}  ({d.ecosystem})")
             lines.append(f"      {d.relpath}   {len(f.vulns)} advisory(ies): {ids}")
 
-    if result.ordered_route_findings:
+    if shown_ordered_route_findings:
         lines.append(
             "\nEndpoints without visible authorization (review — may be globally guarded):"
         )
-        for f in result.ordered_route_findings:
+        for f in shown_ordered_route_findings:
             r = f.route
             lines.append(f"  {_tag(f.severity, color)} {r.method} {r.path}")
             lines.append(f"      {r.relpath}:{r.line}   confidence: {f.confidence:.0%}")

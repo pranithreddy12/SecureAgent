@@ -20,10 +20,31 @@ from dataclasses import dataclass
 # intentionally high-signal to keep false positives low.
 # ---------------------------------------------------------------------------
 
-SECRET_KEYWORD = re.compile(
-    r"(?i)(pass(word|wd)?|secret|token|api[_-]?key|access[_-]?key|"
-    r"client[_-]?secret|private[_-]?key|auth|credential)"
-)
+# Key names are matched as *words*, not substrings: `author`, `author_url`, `passport` and
+# `tokenizer_name` are not credentials although they contain "auth", "pass" or "token".
+_SECRET_WORDS = frozenset(
+    {
+        "password", "passwd", "pwd", "pass", "passphrase", "secret", "secrets", "token", "tokens",
+        "apikey", "credential", "credentials", "cred", "creds", "privatekey", "authorization",
+        "auth",
+    }
+)  # fmt: skip
+_SECRET_PAIRS = frozenset(
+    {
+        ("api", "key"), ("access", "key"), ("private", "key"), ("secret", "key"),
+        ("client", "secret"), ("auth", "token"), ("auth", "key"), ("bearer", "token"),
+        ("signing", "key"), ("encryption", "key"), ("master", "key"),
+    }
+)  # fmt: skip
+_WORD_SPLIT = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+
+
+def key_looks_secret(key: str) -> bool:
+    words = [w.lower() for w in _WORD_SPLIT.findall(key)]
+    if any(w in _SECRET_WORDS for w in words):
+        return True
+    return any(pair in _SECRET_PAIRS for pair in zip(words, words[1:], strict=False))
+
 
 # key = "value" / key: "value" / "key": "value"  (captures the quoted value)
 ASSIGNMENT = re.compile(
@@ -94,6 +115,7 @@ class SecretFinding:
     line: int
     redacted: str
     fingerprint: str  # non-reversible, for de-duplication only
+    gitignored: bool = False  # the file is ignored by git: local, not committed
 
     @property
     def title(self) -> str:
@@ -121,6 +143,13 @@ def _fingerprint(value: str) -> str:
 
 
 _ENV_VAR_NAME = re.compile(r"^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$")  # SECUREAGENT_ADMIN_PASSWORD
+# Words that mark a value as a stand-in (whsec_fake, dummy-key, example-token ...).
+_FAKE_WORDS = ("fake", "dummy", "example", "placeholder", "changeme", "change-me", "redacted")
+_URL_NO_USERINFO = re.compile(r"(?i)^(?:https?|wss?|ftp)://[^/@\s]+(?:/[^\s@]*)?$")
+# A client-side build variable (public by design) holding a Google/Firebase web key.
+_CLIENT_PUBLIC = re.compile(
+    r"(?i)(FIREBASE|NEXT_PUBLIC_|VITE_|REACT_APP_|EXPO_PUBLIC_|NUXT_PUBLIC_)"
+)
 
 
 def _is_placeholder(value: str) -> bool:
@@ -129,6 +158,10 @@ def _is_placeholder(value: str) -> bool:
         return True
     if _ENV_VAR_NAME.match(v):
         return True  # the *name* of a variable (PASSWORD_ENV = "APP_PASSWORD"), not a value
+    if any(w in v.lower() for w in _FAKE_WORDS):
+        return True
+    if _URL_NO_USERINFO.match(v):
+        return True  # a plain URL (author_url, redirect_uri) carries no credential
     return len(set(v)) <= 2  # e.g. "aaaaaa", "------"
 
 
@@ -143,11 +176,16 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
 
         for rule in PROVIDER_RULES:
             for m in rule.pattern.finditer(line):
+                name, severity = rule.name, rule.severity
+                if rule.name == "Google API key" and _CLIENT_PUBLIC.search(line):
+                    # Firebase/Google *web* keys ship in client bundles by design; restrict them
+                    # by HTTP referrer and API, but they are not server secrets.
+                    name, severity = "Google API key (client-side)", "low"
                 _add(
                     findings,
                     seen,
-                    rule.name,
-                    rule.severity,
+                    name,
+                    severity,
                     rule.confidence,
                     relpath,
                     lineno,
@@ -163,7 +201,7 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
         # Generic: a secret-named key assigned a non-placeholder, high-entropy value.
         for m in ASSIGNMENT.finditer(line):
             key, val = m.group("key"), m.group("val")
-            if not SECRET_KEYWORD.search(key) or _is_placeholder(val):
+            if not key_looks_secret(key) or _is_placeholder(val):
                 continue
             if _fingerprint(val) in provider_fps:
                 continue

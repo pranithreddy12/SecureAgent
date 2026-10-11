@@ -57,6 +57,12 @@ CATEGORY_META = {
         "A03:2021 Injection",
         "Do not assign untrusted data to innerHTML; use textContent or sanitize.",
     ),
+    "xml_entity_expansion": (
+        "CWE-776",
+        "A05:2021 Security Misconfiguration",
+        "The standard-library XML parser does not load external entities but can be exhausted by "
+        "entity expansion; use defusedxml when parsing untrusted XML.",
+    ),
 }
 
 # category -> (severity, confidence, definite?)  definite => status likely, else suspicious
@@ -68,6 +74,7 @@ CATEGORY_RISK = {
     "disabled_tls_verification": ("high", 0.8, True),
     "insecure_temp_file": ("low", 0.6, True),
     "xxe": ("medium", 0.5, False),
+    "xml_entity_expansion": ("low", 0.4, False),
     "xss_sink": ("medium", 0.4, False),
 }
 
@@ -213,7 +220,9 @@ class _SinkVisitor(ast.NodeVisitor):
         if last in {"parse", "fromstring", "parseString"} and re.search(
             r"(?:etree|ElementTree|minidom|expat|sax|lxml)", name
         ):
-            self._add("xxe", name, node.lineno)
+            # The standard-library parsers do not fetch external entities; they remain open to
+            # entity-expansion DoS. lxml resolves entities unless configured not to.
+            self._add("xml_entity_expansion" if _is_stdlib_xml(name) else "xxe", name, node.lineno)
 
         self.generic_visit(node)
 
@@ -257,6 +266,11 @@ def _fixed_or_quoted(node, quoted: frozenset[str] | set[str] = frozenset()) -> b
     return False
 
 
+def _is_stdlib_xml(name: str) -> bool:
+    """xml.etree / xml.dom / xml.sax names that are not lxml or defusedxml."""
+    return "lxml" not in name and not name.startswith("defusedxml")
+
+
 def _has_safe_loader(kw: dict) -> bool:
     loader = kw.get("Loader")
     name = _dotted(loader) if loader is not None else None
@@ -286,8 +300,13 @@ _JS_RULES = [
     ("code_injection", re.compile(r"\beval\s*\(")),
     ("code_injection", re.compile(r"\bnew\s+Function\s*\(")),
     (
+        # Shell execution only: `child_process.exec(...)` or a bare `exec(...)` imported from it.
+        # `regex.exec(str)` (RegExp) and `db.exec(sql)` are method calls on other objects.
         "command_injection",
-        re.compile(r"\bchild_process\b.*\.(exec|execSync)\s*\(|\b(exec|execSync)\s*\("),
+        re.compile(
+            r"\b(?:child_process|childProcess|cp)\.(?:exec|execSync)\s*\("
+            r"|(?<![\w.$])(?:exec|execSync)\s*\("
+        ),
     ),
     ("insecure_deserialization", re.compile(r"\b(yaml|jsYaml)\.load\s*\(")),
     ("xss_sink", re.compile(r"\.innerHTML\s*=")),
@@ -300,11 +319,14 @@ _JS_RULES = [
 
 def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:
     findings: list[SinkFinding] = []
+    uses_child_process = "child_process" in text
     for lineno, line in enumerate(text.splitlines(), start=1):
         if len(line) > 4000:
             continue
         for category, pattern in _JS_RULES:
             m = pattern.search(line)
+            if m and category == "command_injection" and not uses_child_process:
+                continue  # no child_process in this file: `exec(` is something else
             if m:
                 sev, conf, _ = CATEGORY_RISK[category]
                 findings.append(

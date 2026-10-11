@@ -56,7 +56,9 @@ def test_disabled_tls_verification() -> None:
 
 def test_insecure_temp_and_xxe() -> None:
     assert "insecure_temp_file" in cats("import tempfile\ntempfile.mktemp()\n")
-    assert "xxe" in cats("import xml.etree.ElementTree as ET\nET.parse(path)\n")
+    # stdlib parsers: entity expansion (low), not XXE; lxml keeps the XXE classification
+    assert "xml_entity_expansion" in cats("import xml.etree.ElementTree as ET\nET.parse(path)\n")
+    assert "xxe" in cats("from lxml import etree\netree.parse(path)\n")
 
 
 def test_syntax_error_file_safe() -> None:

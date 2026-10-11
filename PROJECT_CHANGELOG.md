@@ -828,3 +828,35 @@ Append-only. Never rewrite past entries.
   shorthand implies it so a shell does not show findings as an error). CI still gates with `--fail-on`.
 - README: one-line install straight from GitHub (`pip install git+...#subdirectory=backend`) and a
   `pipx run` variant; no clone, no Docker, no database.
+
+## 2026-10-12 (First independent real-project scan -- false positives fixed)
+
+A developer ran `secureagent` on their own multi-project directory (204 findings) and triaged each class.
+Every false-positive class was traced to a detector defect and fixed, with regression tests
+(`tests/test_realworld_fp.py`):
+
+| Reported as | Cause | Fix |
+|---|---|---|
+| ~140 "Hardcoded credential" on `author`, `author_url`, `author_fullname`, `passport` | key keyword matched as a *substring* (`auth` in `author`, `pass` in `passport`) | key names matched as words (camelCase/snake split); `auth`/`pass` only as whole words |
+| `secret = "whsec_fake"`, URL values | stand-in words and plain URLs not recognised | `fake/dummy/example/placeholder/...` values and URLs without userinfo ignored; credential-bearing URLs still reported |
+| Private key / Google key in untracked `.env`, `secrets/` | working-tree files git ignores were reported as committed | minimal `.gitignore` matcher; such secrets become `informational` with the reason (still a real secret) |
+| Firebase web key "high" | client-side key treated as a server secret | `VITE_/NEXT_PUBLIC_/FIREBASE...` Google keys reported as *low*, "client-side" |
+| ~45 of 60 "missing auth" | `APIRouter(dependencies=[Depends(verify_cat_owner)])`, route-level `dependencies=[...]` and `include_router(..., dependencies=[...])` not understood; `verify_*`/`*_owner` not recognised as guards | router-level, route-level and cross-file `include_router` guards recognised; guard-name hints widened (`get_db`-style plumbing still not a guard) |
+| `inconsistent authorization` on a public read | public-read/authenticated-write is a normal design | an unguarded GET is an outlier only when a sibling GET *is* guarded |
+| 11x `exec(` "command injection" | `RegExp.exec()` / minified bundles | `exec` only when the file uses `child_process`; method calls on other objects ignored; `dev-dist/` and hashed/min bundles skipped |
+| SSRF on `urlopen(Request(f"{OLLAMA_URL}/...", data=prompt))` | user data in the request *body* made the request object "tainted" | `Request(url, data=..., headers=...)` is tainted only through its URL |
+| XXE on `xml.etree...fromstring` | stdlib parsers do not fetch external entities | reported as `xml_entity_expansion` (CWE-776, low); lxml stays XXE |
+| SQL injection in `conn.execute(query, *args)` wrapper | query text arrives from callers through a parameter | such wrapper sinks downgraded to medium / 0.35 with "arrives from callers"; direct handler sinks unchanged |
+| informational findings cluttering the terminal list | text output listed reclassified findings | hidden in text output (counted); the report keeps them with the reason |
+
+### Not changed (by design)
+- `new Function(` / `.innerHTML =` in a vendored design-tool runtime: legitimate review items for any
+  project that ships that file; put the file in `.secureagentignore`.
+- `except: pass` (CWE-778) remains a low-severity hint.
+- The wrapper-SQL finding could not be fully verified without the code; the downgrade is principled
+  (the sink is not where the query is built) but the reporter's callers still deserve review.
+
+### Notes
+- This is the first accuracy signal not written by the project: the author-written benchmark remains
+  97%/95%, but a real scan had a much lower precision than that corpus implied. The new cases are now
+  regression tests; re-running on the same project is the way to measure the improvement.

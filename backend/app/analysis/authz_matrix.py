@@ -73,8 +73,13 @@ def authz_outliers(routes: list[Route]) -> list[LogicFinding]:
         if share < GUARDED_SHARE or g.guarded == len(g.routes):
             continue
         guards = sorted({r.guard for r in g.routes if r.protected and r.guard})
+        guarded_reads = any(r.protected and r.method not in STATE_CHANGING for r in g.routes)
         for r in g.routes:
             if r.protected or not _worth_flagging(r):
+                continue
+            # "Public read, authenticated write" is a normal design. An unguarded GET is only
+            # inconsistent when some sibling GET *is* guarded (the developer protected reads here).
+            if r.method not in STATE_CHANGING and not guarded_reads:
                 continue
             out.append(
                 LogicFinding(
