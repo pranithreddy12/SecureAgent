@@ -21,9 +21,9 @@ async def register(data: RegisterRequest, db: DbSession):  # secureagent: ignore
 
 # Public by design: this is how a caller obtains a session.
 @router.post("/login", response_model=TokenOut)
-async def login(
+async def login(  # secureagent: ignore
     data: LoginRequest, request: Request, response: Response, db: DbSession
-):  # secureagent: ignore
+):
     client = request.client.host if request.client else "unknown"
     key = f"{client}|{data.email.lower()}"
     wait = login_limiter.retry_after(key)

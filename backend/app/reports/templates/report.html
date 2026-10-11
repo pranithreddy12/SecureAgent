@@ -150,6 +150,20 @@
 {% if r.technologies %}<ul>{% for t in r.technologies %}<li>{{ t }}</li>{% endfor %}</ul>{% else %}<p class="muted">No technologies identified.</p>{% endif %}
 
 <h2 id="s8">8. Findings Summary</h2>
+{% if r.attack_chains %}
+<h3>Attack chains</h3>
+<p class="muted small">Findings that combine into a worse outcome than each alone. A chain is an interpretation of the findings below, not an additional finding; its assumptions are listed.</p>
+{% for c in r.attack_chains %}
+<div class="finding">
+  <p><span class="badge sev-{{ c.severity.value }}">{{ c.severity.value }}</span> <b>{{ c.title }}</b></p>
+  <p>{{ c.summary }}</p>
+  <ol class="small">{% for s in c.steps %}<li>{{ s }}</li>{% endfor %}</ol>
+  <p class="small"><b>Links:</b> {% for m in c.members %}{{ m.role }} — {{ m.title }} ({{ m.location }}){{ "; " if not loop.last else "" }}{% endfor %}</p>
+  <p class="small"><b>Fix first:</b> {{ c.fix_first }}</p>
+  <p class="small muted">Assumes: {{ c.assumptions | join(" ") }}</p>
+</div>
+{% endfor %}
+{% endif %}
 {% if r.reportable_findings %}
 <table>
   <tr><th>Severity</th><th>Title</th><th>Endpoint</th><th>Status</th><th>Confidence</th></tr>

@@ -7,6 +7,7 @@ import os
 import uuid
 from datetime import UTC, datetime
 
+from app.analysis.chains import find_chains
 from app.analysis.scanner import ScanResult
 from app.core.enums import FindingStatus, Severity
 from app.schemas.report import ReportContext, ReportFinding, type_label
@@ -301,5 +302,6 @@ def scan_to_report_context(
         technologies=sorted({d.ecosystem for d in result.dependencies}),
         endpoints=endpoints,
         findings=findings,
+        attack_chains=find_chains(findings, result.routes),
         limitations=limitations,
     )

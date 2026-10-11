@@ -105,6 +105,27 @@ class TimelineEntry(BaseModel):
     note: str | None = None
 
 
+class ChainMember(BaseModel):
+    role: str
+    title: str
+    type: str
+    location: str
+    severity: Severity
+
+
+class AttackChain(BaseModel):
+    """Findings that combine into a worse outcome (see app/analysis/chains.py)."""
+
+    id: str
+    title: str
+    severity: Severity
+    summary: str
+    steps: list[str]
+    members: list[ChainMember]
+    fix_first: str
+    assumptions: list[str] = []
+
+
 class ReportContext(BaseModel):
     audit_id: str
     audit_status: str
@@ -131,6 +152,7 @@ class ReportContext(BaseModel):
     parameters: list[str] = []
     interesting_paths: list[str] = []
     findings: list[ReportFinding] = []
+    attack_chains: list[AttackChain] = []
     limitations: list[str] = []
     timeline: list[TimelineEntry] = []
 

@@ -102,6 +102,13 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
 
+## Attack chains
+
+`chains.py` links findings that are worse together (unguarded route + injection in the same handler,
+CORS + CSRF, ...) into a narrative with a fix-first recommendation and explicit assumptions. A chain is
+not a finding and never outranks its worst member. See ADR-012. Shown in the CLI text/JSON output,
+report section 8, the MCP result and the audit page.
+
 ## Use from an AI assistant
 
 The analyser is also exposed as an MCP server (`secureagent-mcp`); see [mcp.md](mcp.md).

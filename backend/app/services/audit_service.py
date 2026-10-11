@@ -130,6 +130,9 @@ async def run_source_audit(db: AsyncSession, audit_id: uuid.UUID) -> None:
         await _set_stage(db, audit, "persist", 60)
         ctx = scan_to_report_context(result, repo_label=audit.source_label)
         await _persist_findings(db, audit, ctx.findings)
+        state = dict(audit.stage_state or {})
+        state["attack_chains"] = [c.model_dump(mode="json") for c in ctx.attack_chains]
+        audit.stage_state = state
         await _finish_stage(db, audit, "persist")
 
         await _set_stage(db, audit, "report", 85)

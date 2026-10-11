@@ -43,6 +43,10 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
 JSON intent spec (ADR-010), authorization matrix (`scan --matrix`), accuracy benchmark
 (`secureagent benchmark`, `docs/benchmark.md`), MCP server (`secureagent-mcp`, `docs/mcp.md`).
 
+**Attack chains (2026-10-11, ADR-012)**: `app/analysis/chains.py`; shown in CLI/JSON/MCP, report section 8
+and the audit page (`attack_chains` on `GET /api/audits/{id}`, stored in `stage_state`). Severity = worst
+member (never escalated); chains are not findings and are excluded from baselines/gating.
+
 **Persisted source audits (2026-10-11, ADR-011)**: `/api/audits/*` (create with authorization confirmation,
 list, detail, findings, logs, report HTML/PDF), asyncio runner (`services/audit_service.py`), path
 confinement to `SOURCE_ROOTS` (`core/paths.py`), migration `b7c1d2e3f4a5` (nullable `target_id`,

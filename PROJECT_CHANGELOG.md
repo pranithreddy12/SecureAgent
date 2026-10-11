@@ -642,3 +642,19 @@ Append-only. Never rewrite past entries.
 ### Notes
 - The sweep assumes a single API process (as in docker-compose); with several workers a restart of one
   would fail audits running on another. Per-audit heartbeat/ownership is the upgrade path.
+
+## 2026-10-11 (Attack chains -- ADR-012)
+
+### Added
+- `app/analysis/chains.py`: unguarded route + injection/IDOR/privilege-escalation finding in the same
+  handler, and credentialed-CORS + CSRF-off, become chains with ordered steps, members, fix-first and
+  assumptions. Report section 8 block, CLI text/JSON, MCP result, audit API/UI card.
+- `tests/test_chains.py` (8 tests).
+
+### Decisions
+- Severity is the worst member's, never escalated: the first draft bumped unauthenticated chains one
+  level and every demo chain became CRITICAL, flattening the ranking and inflating risk.
+
+### Fixed
+- `POST /login` self-scan finding reappeared because the `secureagent: ignore` comment moved to the
+  closing line when the signature was wrapped; moved onto the `def` line.

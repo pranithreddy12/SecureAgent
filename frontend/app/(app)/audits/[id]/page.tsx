@@ -131,6 +131,48 @@ export default function AuditDetailPage() {
         </Card>
       )}
 
+      {audit.attack_chains.length > 0 && (
+        <Card title={`Attack chains (${audit.attack_chains.length})`}>
+          <p className="mb-3 text-xs text-muted">
+            Findings that combine into a worse outcome than each alone. A chain interprets the
+            findings below; it is not an extra finding and never outranks its worst member.
+          </p>
+          <ul className="flex flex-col gap-3">
+            {audit.attack_chains.map((c) => (
+              <li key={c.id} className="rounded-lg border border-border">
+                <details>
+                  <summary className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-3">
+                    <SeverityBadge severity={c.severity} />
+                    <span className="text-sm font-medium">{c.title}</span>
+                  </summary>
+                  <div className="flex flex-col gap-2 border-t border-border px-4 py-3 text-sm">
+                    <p>{c.summary}</p>
+                    <ol className="list-decimal pl-5 text-muted">
+                      {c.steps.map((s) => (
+                        <li key={s}>{s}</li>
+                      ))}
+                    </ol>
+                    <ul className="text-xs text-muted">
+                      {c.members.map((m) => (
+                        <li key={`${m.role}-${m.location}`}>
+                          <span className="font-semibold">{m.role}</span> — {m.title}{" "}
+                          <span className="font-mono">({m.location})</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p>
+                      <span className="font-semibold">Fix first: </span>
+                      {c.fix_first}
+                    </p>
+                    <p className="text-xs text-muted">Assumes: {c.assumptions.join(" ")}</p>
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card title={`Findings (${audit.total_findings})`}>
         <div className="mb-4 flex flex-wrap gap-2 text-xs">
           <button

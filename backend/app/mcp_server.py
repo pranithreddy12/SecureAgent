@@ -104,7 +104,8 @@ def confine(path: str) -> Path:
 def _findings_payload(result, limit: int = MAX_FINDINGS) -> dict[str, Any]:
     from app.analysis.reporting import scan_to_report_context
 
-    findings = scan_to_report_context(result).findings
+    ctx = scan_to_report_context(result)
+    findings = ctx.findings
     items = [
         {
             "title": f.title,
@@ -130,6 +131,7 @@ def _findings_payload(result, limit: int = MAX_FINDINGS) -> dict[str, Any]:
         "intent_rules_evaluated": result.intent_rules,
         "inline_ignored": result.inline_ignored,
         "osv_note": result.osv_note,
+        "attack_chains": [c.model_dump(mode="json") for c in ctx.attack_chains],
         "findings": items,
         "note": "Static analysis; findings are review items, never confirmed exploits.",
     }

@@ -52,10 +52,30 @@ export interface StageEntry {
   error?: string | null;
 }
 
+export interface ChainMember {
+  role: string;
+  title: string;
+  type: string;
+  location: string;
+  severity: Severity;
+}
+
+export interface AttackChain {
+  id: string;
+  title: string;
+  severity: Severity;
+  summary: string;
+  steps: string[];
+  members: ChainMember[];
+  fix_first: string;
+  assumptions: string[];
+}
+
 export interface AuditDetail extends Audit {
   stage_state: Record<string, StageEntry | string[]>;
   finding_counts: Partial<Record<Severity, number>>;
   total_findings: number;
+  attack_chains: AttackChain[];
 }
 
 export interface Finding {

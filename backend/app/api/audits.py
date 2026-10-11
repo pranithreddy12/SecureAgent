@@ -20,6 +20,7 @@ from app.schemas.audit import (
     LogOut,
     SourceAuditCreate,
 )
+from app.schemas.report import AttackChain
 from app.services import audit_service
 
 router = APIRouter(prefix="/audits", tags=["audits"])
@@ -104,6 +105,9 @@ async def get_audit(audit_id: uuid.UUID, db: DbSession, user: CurrentUser):
     detail = AuditDetail.model_validate(audit)
     detail.finding_counts = counts
     detail.total_findings = sum(counts.values())
+    detail.attack_chains = [
+        AttackChain.model_validate(c) for c in (audit.stage_state or {}).get("attack_chains", [])
+    ]
     return detail
 
 

@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.enums import AuditStatus, FindingStatus, LogStatus, Severity
+from app.schemas.report import AttackChain
 
 AUTHORIZATION_STATEMENT = (
     "I confirm that I own this source code or am explicitly authorized to analyse it, and that "
@@ -49,6 +50,7 @@ class AuditDetail(AuditOut):
     stage_state: dict[str, Any]
     finding_counts: dict[str, int] = {}
     total_findings: int = 0
+    attack_chains: list[AttackChain] = []
 
 
 class FindingOut(BaseModel):

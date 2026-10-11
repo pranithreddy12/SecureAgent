@@ -128,7 +128,10 @@ async def test_full_audit_lifecycle(
     assert detail["source_label"] == "Shop"
     assert detail["total_findings"] >= 2
     assert set(detail["stage_state"]) >= {"scan", "persist", "report"}
-    assert all(s["completed_at"] for k, s in detail["stage_state"].items() if k != "exclude")
+    stages = {k: v for k, v in detail["stage_state"].items() if isinstance(v, dict)}
+    assert all(s["completed_at"] for s in stages.values())
+    assert detail["attack_chains"], "the vulnerable route should produce an attack chain"
+    assert detail["attack_chains"][0]["fix_first"]
 
     findings = (await client.get(f"/api/audits/{audit_id}/findings")).json()
     types = {f["type"] for f in findings}

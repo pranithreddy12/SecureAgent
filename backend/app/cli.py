@@ -89,6 +89,16 @@ def _render_text(result: ScanResult, color: bool) -> str:
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
 
+    from app.analysis.reporting import scan_to_report_context
+
+    chains = scan_to_report_context(result).attack_chains
+    if chains:
+        lines.append("\nAttack chains (findings that combine into a worse outcome):")
+        for c in chains:
+            lines.append(f"  {_tag(c.severity.value, color)} {c.title}")
+            lines.append(f"      {c.summary}")
+            lines.append(f"      fix first: {c.fix_first}")
+
     if result.ordered_logic_findings:
         lines.append("\nBusiness-logic flaws (client-trusted values, declared-rule violations):")
         for f in result.ordered_logic_findings:
@@ -138,6 +148,8 @@ def _render_text(result: ScanResult, color: bool) -> str:
 
 
 def _render_json(result: ScanResult, items=None, baseline=None) -> str:
+    from app.analysis.reporting import scan_to_report_context
+
     payload = {
         "root": result.root,
         "stats": {
@@ -197,6 +209,9 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
             for f in result.ordered_logic_findings
         ],
         "intent_rules_evaluated": result.intent_rules,
+        "attack_chains": [
+            c.model_dump(mode="json") for c in scan_to_report_context(result).attack_chains
+        ],
         "idor_findings": [
             {
                 "severity": f.severity,
