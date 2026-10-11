@@ -12,7 +12,9 @@ including the logic flaws that pattern-matching scanners miss — before an atta
 | **Static analysis engine + CLI** (`secureagent`) | ✅ Built, tested, usable on real repositories |
 | Reports (HTML / PDF / JSON / SARIF), CI baseline & gating, demo | ✅ Built, tested |
 | Authentication, PostgreSQL schema + migrations, Docker Compose, frontend login/dashboard shell | ✅ Built, tested |
-| **Live audit pipeline**: targets, authorization gate, reconnaissance, OWASP ZAP, Nuclei, safe validation, validator, LangGraph orchestration, audit-progress UI | ⛔ **Designed but not implemented** — blocked on target management (see below) |
+| **Source audits in the web app**: start an audit on a mounted directory, live progress, findings, activity log, history, HTML/PDF report download | ✅ Built, tested, verified end to end in Docker (ADR-011) |
+| MCP server (`secureagent-mcp`), accuracy benchmark, business-logic detectors, authorization matrix | ✅ Built, tested |
+| **Live audit pipeline**: targets, live-target authorization, reconnaissance, OWASP ZAP, Nuclei, safe validation, validator, LangGraph orchestration | ⛔ **Designed but not implemented** — blocked on target management (see below) |
 
 The multi-agent live-audit architecture from the project specification is fully designed
 (`docs/agent-workflow.md`, `docs/security-model.md`, ADR-001/003/005/008) but its first

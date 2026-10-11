@@ -28,8 +28,8 @@ Legend: ✅ done · ◐ partial · ⛔ not built
 | 5 | Create an authorized target | ⛔ | Blocked (target management) |
 | 6 | Confirm authorization | ⛔ | Blocked; schema + `authorization_records` table exist |
 | 7 | Validate target scope | ⛔ | Blocked (`target_validation.py`) |
-| 8 | Start an audit | ◐ | `secureagent scan` runs a source audit; no audit entity/API/UI |
-| 9 | See audit progress | ⛔ | No runner/progress |
+| 8 | Start an audit | ✅ (source) / ⛔ (live) | `POST /api/audits/source` + `/audits` UI (ADR-011); live-target audits blocked |
+| 9 | See audit progress | ✅ (source) | Stage progress, polling UI; live pipeline stages not built |
 | 10 | Run reconnaissance | ⛔ | Not built (live recon). Static route extraction exists |
 | 11 | Discover endpoints | ◐ | Static discovery of routes from source in 5 frameworks; no live crawling |
 | 12 | Run vulnerability scanning | ◐ | Static engine ✅; ZAP/Nuclei ⛔ |
@@ -41,16 +41,17 @@ Legend: ✅ done · ◐ partial · ⛔ not built
 | 18 | CVE/CVSS where appropriate | ◐ | CVE from real OSV advisories ✅; **CVSS is never populated** for OSV findings (reported "CVSS not determined") |
 | 19 | Generate remediation | ✅ | Per finding type, grouped in the report |
 | 20 | Professional report | ✅ | 19 sections, risk rating, Fix-first, ToC, DEMO labelling |
-| 21 | Download PDF/HTML | ◐ | Via CLI (`--report`, `--pdf`); no download endpoint/UI |
-| 22 | View historical audits | ⛔ | CLI scans are not persisted |
-| 23 | View audit logs | ⛔ | `audit_logs` table only |
+| 21 | Download PDF/HTML | ✅ | `GET /api/audits/{id}/report` + UI links; CLI too |
+| 22 | View historical audits | ✅ | `GET /api/audits`, `/audits` history table |
+| 23 | View audit logs | ✅ | `GET /api/audits/{id}/logs`, activity log on the audit page |
 | 24 | Run DEMO MODE without external credentials | ◐ | `secureagent demo` ✅ (offline); fixture demo of the agent pipeline ⛔ |
 | 25 | Run automated tests | ✅ | `pytest` (253) |
 | 26 | Run through Docker Compose | ◐ | Stack runs; ZAP/juice-shop defined but unused; Nuclei binary not in image |
 | 27 | Recover from a failed audit stage | ⛔ | Designed (`stage_state`); no runner |
 | 28 | Preserve context across sessions | ✅ | Memory, changelog, 9 ADRs, traceability, close-out |
 
-**Tally: ✅ 11 · ◐ 8 · ⛔ 9.**
+**Tally (updated 2026-10-11, after ADR-011): ✅ 16 · ◐ 7 · ⛔ 5** (criteria 8 and 9 are counted done for
+source audits only; their live-target form remains blocked). Previously ✅ 11 · ◐ 8 · ⛔ 9.
 
 ## 3. Phases (brief §36)
 

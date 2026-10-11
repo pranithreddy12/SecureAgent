@@ -87,3 +87,17 @@ secureagent scan .                # see docs/static-analysis.md and docs/ci/gith
 - There is no admin bootstrap command: every registered user is an `auditor`.
 - The Nuclei binary is not in the backend image yet (the Nuclei integration is not built).
 - Back up the `pgdata` volume; `reports` is a volume for generated report files.
+
+## Source audits (web app)
+
+The web app analyses code that is **mounted into the backend container**, never arbitrary host paths.
+
+1. Put the project under `./workspace` (git-ignored), e.g. `./workspace/my-app`.
+2. `docker compose up --build` (compose mounts it read-only at `/workspace` and sets
+   `SOURCE_ROOTS=/workspace`).
+3. In the UI: **Audits -> New source audit**, path `/workspace/my-app`, tick the authorization
+   statement, start. Progress, findings, the activity log and the HTML/PDF report appear on the audit page.
+
+Outside Compose, set `SOURCE_ROOTS` to a comma-separated list of absolute directories; an empty value
+disables the feature (the API answers 503). Paths are resolved (symlinks and `..` included) and must be
+inside a root. The directory is only read.

@@ -39,6 +39,16 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
 - Honesty model: static findings are never `confirmed`; heuristic ones are `suspicious`; CVE only from
   real advisories; CVSS only when supplied (currently never populated for OSV findings).
 
+**Business logic + integrations (2026-10-10/11)**: client-trusted value / mass-assignment detectors and the
+JSON intent spec (ADR-010), authorization matrix (`scan --matrix`), accuracy benchmark
+(`secureagent benchmark`, `docs/benchmark.md`), MCP server (`secureagent-mcp`, `docs/mcp.md`).
+
+**Persisted source audits (2026-10-11, ADR-011)**: `/api/audits/*` (create with authorization confirmation,
+list, detail, findings, logs, report HTML/PDF), asyncio runner (`services/audit_service.py`), path
+confinement to `SOURCE_ROOTS` (`core/paths.py`), migration `b7c1d2e3f4a5` (nullable `target_id`,
+`audit_type`), frontend `/audits` + `/audits/[id]` (polling progress, findings, logs, report links),
+dashboard shows real counts. Verified end to end through Docker (register -> audit -> 31 findings -> PDF).
+
 **Reporting** (`app/schemas/report.py`, `app/reports/`, `app/analysis/reporting.py`): 19-section
 HTML/PDF report with table of contents, risk rating, "Fix first" priorities, hotspots, findings
 consolidated by type, grouped remediation, compact CVE/CVSS sections; DEMO labelling.
@@ -118,6 +128,8 @@ target → audit → children; `unique(audit_id, fingerprint)` on vulnerabilitie
 
 Designed in `docs/api.md` (brief endpoints + health, logout, target validate,
 global findings, activity).
+Also implemented (ADR-011): `POST /api/audits/source` (202), `GET /api/audits`, `/{id}`, `/{id}/findings`,
+`/{id}/logs`, `/{id}/report?format=html|pdf&download=`; all owner-scoped (404 for other users).
 Implemented: `GET /api/health`; `POST /api/auth/register` (201/409/422),
 `POST /api/auth/login` (sets httpOnly cookie, returns token + user; 401 generic),
 `POST /api/auth/logout` (204), `GET /api/auth/me`. Routers live in `app/api/`, are
@@ -128,8 +140,9 @@ mounted under `/api` in `app/main.py`; protected routes use `CurrentUser`.
 Next.js 16 App Router. Route groups: `app/(auth)/` (login, register — public) and
 `app/(app)/` (client layout with `Sidebar` + `useCurrentUser`; dashboard, settings).
 Protected paths are listed in `proxy.ts` matcher; real auth is the API (401 → login).
-All data fetching is client-side through `/api/*`. Not yet built: targets, audits,
-findings, reports, activity pages (APIs don't exist yet). Read
+All data fetching is client-side through `/api/*`. Built: audits (list + new source audit) and audit
+detail (progress polling, findings, logs, report links). Not yet built: targets and a global
+findings/reports/activity view (the per-audit page covers findings, report and log). Read
 `frontend/node_modules/next/dist/docs/` before writing frontend code (Next 16).
 
 ## 10. Security Model
@@ -329,6 +342,10 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Honest state: the project delivers a working, tested static-analysis security scanner plus a web skeleton;
   the live multi-agent audit pipeline (and therefore acceptance criteria 5-10, 14, 22-23, 27) is **not built**
   and is blocked on the two target-management files.
+2026-10-11: persisted source audits end to end (API, runner, migration, frontend), fixed two detector
+false positives that the self-scan found in that new code (parameterised SQLAlchemy expressions;
+`CurrentUser` auth aliases), report titles use proper acronyms (baseline fingerprints include titles, so
+existing baselines of taint/sink findings must be regenerated).
 **Next:** owner supplies the two blocked files (or decides to close the project as static-analysis-centred);
 verify the CI workflow on GitHub; choose a LICENSE; provide the PPT. See `docs/PROJECT_CLOSEOUT.md`.
 

@@ -10,7 +10,7 @@ import type { User } from "@/types/api";
 const NAV: { label: string; href?: string }[] = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Targets" },
-  { label: "Audits" },
+  { label: "Audits", href: "/audits" },
   { label: "Findings" },
   { label: "Reports" },
   { label: "Activity" },

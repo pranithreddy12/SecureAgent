@@ -615,3 +615,17 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Audits left `running` by a process crash are not recovered yet.
 - Full local suite: 305 passed, 1 skipped (PDF).
+
+## 2026-10-11 (Frontend for source audits; report title polish)
+
+### Added
+- Frontend: `/audits` (new source audit with authorization checkbox, history), `/audits/[id]` (progress
+  polling every 2 s until terminal, stage list, severity filter, expandable findings with evidence and
+  remediation, activity log, report links), dashboard with real audit counts and recent audits.
+- Verified end to end through Docker + the Next.js proxy: register, login, rejected unauthorized and
+  out-of-root requests, audit completed with 31 findings, HTML (CSP-locked) and PDF report.
+
+### Changed
+- Report finding titles use proper acronyms ("SSRF", "Disabled TLS verification" instead of
+  "Ssrf", "Disabled Tls Verification"). Baseline fingerprints include the title, so baselines that
+  contain taint or sink findings must be regenerated (`--write-baseline`).

@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 from app.analysis.scanner import ScanResult
 from app.core.enums import FindingStatus, Severity
-from app.schemas.report import ReportContext, ReportFinding
+from app.schemas.report import ReportContext, ReportFinding, type_label
 
 AUTHORIZATION_STATEMENT = (
     "I confirm that I am authorized to analyse the source code scanned in this report."
@@ -163,7 +163,7 @@ def _idor_finding(f) -> ReportFinding:
 def _taint_finding(f) -> ReportFinding:
     status = FindingStatus.LIKELY if f.strong else FindingStatus.SUSPICIOUS
     return ReportFinding(
-        title=f.title,
+        title=f"{type_label(f.vuln_type)} (tainted input → {f.sink})",
         type=f.vuln_type,
         severity=Severity(f.severity),
         confidence=f.confidence,
@@ -195,7 +195,7 @@ def _sink_finding(f) -> ReportFinding:
         else "Dangerous sink; confirm untrusted input cannot reach it (taint/dynamic)."
     )
     return ReportFinding(
-        title=f.title,
+        title=f"{type_label(f.category)}: {f.rule}",
         type=f.category,
         severity=Severity(f.severity),
         confidence=f.confidence,
