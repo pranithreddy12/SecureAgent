@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 
 export function Card({
   title,
@@ -36,15 +36,27 @@ export function Field({
   hint,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  // The hint is *described by*, not part of, the label: a screen reader announces the field as
+  // "Password", then reads the hint as its description.
   return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium">{label}</span>
+    <div className="flex flex-col gap-1.5 text-sm">
+      <label htmlFor={id} className="font-medium">
+        {label}
+      </label>
       <input
+        id={id}
+        aria-describedby={hint ? hintId : undefined}
         className="h-10 rounded-lg border border-border bg-background px-3 text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
         {...props}
       />
-      {hint && <span className="text-xs text-muted">{hint}</span>}
-    </label>
+      {hint && (
+        <span id={hintId} className="text-xs text-muted">
+          {hint}
+        </span>
+      )}
+    </div>
   );
 }
 

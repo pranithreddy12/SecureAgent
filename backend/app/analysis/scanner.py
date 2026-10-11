@@ -52,6 +52,12 @@ class DependencyFinding:
         d = self.dependency
         return f"Vulnerable dependency: {d.name} {d.version}"
 
+    @property
+    def worst_cvss(self) -> Vuln | None:
+        """The advisory with the highest *computed* CVSS score, if any publishes a vector."""
+        scored = [v for v in self.vulns if v.cvss_score is not None]
+        return max(scored, key=lambda v: v.cvss_score) if scored else None
+
 
 def _worst_severity(vulns: list[Vuln]) -> str:
     known = [v.severity for v in vulns if v.severity != "unknown"]

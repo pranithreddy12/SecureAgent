@@ -1,14 +1,14 @@
 # SecureAgent – Testing
 
-Frontend (added 2026-10-11): `cd frontend && npm test` runs 24 Vitest + Testing Library tests (API client,
+Frontend (added 2026-10-11): `cd frontend && npm test` runs 25 Vitest + Testing Library tests (API client,
 badges, audit list/detail pages incl. polling and the authorization gate); CI runs them. Browser end-to-end:
 `cd frontend && npm run e2e` (Playwright, 6 tests against the Docker stack; see
 `frontend/e2e/README.md`) -- registration, a full source audit with findings/chains/report, path
 confinement, ownership isolation, sign-out and login throttling; run as the `e2e` CI job.
 
-Backend status as of 2026-10-11: **346 backend tests: 345 pass, 1 skipped, 0 fail** (the skipped PDF test needs
+Backend status as of 2026-10-11: **380 backend tests: 379 pass, 1 skipped, 0 fail** (the skipped PDF test needs
 the Pango libraries; CI runs it), **93% line coverage** of `backend/app`.
-Frontend: **24 Vitest + 6 Playwright** tests (see above).
+Frontend: **25 Vitest + 6 Playwright** tests (see above).
 
 ## Running the tests
 

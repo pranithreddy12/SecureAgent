@@ -8,6 +8,7 @@ implemented; the target and live-audit endpoints in the full table are still des
 | Method | Path | Purpose |
 |---|---|---|
 | POST | /api/audits/source | `{path, label?, authorization_confirmed, exclude[]}` -> 202; 400 without confirmation or for a path outside `SOURCE_ROOTS`; 503 if `SOURCE_ROOTS` is unset |
+| POST | /api/audits/{id}/retry | Re-run a **failed** source audit with a clean slate (409 otherwise; owner only) |
 | GET | /api/audits | Own audits, newest first |
 | GET | /api/audits/{id} | Status, stage state, severity counts, `attack_chains` |
 | GET | /api/audits/{id}/findings | Persisted findings |

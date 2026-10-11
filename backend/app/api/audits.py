@@ -85,6 +85,24 @@ async def create_source_audit(
     return audit
 
 
+@router.post("/{audit_id}/retry", response_model=AuditOut, status_code=status.HTTP_202_ACCEPTED)
+async def retry_audit(
+    audit_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    launch: Annotated[Launcher, Depends(get_launcher)],
+):
+    audit = await _owned_audit(db, user, audit_id)
+    try:
+        audit = await audit_service.reset_for_retry(db, audit)
+    except audit_service.AuditNotRetryable:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Only a failed source audit can be retried."
+        ) from None
+    await launch(audit.id)
+    return audit
+
+
 @router.get("", response_model=list[AuditOut])
 async def list_audits(
     db: DbSession, user: CurrentUser, limit: Annotated[int, Query(ge=1, le=100)] = 50

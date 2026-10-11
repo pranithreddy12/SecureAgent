@@ -25,8 +25,8 @@ The multi-agent live-audit architecture from the project specification is fully 
 prerequisite — target management with the network-safety validator — has not been built.
 `docs/target-management-implementation.md` is the hand-off specification for those two files.
 Nothing in this repository claims otherwise. See [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md)
-for the complete status against the original requirements (28 criteria: 14 done, 2 done for source
-audits only, 8 partial, 4 not built).
+for the complete status against the original requirements (28 criteria: 15 done, 2 done for source
+audits only, 7 partial, 4 not built).
 
 ## What the scanner finds
 
@@ -121,7 +121,7 @@ redaction everywhere, read-only scanning, escaped reports.
 
 ```bash
 make testdb                      # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q    # 346 tests; ~93% coverage
+cd backend && python -m pytest -q    # 379 tests; ~93% coverage
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 cd frontend && npm run e2e           # Playwright against the Docker stack (frontend/e2e/README.md)
 ```

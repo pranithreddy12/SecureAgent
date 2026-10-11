@@ -2,8 +2,8 @@
 
 Date: 2026-10-11 · Repository: `main` (CI green on all four jobs: backend, frontend, self-scan, end-to-end)
 
-Evidence at close-out: **346 backend tests pass (1 skipped: PDF, which CI runs), 93% line coverage ·
-24 frontend unit tests · 6 Playwright browser tests · 13 ADRs · detector benchmark 94% precision / 94%
+Evidence at close-out: **379 backend tests pass (1 skipped: PDF, which CI runs), 93% line coverage ·
+25 frontend unit tests · 6 Playwright browser tests · 14 ADRs · detector benchmark 97% precision / 95%
 recall on the bundled corpus · self-scan clean (0 new findings; 1 accepted advisory)**.
 
 **Decision (2026-10-11): the owner chose Option 1 (§6) -- the project is closed as a grey-box static
@@ -44,7 +44,7 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | 15 | Reduce false positives | ◐ | Heuristic status/confidence, de-duplication, suppression, baseline, measured benchmark; no Validator agent |
 | 16 | Assign severity | ✅ | Per detector; chains never exceed their worst member |
 | 17 | Map OWASP/CWE | ✅ | Every finding carries OWASP category + CWE |
-| 18 | CVE/CVSS where appropriate | ◐ | CVE only from real OSV advisories ✅; CVSS never populated ("CVSS not determined") |
+| 18 | CVE/CVSS where appropriate | ✅ | CVE only from real OSV advisories; CVSS computed from the advisory's own v3 vector (real `braces` check: 7.5, matching the published score); no vector -> "not determined" |
 | 19 | Generate remediation | ✅ | Per type, grouped in the report, plus verified patches for 7 types |
 | 20 | Professional report | ✅ | 19 sections, risk rating, fix-first, attack chains, authorization matrix, DEMO labelling |
 | 21 | Download PDF/HTML | ✅ | `GET /api/audits/{id}/report?format=html\|pdf`, UI links, CLI |
@@ -53,10 +53,10 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | 24 | Run DEMO MODE without external credentials | ◐ | `secureagent demo` offline ✅; no fixture-driven demo of the agent pipeline |
 | 25 | Run automated tests | ✅ | pytest + Vitest + Playwright, all in CI |
 | 26 | Run through Docker Compose | ◐ | Stack runs and is e2e-tested; ZAP/juice-shop defined but unused, Nuclei not in the image |
-| 27 | Recover from a failed audit stage | ◐ | Failures are recorded (status, generic error, log) and audits interrupted by a restart are marked failed; no resume/retry |
-| 28 | Preserve context across sessions | ✅ | Memory, changelog, 13 ADRs, traceability R1-R58, this close-out |
+| 27 | Recover from a failed audit stage | ◐ | Failures are recorded; interrupted audits are marked failed; **a failed audit can be retried** (clean slate, same authorization). No stage-level resume |
+| 28 | Preserve context across sessions | ✅ | Memory, changelog, 14 ADRs, traceability R1-R62, this close-out |
 
-**Tally: ✅ 14 · ✅s 2 · ◐ 8 · ⛔ 4** (28). At the 2026-10-09 close-out it was ✅ 11 · ◐ 8 · ⛔ 9.
+**Tally: ✅ 15 · ✅s 2 · ◐ 7 · ⛔ 4** (28). At the 2026-10-09 close-out it was ✅ 11 · ◐ 8 · ⛔ 9.
 
 ## 3. What was delivered since the 2026-10-09 close-out
 
@@ -103,11 +103,12 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 
 ### C. Independent improvements (any time)
 - Detector accuracy on an **independent** labelled corpus (the bundled one is author-written).
-- Parse OSV CVSS vectors into scores; JS/TS AST-based analysis and sanitizer modelling in taint.
-- Zip upload for source audits; audit resume/retry; multi-worker-safe throttling and sweep.
-- Authorization matrix grouping beyond the first path segment (currently flags public GETs among guarded siblings).
-- Accessibility: `Field` puts hint text inside the label (screen readers announce it as the field name).
+- JS/TS AST-based analysis (replace regex heuristics); per-kind sanitizer tracking; CVSS v4/v2 scoring.
+- Zip upload for source audits; stage-level audit resume; multi-worker-safe throttling and sweep.
+- Authorization matrix grouping beyond the first path segment; Application Model persistence.
 - Browsers other than Chromium in e2e; frontend coverage reporting.
+- *(Done since the close-out: CVSS v3 scoring, sanitizer modelling, matrix refinement for public listings,
+  audit retry, accessible form fields.)*
 
 ## 6. Two honest ways to close the project
 

@@ -11,7 +11,7 @@ import {
   SeverityBadge,
   isActive,
 } from "@/components/badges";
-import { Card, ErrorMessage } from "@/components/ui";
+import { Button, Card, ErrorMessage } from "@/components/ui";
 import { auditService } from "@/services/audits";
 import type { AuditDetail, AuditLogEntry, Finding, Severity } from "@/types/api";
 
@@ -29,6 +29,8 @@ export default function AuditDetailPage() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Severity | "all">("all");
+  const [reload, setReload] = useState(0); // bumped by Retry to restart loading/polling
+  const [retrying, setRetrying] = useState(false);
 
   // Poll while the audit is queued/running; stop once it reaches a terminal state.
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function AuditDetailPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [id]);
+  }, [id, reload]);
 
   const visible = useMemo(
     () => (filter === "all" ? findings : findings.filter((f) => f.severity === filter)),
@@ -104,8 +106,28 @@ export default function AuditDetailPage() {
           })}
         </ol>
         {audit.error_message && (
-          <div className="mt-4">
+          <div className="mt-4 flex flex-col gap-3">
             <ErrorMessage message={audit.error_message} />
+            {audit.status === "failed" && (
+              <Button
+                className="self-start"
+                disabled={retrying}
+                onClick={async () => {
+                  setRetrying(true);
+                  try {
+                    await auditService.retry(id);
+                    setError(null);
+                    setReload((n) => n + 1);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Could not retry the audit");
+                  } finally {
+                    setRetrying(false);
+                  }
+                }}
+              >
+                {retrying ? "Retrying…" : "Retry audit"}
+              </Button>
+            )}
           </div>
         )}
       </Card>

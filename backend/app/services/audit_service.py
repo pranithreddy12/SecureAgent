@@ -11,7 +11,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.baseline import fingerprint
@@ -225,6 +225,33 @@ async def finding_counts(db: AsyncSession, audit_id: uuid.UUID) -> dict[str, int
         .group_by(Vulnerability.severity)
     )
     return {sev.value: n for sev, n in rows.all()}
+
+
+class AuditNotRetryable(Exception):
+    """Only a failed source audit can be retried."""
+
+
+async def reset_for_retry(db: AsyncSession, audit: SecurityAudit) -> SecurityAudit:
+    """Return a failed audit to ``queued`` with a clean slate (findings, report, stages).
+
+    The original request parameters (path, exclude patterns, authorization record) are kept: a retry
+    re-runs the *same* authorized analysis, it does not widen it.
+    """
+    if audit.audit_type != "source" or audit.status is not AuditStatus.FAILED:
+        raise AuditNotRetryable
+    await db.execute(delete(Vulnerability).where(Vulnerability.audit_id == audit.id))
+    await db.execute(delete(SecurityReport).where(SecurityReport.audit_id == audit.id))
+    exclude = list((audit.stage_state or {}).get("exclude", []))
+    audit.stage_state = {"exclude": exclude}
+    audit.status = AuditStatus.QUEUED
+    audit.current_stage = None
+    audit.progress = 0
+    audit.error_message = None
+    audit.started_at = None
+    audit.completed_at = None
+    await _log(db, audit.id, "retry", "Audit re-queued after a failure.")
+    await db.commit()
+    return audit
 
 
 async def fail_interrupted(db: AsyncSession) -> int:

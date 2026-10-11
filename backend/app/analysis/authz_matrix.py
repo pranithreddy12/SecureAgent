@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 
 from app.analysis.business_logic import LogicFinding
-from app.analysis.routes import Route
+from app.analysis.routes import PRIVILEGED_PATH, STATE_CHANGING, Route
 
 MIN_GROUP = 3  # a pattern needs at least this many routes to be a pattern
 GUARDED_SHARE = 0.6  # at least this share of the group must be guarded
@@ -52,6 +52,18 @@ def build_matrix(routes: list[Route]) -> list[MatrixGroup]:
     ]
 
 
+_PATH_PARAM = re.compile(r"<[^>]+>|\{[^}]+\}|/:[A-Za-z_]")
+
+
+def _worth_flagging(route: Route) -> bool:
+    """An unguarded *collection listing* (GET /items) is very often public by design (a catalogue,
+    a status page). Flag unguarded state changes, object-level access (a path parameter), and
+    paths that look privileged; do not flag a plain public listing among guarded siblings."""
+    if route.method in STATE_CHANGING:
+        return True
+    return bool(_PATH_PARAM.search(route.path) or PRIVILEGED_PATH.search(route.path))
+
+
 def authz_outliers(routes: list[Route]) -> list[LogicFinding]:
     out: list[LogicFinding] = []
     for g in build_matrix(routes):
@@ -62,7 +74,7 @@ def authz_outliers(routes: list[Route]) -> list[LogicFinding]:
             continue
         guards = sorted({r.guard for r in g.routes if r.protected and r.guard})
         for r in g.routes:
-            if r.protected:
+            if r.protected or not _worth_flagging(r):
                 continue
             out.append(
                 LogicFinding(

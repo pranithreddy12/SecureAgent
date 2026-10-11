@@ -39,7 +39,7 @@ Exit codes: `0` clean / gate passed, `1` findings (or new findings ≥ `--fail-o
 | `access_control.py` | IDOR / missing object-level authorization | CWE-639 / A01 |
 | `business_logic.py` | Mass assignment, client-trusted privilege/value (ADR-010) | CWE-915, 269, 602 / A01, A04 |
 | `workflow.py` | Terminal state set without checking the current state (pay -> ship skipped) | CWE-841 / A04 |
-| `authz_matrix.py` | Route x guard grid by resource; unguarded outliers among guarded siblings (`scan --matrix`) | CWE-862 / A01 |
+| `authz_matrix.py` | Route x guard grid by resource; unguarded state changes / object-level routes among guarded siblings (`scan --matrix`); public collection listings are not flagged | CWE-862 / A01 |
 | `intent.py` | Developer intent spec (`secureagent-intent.json`) checked against routes + IDOR | CWE-862, 639 / A01 |
 | `misconfig.py` | Debug on, permissive CORS, disabled JWT verification, CSRF off, autoescape off, wildcard hosts, insecure cookies | A05/A07 |
 | `logging_checks.py` | Sensitive data in logs (CWE-532), swallowed exceptions (CWE-778) | A09 |
@@ -102,6 +102,18 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `backend/tests/test_{secret_scan,dependencies,sinks,taint,taint_deep,access_control,`
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
+
+## Sanitizers and CVSS
+
+- **Sanitizer modelling (taint).** `int/float/bool/Decimal/UUID/len/ord`, `shlex.quote`, `secure_filename`,
+  `os.path.basename` and `html.escape` end taint; an early-exit allow-list guard
+  (`if x not in ALLOWED: return|raise|abort`, or `assert x in ALLOWED`) makes `x` clean in that function.
+  Access-control (IDOR) analysis deliberately ignores sanitizers: `int(order_id)` cannot inject but the
+  client still chooses the record. Known limit: taint is not tracked per vulnerability kind, so a value
+  shell-quoted and then reused in SQL would be missed.
+- **CVSS.** When an advisory publishes a CVSS **v3.x vector**, the base score is computed from it
+  (`app/analysis/cvss.py`, FIRST v3.1 formulas; checked against published scores). v2/v4 vectors or no
+  vector stay "CVSS not determined". Nothing is estimated.
 
 ## Verified fix patches
 

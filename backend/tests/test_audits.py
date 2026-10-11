@@ -205,3 +205,43 @@ async def test_unknown_audit_id_is_404(client: AsyncClient) -> None:
     await register_login(client, "a@example.com")
     res = await client.get(f"/api/audits/{uuid.uuid4()}")
     assert res.status_code == 404
+
+
+async def test_retry_reruns_a_failed_audit_with_a_clean_slate(
+    client: AsyncClient, workspace: Path, inline_runner: None, db_session: AsyncSession
+) -> None:
+    await register_login(client, "a@example.com")
+    spec = workspace / "shop" / "secureagent-intent.json"
+    spec.write_text("not json", encoding="utf-8")
+    created = await client.post("/api/audits/source", json=create_body(workspace / "shop"))
+    audit_id = created.json()["id"]
+    assert (await client.get(f"/api/audits/{audit_id}")).json()["status"] == "failed"
+
+    # A completed audit cannot be retried; fix the cause and retry the failed one.
+    spec.unlink()
+    res = await client.post(f"/api/audits/{audit_id}/retry")
+    assert res.status_code == 202, res.text
+    detail = (await client.get(f"/api/audits/{audit_id}")).json()
+    assert detail["status"] == "completed" and detail["error_message"] is None
+    assert detail["total_findings"] >= 2
+    logs = [e["action"] for e in (await client.get(f"/api/audits/{audit_id}/logs")).json()]
+    assert "failed" in logs and "retry" in logs and logs[-1] == "completed"
+
+    rows = (await db_session.scalars(select(Vulnerability))).all()
+    assert len(rows) == detail["total_findings"]  # no duplicates from the first attempt
+
+    again = await client.post(f"/api/audits/{audit_id}/retry")
+    assert again.status_code == 409
+
+
+async def test_retry_is_owner_only(
+    client: AsyncClient, workspace: Path, inline_runner: None
+) -> None:
+    await register_login(client, "a@example.com")
+    (workspace / "shop" / "secureagent-intent.json").write_text("x", encoding="utf-8")
+    audit_id = (
+        await client.post("/api/audits/source", json=create_body(workspace / "shop"))
+    ).json()["id"]
+    client.cookies.clear()
+    await register_login(client, "b@example.com")
+    assert (await client.post(f"/api/audits/{audit_id}/retry")).status_code == 404

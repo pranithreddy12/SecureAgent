@@ -143,7 +143,16 @@ class _SinkVisitor(ast.NodeVisitor):
         self.relpath = relpath
         self.lines = lines
         self.aliases = aliases
+        self.quoted: set[str] = set()
         self.findings: list[SinkFinding] = []
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802 (ast API)
+        outer = self.quoted
+        self.quoted = _quoted_names(node)  # scoped: another function may reuse the name
+        self.generic_visit(node)
+        self.quoted = outer
+
+    visit_AsyncFunctionDef = visit_FunctionDef  # noqa: N815
 
     def _resolve(self, name: str) -> str:
         head, sep, tail = name.partition(".")
@@ -176,10 +185,13 @@ class _SinkVisitor(ast.NodeVisitor):
                 self._add("code_injection", name, node.lineno)
 
         # Command execution
+        first_arg = node.args[0] if node.args else None
         if name in {"os.system", "os.popen", "commands.getoutput", "subprocess.getoutput"}:
-            self._add("command_injection", name, node.lineno)
+            if not _fixed_or_quoted(first_arg, self.quoted):
+                self._add("command_injection", name, node.lineno)
         elif re.search(r"(?:^|\.)subprocess\.", name) and _is_true(kw.get("shell")):
-            self._add("command_injection", f"{name}(shell=True)", node.lineno)
+            if not _fixed_or_quoted(first_arg, self.quoted):
+                self._add("command_injection", f"{name}(shell=True)", node.lineno)
 
         # Disabled TLS verification
         if _is_false(kw.get("verify")):
@@ -204,6 +216,45 @@ class _SinkVisitor(ast.NodeVisitor):
             self._add("xxe", name, node.lineno)
 
         self.generic_visit(node)
+
+
+_QUOTERS = {"shlex.quote", "pipes.quote"}
+
+
+def _quoted_names(tree: ast.AST) -> set[str]:
+    """Names whose every assignment in this function is a shell-quoting call."""
+    quoted: set[str] = set()
+    other: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            is_quote = isinstance(node.value, ast.Call) and (_dotted(node.value.func) in _QUOTERS)
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    (quoted if is_quote else other).add(t.id)
+    return quoted - other
+
+
+def _fixed_or_quoted(node, quoted: frozenset[str] | set[str] = frozenset()) -> bool:
+    """True if a shell command is a constant string, or every dynamic part is shell-quoted."""
+    if node is None:
+        return False
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, str)
+    if isinstance(node, ast.Name):
+        return node.id in quoted
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
+        return _fixed_or_quoted(node.left, quoted) and _fixed_or_quoted(node.right, quoted)
+    if isinstance(node, ast.JoinedStr):
+        return all(
+            isinstance(part, ast.Constant)
+            or (isinstance(part, ast.FormattedValue) and _fixed_or_quoted(part.value, quoted))
+            for part in node.values
+        )
+    if isinstance(node, ast.Tuple):
+        return all(_fixed_or_quoted(e, quoted) for e in node.elts)
+    if isinstance(node, ast.Call):
+        return (_dotted(node.func) or "") in _QUOTERS
+    return False
 
 
 def _has_safe_loader(kw: dict) -> bool:

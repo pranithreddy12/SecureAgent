@@ -119,7 +119,7 @@ def _tainted_set(func) -> set[str]:
     while changed:
         changed = False
         for targets, value in assigns:
-            if _expr_tainted(value, tainted):
+            if _expr_tainted(value, tainted, sanitize=False):
                 for t in targets:
                     if t not in tainted:
                         tainted.add(t)
@@ -128,7 +128,7 @@ def _tainted_set(func) -> set[str]:
 
 
 def _req(node, tainted: set[str]) -> bool:
-    return node is not None and _expr_tainted(node, tainted)
+    return node is not None and _expr_tainted(node, tainted, sanitize=False)
 
 
 def _by_id_lookups(func, tainted: set[str]) -> list[tuple[int, str]]:

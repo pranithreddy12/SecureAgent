@@ -23,6 +23,7 @@ const service = vi.hoisted(() => ({
   findings: vi.fn(),
   logs: vi.fn(),
   createSource: vi.fn(),
+  retry: vi.fn(),
   reportUrl: (id: string) => `/api/audits/${id}/report`,
 }));
 vi.mock("@/services/audits", () => ({ auditService: service }));
@@ -130,6 +131,18 @@ describe("AuditDetailPage", () => {
     render(<AuditDetailPage />);
     expect(await screen.findByText("The source directory could not be read.")).toBeInTheDocument();
     expect(screen.queryByText("View report")).not.toBeInTheDocument();
+  });
+
+  it("offers Retry for a failed audit and reloads after it is accepted", async () => {
+    service.get
+      .mockResolvedValueOnce({ ...base, status: "failed", progress: 60, error_message: "boom" })
+      .mockResolvedValue(base);
+    service.retry.mockResolvedValue({ ...base, status: "queued" });
+    render(<AuditDetailPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /retry audit/i }));
+    expect(service.retry).toHaveBeenCalledWith("audit-1");
+    await waitFor(() => expect(screen.getByText("completed")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /retry audit/i })).not.toBeInTheDocument();
   });
 
   it("keeps polling while the audit is running and stops at a terminal state", async () => {

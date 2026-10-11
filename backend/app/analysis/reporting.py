@@ -12,6 +12,7 @@ from app.analysis.chains import find_chains
 from app.analysis.scanner import ScanResult
 from app.core.enums import FindingStatus, Severity
 from app.schemas.report import (
+    CvssScore,
     MatrixGroupView,
     MatrixRoute,
     ReportContext,
@@ -50,6 +51,7 @@ def _dependency_finding(f) -> ReportFinding:
     d = f.dependency
     ids = ", ".join(v.id for v in f.vulns[:10])
     cve = next((v.cve for v in f.vulns if v.cve), None)
+    top = f.worst_cvss
     severity = f.severity if f.severity != "unknown" else "medium"
     return ReportFinding(
         title=f.title,
@@ -67,6 +69,11 @@ def _dependency_finding(f) -> ReportFinding:
         owasp_category="A06:2021 Vulnerable and Outdated Components",
         cwe="CWE-1104",
         cve=cve,  # only a real advisory id; never invented
+        cvss=(
+            CvssScore(score=top.cvss_score, vector=top.cvss_vector, version=top.cvss_version)
+            if top
+            else None  # no published v3 vector: stays "CVSS not determined"
+        ),
         remediation="Upgrade to a non-vulnerable version listed in the advisories.",
         sources=["static:dependencies(osv)"],
     )

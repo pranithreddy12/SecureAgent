@@ -755,3 +755,24 @@ Append-only. Never rewrite past entries.
 ### Added (same day)
 - `LICENSE` (MIT, chosen by the owner); `license` metadata in `backend/pyproject.toml`; README section.
 - Copyright line uses the GitHub handle `pranithreddy12`; replace with a legal name if preferred.
+
+## 2026-10-11 (Post-close-out improvements)
+
+### Added
+- `app/analysis/cvss.py`: CVSS v3.x base score computed from an advisory's own vector (FIRST v3.1
+  formulas; unit-checked against published scores). Findings now carry a real `cvss` when one is
+  published (live check: `braces` 7.5). v2/v4/no vector stay "CVSS not determined". Also fixed: vectors
+  were previously never used for severity because they were parsed as bare numbers.
+- Sanitizer modelling: numeric casts, `shlex.quote`, `secure_filename`, `os.path.basename`, `html.escape`
+  end taint; early-exit allow-list guards clean a name; bare `os.system` sinks are quiet for constant or
+  shell-quoted commands (scoped per function). IDOR analysis ignores sanitizers on purpose.
+- `POST /api/audits/{id}/retry` (+ UI button): failed source audits re-run from a clean slate under the
+  original authorization; 409 for non-failed audits; owner only.
+- 33 new backend tests, 1 new unit test, e2e labels now exact.
+
+### Changed
+- Authorization-matrix outliers no longer include plain public collection listings (`GET /items`);
+  state changes, object-level routes (path parameter) and privileged paths are still flagged.
+- `Field` component: hint is `aria-describedby`, not part of the label (screen readers announced
+  "Password At least 10 characters"); verified by exact-label Playwright locators.
+- Benchmark corpus: 35 TP / 1 FP / 2 FN = 97% precision, 95% recall (was 94% / 94%).

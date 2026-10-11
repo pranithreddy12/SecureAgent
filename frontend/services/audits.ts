@@ -12,6 +12,7 @@ export const auditService = {
   get: (id: string) => api<AuditDetail>(`/audits/${id}`),
   findings: (id: string) => api<Finding[]>(`/audits/${id}/findings`),
   logs: (id: string) => api<AuditLogEntry[]>(`/audits/${id}/logs`),
+  retry: (id: string) => api<Audit>(`/audits/${id}/retry`, { method: "POST" }),
   createSource: (body: SourceAuditRequest) =>
     api<Audit>("/audits/source", { method: "POST", body: JSON.stringify(body) }),
   reportUrl: (id: string, opts: { format?: "html" | "pdf"; download?: boolean } = {}) => {

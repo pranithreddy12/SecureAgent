@@ -8,10 +8,11 @@ function uniqueEmail(prefix: string): string {
 
 async function register(page: Page, email: string) {
   await page.goto("/register");
-  await page.locator('input[name="name"]').fill("E2E Tester");
-  await page.locator('input[name="email"]').fill(email);
-  await page.locator('input[name="password"]').fill(PASSWORD);
-  await page.locator('input[name="confirm"]').fill(PASSWORD);
+  // Exact labels double as an accessibility check: hints must not leak into the field name.
+  await page.getByLabel("Name", { exact: true }).fill("E2E Tester");
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByLabel("Confirm password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 }

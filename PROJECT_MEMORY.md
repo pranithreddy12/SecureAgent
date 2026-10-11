@@ -190,7 +190,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 14 Frontend | Auth, dashboard (real data), audits list/detail; targets/global pages pending their APIs |
 | 15 Audit progress | Done for source audits (stages, polling, activity log) |
 | 16 Demo mode | CLI demo done; fixture demo of the agent pipeline pending |
-| 17 Testing | 346 backend (93% cov.) + 24 Vitest + 6 Playwright, all in CI |
+| 17 Testing | 379 backend (93% cov.) + 25 Vitest + 6 Playwright, all in CI |
 | 18 Docker integration | Compose runs and is e2e-tested; ZAP/Nuclei unused |
 | 19 End-to-end | Done for the source-audit journey (Playwright, CI job `e2e`) |
 | 20 Documentation | Done (13 ADRs, UML, guides, traceability R1-R58, close-out) |
@@ -236,10 +236,9 @@ changelog.
   eslint-config-next) is recorded in `.secureagent-baseline.json` so CI gates only on NEW high/critical findings.
 - ~~No `LICENSE`~~ -- **MIT** chosen by the owner 2026-10-11 (copyright line uses the GitHub handle
   `pranithreddy12`; the owner may replace it with their legal name).
-- **Detector accuracy is measured only on an author-written corpus** (94%/94%); no independent real-world
+- **Detector accuracy is measured only on an author-written corpus** (97%/95%); no independent real-world
   rate. Login throttling is in-process (per worker); the interrupted-audit sweep assumes one API process.
-- CVSS is never populated for OSV findings (reported as "not determined"); advisory CVSS vectors are not
-  parsed to a score.
+- CVSS is computed only from advisories that publish a v3.x vector; v2/v4 or none -> "not determined".
 - Local dev DB contains test users (`smoke*@example.com`, `uitest@example.com`).
 - `npm audit`: 5 high advisories in dev-only tooling (`braces`); production dependencies report 0;
   OSV flags `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm).
@@ -265,8 +264,8 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
   commit. Lesson: verify against `git ls-tree HEAD` after the final commit, not before.
 
 ## 18. Testing Status
-- **Backend: 346 passed, 1 skipped, 0 failed; 93% line coverage (2026-10-11, local run with the DB; CI green).**
-  Frontend: 24 Vitest + 6 Playwright. The skipped test is
+- **Backend: 379 passed, 1 skipped, 0 failed; 93% line coverage (2026-10-11, local run with the DB; CI green).**
+  Frontend: 25 Vitest + 6 Playwright. The skipped test is
   PDF rendering, which needs Pango (passes in the backend Docker image). DB-backed tests need
   `make testdb` (PostgreSQL on :55432); they build the schema via the real Alembic migration.
 - Static-analysis tests use snippets + the pinned demo; OSV is tested through an injected fake transport
@@ -282,8 +281,8 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Single backend replica by design (ADR-005); running audits would be lost on restart (resumable).
 - Static analysis cannot prove exploitability, so findings are never `confirmed`; unprotected-endpoint and
   IDOR findings cannot see global middleware / base querysets (low confidence by design).
-- Python taint resolves cross-file calls heuristically (import hint / unique name), does not model
-  sanitizers, and does not follow class attributes; JS/TS analysis is regex-based (no AST).
+- Python taint resolves cross-file calls heuristically (import hint / unique name), models only a fixed
+  set of sanitizers (not per vulnerability kind), and does not follow class attributes; JS/TS analysis is regex-based (no AST).
 - OSV matching uses pinned versions in lockfiles (no range resolution); needs network (skipped gracefully).
 - Frontend has 24 Vitest tests and 6 Playwright e2e tests (own CI job; need Docker). `vitest@5` required `@types/node@^22`; vitest 3 pulled
   critical advisories (tinypool/mocker), which the project's own OSV scan would have flagged.
@@ -294,7 +293,7 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Workflow-order detection is a handler-local heuristic (Python): a state machine in the model/DB or a helper
   like `order.ship()` is invisible, so findings stay `suspicious` (confidence 0.4-0.5).
 - The MCP server (docs/mcp.md) implements tools over stdio only, by hand; no resources/prompts/HTTP.
-- Accuracy is measured only on a small author-written corpus (`docs/benchmark.md`, 94%/94%); no
+- Accuracy is measured only on a small author-written corpus (`docs/benchmark.md`, 97%/95%); no
   independent real-world detection rate exists.
 - Business-logic detectors (ADR-010) are Python-only; they cover client-trusted values, mass assignment and
   declared intent rules, not workflow-order. A serializer or middleware outside the handler can neutralise a
@@ -356,3 +355,7 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 **Decision (2026-10-11):** owner chose Option 1 -- closed as a grey-box static security auditor (ADR-014).
 **Next (owner):** provide the PPT for the pending SPECIFICATION sections (LICENSE: MIT, done). Resuming the live
 pipeline (Option 2) needs the two target-management files. See `docs/PROJECT_CLOSEOUT.md` §5-6.
+
+**Post-close-out polish (2026-10-11):** CVSS v3 scoring from advisory vectors, sanitizer modelling, matrix
+refinement, audit retry, accessible form fields (see `PROJECT_CHANGELOG.md`). Tally now 15 done, 2 source-only,
+7 partial, 4 not built.

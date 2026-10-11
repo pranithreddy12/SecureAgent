@@ -97,3 +97,12 @@ def test_report_context_carries_the_matrix(tmp_path):
     ctx = scan_to_report_context(scan_repo(str(tmp_path), check_osv=False))
     assert ctx.authorization_matrix[0].resource == "a"
     assert "Authorization matrix" in render_html(ctx)
+
+
+def test_public_collection_listing_is_not_an_outlier_but_object_access_is():
+    guarded = [r("POST", "/catalog", True, "g"), r("PUT", "/catalog/<id>", True, "g")]
+    public_list = r("GET", "/catalog", False)
+    public_item = r("GET", "/catalog/<id>", False)
+    assert authz_outliers([*guarded, r("DELETE", "/catalog/<id>", True, "g"), public_list]) == []
+    flagged = authz_outliers([*guarded, r("DELETE", "/catalog/<id>", True, "g"), public_item])
+    assert len(flagged) == 1 and "/catalog/<id>" in flagged[0].rule

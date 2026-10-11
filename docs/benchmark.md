@@ -33,14 +33,18 @@ precision or recall drops below 90% or if the corpus shrinks.
 For a real-world figure, point the command at a larger labelled corpus (for example an OWASP
 benchmark checkout annotated with `VULN:` markers); no changes to the harness are needed.
 
-## Latest result (2026-10-10, bundled corpus)
+## Latest result (2026-10-11, bundled corpus)
 
 | | TP | FP | FN | precision | recall |
 |---|---|---|---|---|---|
-| overall | 32 | 2 | 2 | 94% | 94% |
+| overall | 35 | 1 | 2 | 97% | 95% |
 
 Known misses: `py_injection.py` second-order SQL injection; `py_access_logic.py` plain-dict IDOR.
-Known false positives: allow-listed SSRF host; catalogue lookup flagged as IDOR.
+Known false positive: catalogue lookup by id flagged as IDOR.
+
+History: 94% / 94% on 2026-10-10. Sanitizer modelling (casts, `shlex.quote`, allow-list guards) removed
+the allow-listed-SSRF false positive and the corpus gained safe casts/quoting and an unguarded-membership
+case (a membership check that does not stop execution is correctly still flagged).
 
 ## What the first run found
 

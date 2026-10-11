@@ -181,3 +181,29 @@ def s_orm_expression():
 def v_orm_text():
     name = request.args.get("name")
     return str(session.execute(select(User).where(text(f"name = '{name}'"))).all())  # VULN:sql_injection
+
+
+@app.route("/s/int_cast")
+def s_int_cast():
+    user_id = int(request.args.get("id", "0"))
+    cur = db.cursor()
+    cur.execute("SELECT * FROM t WHERE id = " + str(user_id))
+    return str(cur.fetchall())
+
+
+@app.route("/s/shell_quote")
+def s_shell_quote():
+    import shlex
+
+    host = shlex.quote(request.args.get("host", ""))
+    os.system("nslookup " + host)
+    return "ok"
+
+
+@app.route("/v/guard_without_exit")
+def v_guard_without_exit():
+    # A membership check that does not stop execution is not a guard.
+    host = request.args.get("host")
+    if host not in ALLOWED_HOSTS:
+        print("unexpected host")
+    return requests.get("https://" + host).text  # VULN:ssrf

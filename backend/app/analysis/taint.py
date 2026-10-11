@@ -304,8 +304,50 @@ def _handler_param_taint(func) -> set[str]:
     }
 
 
+def _allowlist_guarded(func) -> set[str]:
+    """Names validated by an early-exit allow-list check::
+
+        if host not in ALLOWED:        # also: assert host in ALLOWED
+            return / raise / abort(...)
+
+    After such a check the value is one of the allowed ones, so it is not attacker-shaped. The
+    check is position-insensitive (a use *before* the guard is not distinguished)."""
+    guarded: set[str] = set()
+    for node in ast.walk(func):
+        if isinstance(node, ast.If) and _membership_name(node.test, negated=True):
+            if _exits(node.body):
+                guarded.add(_membership_name(node.test, negated=True))
+        elif isinstance(node, ast.Assert) and _membership_name(node.test, negated=False):
+            guarded.add(_membership_name(node.test, negated=False))
+    return guarded
+
+
+def _membership_name(test, *, negated: bool) -> str | None:
+    if (
+        isinstance(test, ast.Compare)
+        and len(test.ops) == 1
+        and isinstance(test.left, ast.Name)
+        and isinstance(test.ops[0], ast.NotIn if negated else ast.In)
+        and isinstance(test.comparators[0], (ast.Name, ast.Attribute, ast.Set, ast.List, ast.Tuple))
+    ):
+        return test.left.id
+    return None
+
+
+def _exits(body: list[ast.stmt]) -> bool:
+    if not body:
+        return False
+    last = body[-1]
+    if isinstance(last, (ast.Return, ast.Raise, ast.Continue, ast.Break)):
+        return True
+    if isinstance(last, ast.Expr) and isinstance(last.value, ast.Call):
+        return (_dotted(last.value.func) or "").rsplit(".", 1)[-1] in {"abort", "exit", "fail"}
+    return False
+
+
 def _function_tainted(func, initial: set[str], ctx: _Ctx | None = None) -> set[str]:
-    tainted = set(initial)
+    guarded = _allowlist_guarded(func)
+    tainted = set(initial) - guarded
     assigns = _collect_assignments(func)
     changed = True
     while changed:
@@ -313,7 +355,7 @@ def _function_tainted(func, initial: set[str], ctx: _Ctx | None = None) -> set[s
         for targets, value in assigns:
             if _expr_tainted(value, tainted, ctx):
                 for t in targets:
-                    if t not in tainted:
+                    if t not in tainted and t not in guarded:
                         tainted.add(t)
                         changed = True
     return tainted
@@ -601,8 +643,49 @@ def _tainted(node: ast.expr | None, tainted: set[str], ctx: _Ctx | None = None) 
     return node is not None and _expr_tainted(node, tainted, ctx)
 
 
-def _expr_tainted(node: ast.expr, tainted: set[str], ctx: _Ctx | None = None) -> bool:
-    for sub in ast.walk(node):
+# Calls whose result cannot carry an injection payload. Numeric casts and UUID parsing always
+# neutralise; quoting/basename helpers are accepted globally too (taint here is not tracked per
+# vulnerability kind), so a value shell-quoted and then reused in SQL would be missed -- rare, and
+# documented in docs/static-analysis.md.
+_SANITIZER_NAMES = {"int", "float", "bool", "Decimal", "UUID", "len", "ord"}
+_SANITIZER_DOTTED = (
+    "shlex.quote",
+    "pipes.quote",
+    "secure_filename",
+    "os.path.basename",
+    "posixpath.basename",
+    "ntpath.basename",
+    "html.escape",
+    "markupsafe.escape",
+)
+
+
+def _is_sanitizer_call(call: ast.Call) -> bool:
+    name = _dotted(call.func) or ""
+    if name.rsplit(".", 1)[-1] in _SANITIZER_NAMES:
+        return True
+    return any(name == d or name.endswith("." + d) for d in _SANITIZER_DOTTED)
+
+
+def _iter_unsanitized(node: ast.expr, sanitize: bool = True):
+    """Walk an expression but do not descend into the arguments of sanitizing calls."""
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        yield n
+        if sanitize and isinstance(n, ast.Call) and _is_sanitizer_call(n):
+            continue
+        stack.extend(ast.iter_child_nodes(n))
+
+
+def _expr_tainted(
+    node: ast.expr, tainted: set[str], ctx: _Ctx | None = None, sanitize: bool = True
+) -> bool:
+    """True if the expression carries request-controlled data.
+
+    ``sanitize=False`` ignores sanitizers: access-control analysis asks "does the *client choose*
+    this id", and ``int(order_id)`` is still client-chosen even though it cannot inject."""
+    for sub in _iter_unsanitized(node, sanitize):
         if isinstance(sub, ast.Name) and sub.id in tainted:
             return True
         if _is_source(sub):

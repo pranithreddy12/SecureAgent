@@ -63,6 +63,10 @@ Status: Planned → In Progress → Implemented → Tested.
 | R56 | Admin bootstrap command (password via env/prompt, never argv) | SPEC §10 (security model) | backend/app/manage.py, tests/test_manage.py | Implemented + Tested |
 | R57 | Verified fix patches (`secureagent fix`, MCP `suggest_fixes`) | ADR-013 | backend/app/analysis/fixes.py, tests/test_fixes.py | Implemented + Tested (7 finding types; single-file verification; behaviour not proven preserved) |
 | R58 | Browser end-to-end tests (Playwright) of the audit journey | SPEC §15 (testing), criteria 1-4, 8-9, 21-23 | frontend/e2e/, playwright.config.ts, CI job `e2e` | Implemented (6 tests; Chromium only) |
+| R59 | CVSS v3 base score computed from advisory vectors (never estimated) | SPEC §14 (CVSS) | backend/app/analysis/cvss.py, osv.py, tests/test_cvss.py | Implemented + Tested (v3.x only; v2/v4 stay "not determined") |
+| R60 | Sanitizer modelling in taint (casts, quoting, allow-list guards) | ADR-008 | backend/app/analysis/taint.py, sinks.py, tests/test_sanitizers.py | Implemented + Tested (not tracked per vulnerability kind) |
+| R61 | Retry a failed source audit (clean slate, same authorization) | BRIEF §34 (recovery) | api/audits.py, services/audit_service.py, tests/test_audits.py | Implemented + Tested |
+| R62 | Accessible form fields (hint described-by, not in the label) | WCAG 1.3.1 / 4.1.2 | frontend/components/ui.tsx, e2e exact-label locators | Implemented + Tested |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted.
