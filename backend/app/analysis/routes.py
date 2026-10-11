@@ -287,6 +287,40 @@ def _python_handler_guard(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str |
             n = _dotted_name(arg.annotation)
             if n and AUTH_HINT.search(n) and ("user" in n.lower() or "current" in n.lower()):
                 return n
+    # 4) The handler itself enforces access: it calls an ownership/permission helper, compares an
+    #    owner attribute, or explicitly denies with 401/403.
+    return _body_guard(node)
+
+
+# Helper names that load-or-deny: _get_owned_cat(cat_id, user), ensure_member(...), ...
+_GUARD_CALL = re.compile(
+    r"(?i)^_?(verify|ensure|require|authori[sz]e|enforce|can_|get_owned|load_owned|owned)"
+    r"|^_?check_(owner|ownership|access|permission|auth|member|user|role|consent)"
+    r"|owner|ownership|permission"
+)  # not `check_output` / `check_call`: those are subprocess helpers, not access checks
+_OWNER_ATTRS = {"owner_id", "user_id", "account_id", "tenant_id", "org_id", "created_by", "owner"}
+
+
+def _body_guard(func: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
+    for node in ast.walk(func):
+        if isinstance(node, ast.Call):
+            name = (_dotted_name(node.func) or "").rsplit(".", 1)[-1]
+            if name and _GUARD_CALL.search(name):
+                return f"in-handler check: {name}()"
+            # raise HTTPException(status_code=403) / abort(401) is an explicit access decision
+            if name in {"HTTPException", "abort", "PermissionDenied"}:
+                for arg in [*node.args, *(k.value for k in node.keywords)]:
+                    if isinstance(arg, ast.Constant) and arg.value in {401, 403}:
+                        return "in-handler check: explicit 401/403"
+                    if isinstance(arg, ast.Attribute) and arg.attr in {
+                        "HTTP_401_UNAUTHORIZED",
+                        "HTTP_403_FORBIDDEN",
+                    }:
+                        return "in-handler check: explicit 401/403"
+        elif isinstance(node, ast.Compare):
+            for side in [node.left, *node.comparators]:
+                if isinstance(side, ast.Attribute) and side.attr in _OWNER_ATTRS:
+                    return f"in-handler check: compares .{side.attr}"
     return None
 
 
@@ -303,8 +337,8 @@ def _depends_guard_in(call: ast.Call) -> str | None:
 # Dependency names that guard access without containing "auth": verify_cat_owner, check_access,
 # require_member ... Used only for names passed to Depends()/Security().
 DEPENDS_HINT = re.compile(
-    r"(?i)(verify|owner|ownership|access|role|scope|member|principal|identity|tenant|acl|rbac|"
-    r"can_|check_|authoriz)"
+    r"(?i)(verify|owner|owned|ownership|access|role|scope|member|principal|identity|tenant|acl|"
+    r"rbac|can_|check_|authoriz)"
 )
 
 

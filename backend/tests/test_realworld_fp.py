@@ -319,3 +319,53 @@ def test_db_wrapper_passthrough_is_downgraded_but_a_handler_sink_is_not():
     )
     (hit,) = [f for f in analyze_taint("a.py", direct) if f.vuln_type == "sql_injection"]
     assert hit.severity == "high" and hit.confidence >= 0.7
+
+
+def test_ownership_enforced_inside_the_handler_counts_as_a_guard():
+    src = textwrap.dedent(
+        """
+        @router.put("/visits/{visit_id}")
+        async def update_visit(visit_id: int, user=Depends(get_current_user_optional)):
+            visit = await load(visit_id)
+            if visit.owner_id != user.id:
+                raise HTTPException(status_code=404)
+            return visit
+
+        @router.post("/cats/{cat_id}/log")
+        async def log(cat_id: int):
+            cat = await _get_owned_cat(cat_id)
+            return cat
+
+        @router.post("/cats/{cat_id}/weight")
+        async def weight(cat_id: int, cat=Depends(get_owned_cat)):
+            return cat
+
+        @router.delete("/notes/{note_id}")
+        async def remove(note_id: int):
+            raise HTTPException(status_code=403, detail="no")
+
+        @router.post("/open")
+        async def open_route(data: dict):
+            return data
+        """
+    )
+    guarded = {r.path: r.protected for r in extract_routes("routes.py", src)}
+    assert guarded == {
+        "/visits/{visit_id}": True,
+        "/cats/{cat_id}/log": True,
+        "/cats/{cat_id}/weight": True,
+        "/notes/{note_id}": True,
+        "/open": False,  # nothing checks anything: still reported
+    }
+
+
+def test_subprocess_check_output_is_not_mistaken_for_an_access_check():
+    src = textwrap.dedent(
+        """
+        @app.get("/ping")
+        def ping(h):
+            return subprocess.check_output(["ping", h])
+        """
+    )
+    (route,) = extract_routes("app.py", src)
+    assert route.protected is False

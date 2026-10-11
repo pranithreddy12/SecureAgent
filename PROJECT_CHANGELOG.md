@@ -860,3 +860,9 @@ Every false-positive class was traced to a detector defect and fixed, with regre
 - This is the first accuracy signal not written by the project: the author-written benchmark remains
   97%/95%, but a real scan had a much lower precision than that corpus implied. The new cases are now
   regression tests; re-running on the same project is the way to measure the improvement.
+
+### Follow-up (same day): access checks inside the handler
+- A handler that calls a load-or-deny helper (`_get_owned_cat`, `ensure_member`, `require_consent`,
+  `verify_*`, `*_owner*`), compares an owner attribute (`.owner_id`, `.user_id`, `.created_by`), or raises
+  an explicit 401/403 is treated as guarded (the matrix shows "in-handler check: ..."). `check_output` /
+  `check_call` are deliberately *not* access checks. `Depends(get_owned_cat)` is recognised.
