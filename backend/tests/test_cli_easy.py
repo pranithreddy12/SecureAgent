@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import webbrowser
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import pytest
 
@@ -39,7 +41,7 @@ def test_open_writes_the_report_to_a_temp_file_and_opens_it(tmp_path, opened, ca
     code = main(["scan", str(tmp_path), "--no-osv", "--no-color", "--open", "--exit-zero"])
     assert code == 0
     assert len(opened) == 1 and opened[0].startswith("file:")
-    report = Path(opened[0].removeprefix("file:///").replace("%20", " "))
+    report = Path(url2pathname(urlparse(opened[0]).path))  # portable file URI -> path
     html = report.read_text(encoding="utf-8")
     assert "SecureAgent" in html and "weak" in html.lower()
     # the project directory itself is not polluted with report files
