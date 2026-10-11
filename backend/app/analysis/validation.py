@@ -52,6 +52,11 @@ def _rule_for(finding: ReportFinding) -> str | None:
     return None
 
 
+def rule_for(finding: ReportFinding) -> str | None:
+    """Which validation rule (if any) applies to a finding."""
+    return _rule_for(finding)
+
+
 _REASON = {
     RULE_TEST: "Located in test/fixture/example code, not part of the deployed application.",
     RULE_DEV: "Debug flag in a development-only configuration file; verify production differs.",

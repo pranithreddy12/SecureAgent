@@ -73,7 +73,7 @@ async def create_source_audit(
             "You must confirm you are authorized to analyse this source code.",
         )
     try:
-        audit = await audit_service.create_source_audit(db, user, data)
+        audit = await audit_service.create_source_audit_from_request(db, user, data)
     except audit_service.SourceAuditsDisabled:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -81,6 +81,11 @@ async def create_source_audit(
         ) from None
     except audit_service.SourcePathRejected as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+    except audit_service.TooManyActiveAudits:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many audits are already queued or running. Wait for one to finish.",
+        ) from None
     await launch(audit.id)
     return audit
 
@@ -91,10 +96,11 @@ async def retry_audit(
     db: DbSession,
     user: CurrentUser,
     launch: Annotated[Launcher, Depends(get_launcher)],
+    resume: bool = False,
 ):
     audit = await _owned_audit(db, user, audit_id)
     try:
-        audit = await audit_service.reset_for_retry(db, audit)
+        audit = await audit_service.reset_for_retry(db, audit, resume=resume)
     except audit_service.AuditNotRetryable:
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Only a failed source audit can be retried."

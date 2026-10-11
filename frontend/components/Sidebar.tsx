@@ -9,6 +9,7 @@ import type { User } from "@/types/api";
 // Only pages that exist are listed (ADR-014): findings, logs and reports live on each audit page.
 const NAV: { label: string; href?: string }[] = [
   { label: "Dashboard", href: "/dashboard" },
+  { label: "Projects", href: "/projects" },
   { label: "Audits", href: "/audits" },
   { label: "Settings", href: "/settings" },
 ];

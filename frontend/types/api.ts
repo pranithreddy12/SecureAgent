@@ -110,6 +110,28 @@ export interface AuditLogEntry {
   timestamp: string;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  description: string | null;
+  authorization_confirmed: boolean;
+  authorization_timestamp: string | null;
+  created_at: string;
+}
+
+export interface AuthorizationEntry {
+  confirmed: boolean;
+  statement: string;
+  timestamp: string;
+}
+
+export interface ProjectDetail extends Project {
+  authorization_statement: string;
+  authorization_history: AuthorizationEntry[];
+  audit_count: number;
+}
+
 export interface SourceAuditRequest {
   path: string;
   label?: string;

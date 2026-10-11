@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.audits import get_launcher
 from app.core.config import get_settings
 from app.models import SecurityAudit, Vulnerability
+from app.pipeline.stages import STAGE_NAMES
 from app.services.audit_service import run_source_audit
 
 pytestmark = pytest.mark.anyio
@@ -127,8 +128,8 @@ async def test_full_audit_lifecycle(
     assert detail["audit_type"] == "source"
     assert detail["source_label"] == "Shop"
     assert detail["total_findings"] >= 2
-    assert set(detail["stage_state"]) >= {"scan", "persist", "report"}
-    stages = {k: detail["stage_state"][k] for k in ("scan", "persist", "report")}
+    assert set(detail["stage_state"]) >= set(STAGE_NAMES)
+    stages = {k: detail["stage_state"][k] for k in STAGE_NAMES}
     assert all(s["completed_at"] for s in stages.values())
     assert detail["attack_chains"], "the vulnerable route should produce an attack chain"
     assert detail["attack_chains"][0]["fix_first"]

@@ -186,3 +186,9 @@ def test_lockfiles_survive_file_ingestion(tmp_path: Path) -> None:
     (tmp_path / "requirements.lock").write_text("pyyaml==6.0.2\n", encoding="utf-8")
     result = scan_repo(str(tmp_path), check_osv=False)
     assert {d.name for d in result.dependencies} == {"requests", "flask", "pyyaml"}
+
+
+def test_packages_whose_names_start_with_http_are_not_mistaken_for_urls() -> None:
+    text = "httpx==0.28.1\nhttpcore==1.0.9\nhttptools==0.7.1\nhttps://example.com/pkg.whl\n"
+    names = [d.name for d in parse_dependencies("requirements.txt", text)]
+    assert names == ["httpx", "httpcore", "httptools"]

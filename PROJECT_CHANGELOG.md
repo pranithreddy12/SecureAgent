@@ -794,3 +794,27 @@ Append-only. Never rewrite past entries.
   are named as such and criteria 10 and 14 are **not** marked met.
 - A "two detectors agree => likely" rule was rejected: detectors share inputs, so agreement is not
   independent evidence.
+
+## 2026-10-11 (Source-only phases 4-12 -- ADR-016)
+
+### Added
+- **Source projects (phases 4-5):** `source_projects` + `source_authorizations` tables (migration
+  `c8d2e4f6a1b3`), `/api/projects` (create, list, get, authorize, revoke, delete, start audit, list audits),
+  `core/paths.py` confinement re-checked at launch, per-user project limit, per-user concurrent-audit limit
+  (also applied to ad-hoc `/api/audits/source`, 429), revocation blocks queued audits.
+- **Agent pipeline (phases 6-12):** `app/pipeline/` -- LangGraph StateGraph of seven agents
+  (authorization gate, reconnaissance, scanner, safe validation = fix verification, validator, correlation,
+  report) over persisted artifacts; `reconnaissance_results` populated; fix evidence in
+  `vulnerabilities.validation_result`; report built from the database; per-agent audit log lines.
+- **Resume:** `POST /api/audits/{id}/retry?resume=true` continues from the failed stage.
+- Frontend: `/projects`, `/projects/[id]` (authorization, run audit, history, delete), seven-stage
+  timeline, "Resume from failed stage". Playwright project workflow test.
+- `langgraph>=1.0` (lock regenerated on python:3.12: 74 pins, checked against OSV, no advisories).
+
+### Fixed (found by dogfooding)
+- Dependency parser skipped any requirement whose package name starts with `http` (`httpx`, `httpcore`,
+  `httptools`) as if it were a URL, so they were never checked against OSV. Regression test added.
+
+### Notes
+- ZAP (phase 9) and Nuclei (phase 10) have no source-file meaning and are marked not applicable.
+- Concurrent-session incident recorded in PROJECT_MEMORY (untracked files not authored here; not committed).

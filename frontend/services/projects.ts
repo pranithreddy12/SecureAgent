@@ -1,0 +1,19 @@
+import { api } from "@/lib/api";
+import type { Audit, AuthorizationEntry, Project, ProjectDetail } from "@/types/api";
+
+export const projectService = {
+  list: () => api<Project[]>("/projects"),
+  get: (id: string) => api<ProjectDetail>(`/projects/${id}`),
+  create: (body: { name: string; path: string; description?: string }) =>
+    api<Project>("/projects", { method: "POST", body: JSON.stringify(body) }),
+  authorize: (id: string) =>
+    api<AuthorizationEntry>(`/projects/${id}/authorize`, {
+      method: "POST",
+      body: JSON.stringify({ confirmed: true }),
+    }),
+  revoke: (id: string) => api<AuthorizationEntry>(`/projects/${id}/revoke`, { method: "POST" }),
+  remove: (id: string) => api<void>(`/projects/${id}`, { method: "DELETE" }),
+  audits: (id: string) => api<Audit[]>(`/projects/${id}/audits`),
+  startAudit: (id: string, exclude: string[]) =>
+    api<Audit>(`/projects/${id}/audits`, { method: "POST", body: JSON.stringify({ exclude }) }),
+};

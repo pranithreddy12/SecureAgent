@@ -285,7 +285,11 @@ def _matrix_view(result: ScanResult) -> list[MatrixGroupView]:
 
 
 def scan_to_report_context(
-    result: ScanResult, *, repo_label: str | None = None, demo: bool = False
+    result: ScanResult,
+    *,
+    repo_label: str | None = None,
+    demo: bool = False,
+    validate: bool = True,
 ) -> ReportContext:
     name = repo_label or os.path.basename(os.path.abspath(result.root)) or result.root
     now = datetime.now(UTC)
@@ -306,7 +310,7 @@ def scan_to_report_context(
     findings += [_sink_finding(f) for f in result.ordered_sink_findings]
     findings += [_route_finding(f) for f in result.ordered_route_findings]
 
-    findings, validation = validate_findings(findings)
+    findings, validation = validate_findings(findings) if validate else (findings, {})
     endpoints = sorted({f"{r.method} {r.path}" for r in result.routes})
     model = result.app_model
     interesting = sorted(

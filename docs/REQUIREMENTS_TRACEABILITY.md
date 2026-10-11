@@ -7,22 +7,22 @@ Status: Planned → In Progress → Implemented → Tested.
 | # | Requirement | Source | Implementation (planned path) | Status |
 |---|---|---|---|---|
 | R1 | User registration / login / me / logout | SPEC §3 | backend/app/api/auth.py, services/user_service.py, core/security.py | Implemented + Tested |
-| R2 | Target CRUD | SPEC §3 | backend/app/api/targets.py | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
-| R3 | Authorization confirmation + record | SPEC §13 | backend/app/services/authorization_service.py | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
-| R4 | Target safety validation (scheme, private/loopback/link-local/metadata blocking, allowlist) | SPEC §13 | backend/app/security/target_validation.py | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
-| R5 | Scope enforcement in every tool | SPEC §13 | backend/app/tools/* | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
-| R6 | LangGraph audit workflow + AuditState | SPEC §7, ADR-001 | backend/app/workflows/audit_graph.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
-| R7 | Reconnaissance Agent | SPEC §8 | backend/app/agents/reconnaissance_agent.py, tools/recon_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
-| R8 | Vulnerability Scanner Agent | SPEC §8 | backend/app/agents/vulnerability_scanner_agent.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
-| R9 | OWASP ZAP integration | SPEC §9 | backend/app/tools/zap_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
-| R10 | Nuclei integration | SPEC §9 | backend/app/tools/nuclei_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
-| R11 | Exploitation Agent → Safe Validation Agent | SPEC §8, ADR-003 | backend/app/agents/safe_validation_agent.py, tools/validation_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
-| R12 | Validator Agent / false-positive reduction | SPEC §8 | backend/app/agents/validator_agent.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R2 | Target CRUD | SPEC §3 | backend/app/api/projects.py, services/project_service.py, models/source_project.py, migration c8d2e4f6a1b3, frontend /projects | Implemented + Tested **for source projects** (ADR-016); live URL targets Deferred (ADR-014) |
+| R3 | Authorization confirmation + record | SPEC §13 | services/project_service.py (append-only `source_authorizations`, revocable), pipeline authorization gate | Implemented + Tested for source projects; live targets Deferred |
+| R4 | Target safety validation (scheme, private/loopback/link-local/metadata blocking, allowlist) | SPEC §13 | core/paths.py (SOURCE_ROOTS confinement, symlinks/`..` resolved, re-checked at launch and by the gate) | Implemented + Tested for **source paths**; network-target validation Deferred (ADR-014) |
+| R5 | Scope enforcement in every tool | SPEC §13 | pipeline authorization gate; per-user concurrency limit; exclude patterns | Implemented + Tested for source audits; tools that contact networks do not exist in the delivered scope |
+| R6 | LangGraph audit workflow + AuditState | SPEC §7, ADR-001 | backend/app/pipeline/graph.py, context.py | Implemented + Tested (source-only, 7 agents, resume from failed stage; ADR-016) |
+| R7 | Reconnaissance Agent | SPEC §8 | pipeline/stages.py::reconnaissance, analysis/recon.py | Implemented + Tested as **source reconnaissance**; live reconnaissance Deferred |
+| R8 | Vulnerability Scanner Agent | SPEC §8 | pipeline/stages.py::vulnerability_scanner (static engine) | Implemented + Tested (static) |
+| R9 | OWASP ZAP integration | SPEC §9 | n/a | Not applicable to source files (ADR-016); dynamic scanning Deferred (ADR-014) |
+| R10 | Nuclei integration | SPEC §9 | n/a | Not applicable to source files (ADR-016); dynamic scanning Deferred (ADR-014) |
+| R11 | Exploitation Agent → Safe Validation Agent | SPEC §8, ADR-003 | pipeline/stages.py::safe_validation, analysis/fixes.py | Partially implemented: **fix verification** for source (does not prove exploitability); live safe validation Deferred |
+| R12 | Validator Agent / false-positive reduction | SPEC §8 | pipeline/stages.py::validator, analysis/validation.py | Implemented + Tested (rule-based; no dynamic validation) |
 | R13 | OWASP / CWE / CVE / CVSS mapping (no fabrication) | SPEC §12 | per-detector metadata in backend/app/analysis/*.py; CVE via OSV; reports/report.html | Implemented + Tested for static findings (CVE only from real advisories; CVSS never populated for OSV findings; no central standards.py) |
 | R14 | Report Agent — HTML + PDF | SPEC §8, §15 | backend/app/reports/ (renderer, template), schemas/report.py, api/audits.py (download); agent pending | In Progress (rendering, persistence and download done for source audits; Report *agent* needs the live pipeline) |
 | R15 | Audit progress tracking + logs | SPEC §3 | services/audit_service.py, api/audits.py, frontend/app/(app)/audits/[id] | Implemented + Tested for source audits (ADR-011); live-audit stages pending |
 | R16 | Background execution | BRIEF §43, ADR-005 | services/audit_service.py, api/audits.py (asyncio task per audit, startup sweep) | Implemented for source audits (single replica; no resume) |
-| R17 | Resumable / idempotent audits | BRIEF §34 | runner + fingerprint constraint | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R17 | Resumable / idempotent audits | BRIEF §34 | graph entry router, `POST /api/audits/{id}/retry?resume=true`, fingerprint constraint | Implemented + Tested (resume from the failed stage) |
 | R18 | PostgreSQL schema + migrations | SPEC §9, ADR-002 | backend/app/models/, backend/alembic/ | Implemented + Tested |
 | R19 | Dashboard + charts | SPEC §15 | frontend/app/(app)/dashboard | In Progress (shell + live health + honest empty state; no data/charts until audits exist) |
 | R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | In Progress (login, register, dashboard with real data, settings, audits list + detail with findings/chains/logs/report done; targets and global findings/activity pages need target management) |
@@ -71,4 +71,4 @@ Status: Planned → In Progress → Implemented → Tested.
 | R64 | Rule-based finding validation (test/example/dev-only code reclassified as informational) | ADR-015 | backend/app/analysis/validation.py, tests/test_recon_validation.py | Implemented + Tested. **Does not satisfy Safe Validation (R11), which stays Deferred** |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
-Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted.
+Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.

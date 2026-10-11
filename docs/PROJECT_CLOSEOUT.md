@@ -2,8 +2,8 @@
 
 Date: 2026-10-11 · Repository: `main` (CI green on all four jobs: backend, frontend, self-scan, end-to-end)
 
-Evidence at close-out: **386 backend tests pass (1 skipped: PDF, which CI runs), 93% line coverage ·
-26 frontend unit tests · 6 Playwright browser tests · 15 ADRs · detector benchmark 97% precision / 95%
+Evidence at close-out: **402 backend tests pass (2 skipped: PDF, which CI runs, and a Windows-only symlink case), 93% line coverage ·
+33 frontend unit tests · 7 Playwright browser tests · 16 ADRs · detector benchmark 97% precision / 95%
 recall on the bundled corpus · self-scan clean (0 new findings; 1 accepted advisory)**.
 
 **Decision (2026-10-11): the owner chose Option 1 (§6) -- the project is closed as a grey-box static
@@ -17,7 +17,7 @@ code does. It supersedes the 2026-10-09 close-out audit (kept in git history).
 | | |
 |---|---|
 | **What exists and works** | A tested, installable **grey-box static application-security auditor**: scanner + CLI (`secureagent`), MCP server, web app with persisted source audits (history, live progress, findings, attack chains, logs, HTML/PDF reports), CI baseline/gating, SARIF, verified fix patches, accuracy benchmark. |
-| **What does not exist** | The **live-target multi-agent pipeline**: target management and live-target authorization, reconnaissance, OWASP ZAP and Nuclei, safe validation, validator agent, LangGraph orchestration. |
+| **What does not exist** | The **live-target** pipeline: URL targets and network-safety validation, live reconnaissance, OWASP ZAP and Nuclei (not applicable to source files), exploit-style safe validation, any LLM reasoning. The **source-only** pipeline (projects, authorization, seven LangGraph agents, resume) exists (ADR-016). |
 | **Why** | All of it depends on target management (network-safety validation of target URLs). Generating those two files was halted by an automated safety classifier and I may not regenerate that content; the requirement is legitimate and unchanged. The hand-off specification is `docs/target-management-implementation.md`. |
 | **Can it be presented as complete?** | **As "a grey-box static security auditor with business-logic checks", yes** -- it is real, demonstrable, honest and CI-verified. **As the full live multi-agent platform in the original brief, no.** Choose one framing and state it plainly (§6). |
 
@@ -31,16 +31,16 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | 2 | Open the dashboard | ✅ | `/dashboard`: live health and real audit counts, nothing simulated |
 | 3 | Register | ✅ | `/api/auth/register`, `/register`; Playwright-tested |
 | 4 | Login | ✅ | Argon2id, JWT httpOnly cookie, throttling (429 after 5 failures) |
-| 5 | Create an authorized target | ⛔ | Blocked (target management) |
-| 6 | Confirm authorization | ◐ | Source audits require and persist an authorization statement + timestamp (shown in the report); no target authorization |
-| 7 | Validate target scope | ⛔ | Blocked (`target_validation.py`). Source paths are confined to `SOURCE_ROOTS`, which is not target scope |
+| 5 | Create an authorized target | ✅s | Source projects (ADR-016): registered, owner-scoped, limited per user. Live URL targets not built |
+| 6 | Confirm authorization | ✅s | Per-project append-only authorization trail, revocable, required before any audit; checked again by the pipeline gate |
+| 7 | Validate target scope | ✅s | Source paths confined to `SOURCE_ROOTS` (symlinks/`..` resolved) at registration, launch and by the gate. Network-target scope validation not built |
 | 8 | Start an audit | ✅s | `POST /api/audits/source`, `/audits` UI (ADR-011) |
 | 9 | See audit progress | ✅s | Persisted stages, polling UI, activity log |
-| 10 | Run reconnaissance | ⛔ | **Live** reconnaissance not built (needs the target gate, ADR-014). A *static* source reconnaissance / application model exists (ADR-015) and is not counted as meeting this |
+| 10 | Run reconnaissance | ✅s | Reconnaissance agent in the pipeline builds the application model from source (ADR-015/016). **Live** reconnaissance not built |
 | 11 | Discover endpoints | ◐ | Static route discovery in 5 frameworks + authorization matrix; no live crawling |
 | 12 | Run vulnerability scanning | ◐ | Static engine ✅; ZAP/Nuclei ⛔ |
 | 13 | Produce potential findings | ✅ | All detectors; honest statuses (never `confirmed` from static analysis) |
-| 14 | Safely validate findings | ⛔ | Safe Validation (against a running target) not built (ADR-003 design only). Rule-based reclassification of test/dev-only findings (ADR-015) and fix verification (ADR-013) exist but are different things |
+| 14 | Safely validate findings | ◐ | Source form: verified fix patches and rule-based validation run as pipeline agents (ADR-013/015/016). They prove a fix removes a finding, **not** that a flaw is exploitable; live safe validation not built |
 | 15 | Reduce false positives | ◐ | Heuristic status/confidence, de-duplication, suppression, baseline, sanitizer modelling, rule-based validation (ADR-015), measured benchmark; no dynamic Validator |
 | 16 | Assign severity | ✅ | Per detector; chains never exceed their worst member |
 | 17 | Map OWASP/CWE | ✅ | Every finding carries OWASP category + CWE |
@@ -53,10 +53,10 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | 24 | Run DEMO MODE without external credentials | ◐ | `secureagent demo` offline ✅; no fixture-driven demo of the agent pipeline |
 | 25 | Run automated tests | ✅ | pytest + Vitest + Playwright, all in CI |
 | 26 | Run through Docker Compose | ◐ | Stack runs and is e2e-tested; ZAP/juice-shop defined but unused, Nuclei not in the image |
-| 27 | Recover from a failed audit stage | ◐ | Failures are recorded; interrupted audits are marked failed; **a failed audit can be retried** (clean slate, same authorization). No stage-level resume |
-| 28 | Preserve context across sessions | ✅ | Memory, changelog, 15 ADRs, traceability R1-R64, this close-out |
+| 27 | Recover from a failed audit stage | ✅s | Per-stage errors recorded; interrupted audits marked failed; retry (clean) **or resume from the failed stage** reusing earlier artifacts |
+| 28 | Preserve context across sessions | ✅ | Memory, changelog, 16 ADRs, traceability R1-R64, this close-out |
 
-**Tally: ✅ 15 · ✅s 2 · ◐ 7 · ⛔ 4** (28). At the 2026-10-09 close-out it was ✅ 11 · ◐ 8 · ⛔ 9.
+**Tally: ✅ 15 · ✅s 7 · ◐ 6 · ⛔ 0** (28). At the 2026-10-09 close-out it was ✅ 11 · ◐ 8 · ⛔ 9.
 
 ## 3. What was delivered since the 2026-10-09 close-out
 
@@ -93,7 +93,7 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 5. **Accepted advisory:** `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm), dev-only transitive dependency, no patched
    version exists; recorded in `.secureagent-baseline.json`. Revisit when a fix ships.
 
-### B. Assistant can build once A1 exists (in order)
+### B. Live-target pipeline (deferred; assistant can build once A1 exists)
 1. Authorization service + `/api/targets`, `/authorize`, `/validate` + the security-restriction tests.
 2. Live-audit entity/runner reusing the ADR-011 runner and stage persistence.
 3. Recon, ZAP and Nuclei integration (scope-checked, no `shell=True`); Nuclei in the image.

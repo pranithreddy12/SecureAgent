@@ -78,7 +78,7 @@ test.describe("register, audit and review", () => {
     await expect(page.getByText(/no running\s+system was contacted/)).toBeVisible();
 
     // Activity log shows the staged run.
-    await expect(page.getByText(/scan_completed/)).toBeVisible();
+    await expect(page.getByText(/\[vulnerability-scanner-agent\] completed/)).toBeVisible();
 
     // Report opens in a new tab and is labelled as a static audit.
     const [report] = await Promise.all([
@@ -153,5 +153,48 @@ test.describe("register, audit and review", () => {
     await page.locator('input[name="password"]').fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.locator("p[role='alert']")).toContainText("Too many failed sign-in attempts");
+  });
+  test("project workflow: register, authorize, run the agent pipeline, revoke", async ({
+    page,
+  }) => {
+    await register(page, uniqueEmail("project"));
+    await page.goto("/projects");
+    await page.getByLabel("Name", { exact: true }).fill("Shop API");
+    await page.getByLabel(/Source directory/).fill("/workspace/shop");
+    await page.getByRole("button", { name: "Register project" }).click();
+    await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+
+    // No audit before authorization.
+    const start = page.getByRole("button", { name: "Start audit" });
+    await expect(start).toBeDisabled();
+    await expect(page.getByText(/Not authorized/)).toBeVisible();
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Confirm authorization" }).click();
+    await expect(page.getByRole("button", { name: "Revoke authorization" })).toBeVisible();
+    await expect(start).toBeEnabled();
+    const projectUrl = page.url();
+
+    await start.click();
+    await expect(page).toHaveURL(/\/audits\/[0-9a-f-]{36}$/);
+    await expect(page.getByText("completed", { exact: true })).toBeVisible({ timeout: 60_000 });
+    for (const stage of [
+      "Check authorization and scope",
+      "Map the application",
+      "Analyse source",
+      "Verify fixes",
+      "Reduce false positives",
+      "Correlate attack chains",
+      "Generate report",
+    ]) {
+      await expect(page.getByText(`✓ ${stage}`)).toBeVisible();
+    }
+    // Fix evidence from the safe-validation agent is on the report-backed findings API.
+    await expect(page.getByText(/Findings \(\d+\)/)).toBeVisible();
+
+    // Revocation takes effect immediately.
+    await page.goto(projectUrl);
+    await page.getByRole("button", { name: "Revoke authorization" }).click();
+    await expect(page.getByText(/Not authorized/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start audit" })).toBeDisabled();
   });
 });

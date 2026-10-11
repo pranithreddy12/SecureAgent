@@ -32,6 +32,9 @@ class SecurityAudit(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     audit_type: Mapped[str] = mapped_column(String(16), default="live", server_default="live")
+    source_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("source_projects.id", ondelete="SET NULL"), index=True
+    )
     source_label: Mapped[str | None] = mapped_column(String(255))
     source_path: Mapped[str | None] = mapped_column(String(1024))
     authorization_statement: Mapped[str | None] = mapped_column(Text)

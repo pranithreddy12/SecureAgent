@@ -155,7 +155,7 @@ describe("AuditDetailPage", () => {
     service.retry.mockResolvedValue({ ...base, status: "queued" });
     render(<AuditDetailPage />);
     await userEvent.click(await screen.findByRole("button", { name: /retry audit/i }));
-    expect(service.retry).toHaveBeenCalledWith("audit-1");
+    expect(service.retry).toHaveBeenCalledWith("audit-1", { resume: false });
     await waitFor(() => expect(screen.getByText("completed")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /retry audit/i })).not.toBeInTheDocument();
   });

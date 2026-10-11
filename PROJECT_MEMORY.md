@@ -190,7 +190,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 14 Frontend | Auth, dashboard (real data), audits list/detail; targets/global pages pending their APIs |
 | 15 Audit progress | Done for source audits (stages, polling, activity log) |
 | 16 Demo mode | CLI demo done; fixture demo of the agent pipeline pending |
-| 17 Testing | 379 backend (93% cov.) + 25 Vitest + 6 Playwright, all in CI |
+| 17 Testing | 404 backend (93% cov.) + 33 Vitest + 7 Playwright, all in CI |
 | 18 Docker integration | Compose runs and is e2e-tested; ZAP/Nuclei unused |
 | 19 End-to-end | Done for the source-audit journey (Playwright, CI job `e2e`) |
 | 20 Documentation | Done (13 ADRs, UML, guides, traceability R1-R58, close-out) |
@@ -353,8 +353,20 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Honest state: a complete, tested grey-box static security auditor; the live multi-agent pipeline is **not
   built** and is blocked on the two owner-supplied target-management files.
 **Decision (2026-10-11):** owner chose Option 1 -- closed as a grey-box static security auditor (ADR-014).
+**Concurrent-session incident (2026-10-11):** while the source pipeline was being built, untracked files
+appeared that this session did not write (`app/agents/`, `app/tools/`, `app/workflows/`, `app/security/`,
+`services/{target,authorization}_service.py`, `schemas/pipeline.py`, `demo/adapters.py`, `demo/fixtures/`).
+Per the owner they are **not to be committed, read or edited by this session**. Whole-tree `ruff format` /
+`ruff check --fix` runs during that period reformatted ten of them (cosmetic); all later tool runs are
+scoped to this session's own paths, and commits use explicit paths (never `git add -A`).
 **Next (owner):** provide the PPT for the pending SPECIFICATION sections (LICENSE: MIT, done). Resuming the live
 pipeline (Option 2) needs the two target-management files. See `docs/PROJECT_CLOSEOUT.md` §5-6.
+
+**Source-only agent pipeline (2026-10-11, ADR-016):** `app/pipeline/` (LangGraph; stages authorization ->
+reconnaissance -> scanner -> safe_validation -> validator -> correlation -> report), source projects
+(`/api/projects`, authorization trail, revocation, per-user limits), resume from failed stage
+(`POST /api/audits/{id}/retry?resume=true`), migration `c8d2e4f6a1b3`, frontend `/projects`. ZAP/Nuclei are
+not applicable to source files. LangGraph tracing is disabled by default.
 
 **Static reconnaissance + rule-based validation (2026-10-11, ADR-015):** `analysis/recon.py` (application
 model) and `analysis/validation.py` (test/example/dev-only findings -> informational). They are the in-scope

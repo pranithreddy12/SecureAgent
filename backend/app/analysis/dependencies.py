@@ -79,7 +79,8 @@ def _parse_requirements(relpath: str, text: str) -> list[Dependency]:
     deps = []
     for raw in text.splitlines():
         line = raw.strip()
-        if not line or line.startswith(("#", "-", "git+", "http")):
+        # URL requirements (git+..., https://...) are skipped; a package *named* httpx is not.
+        if not line or line.startswith(("#", "-", "git+", "http://", "https://")):
             continue
         m = _REQ_LINE.match(line)
         if m:

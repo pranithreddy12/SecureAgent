@@ -1,8 +1,8 @@
 # SecureAgent – Testing
 
-Frontend (added 2026-10-11): `cd frontend && npm test` runs 25 Vitest + Testing Library tests (API client,
+Frontend (added 2026-10-11): `cd frontend && npm test` runs 33 Vitest + Testing Library tests (API client,
 badges, audit list/detail pages incl. polling and the authorization gate); CI runs them. Browser end-to-end:
-`cd frontend && npm run e2e` (Playwright, 6 tests against the Docker stack; see
+`cd frontend && npm run e2e` (Playwright, 7 tests against the Docker stack; see
 `frontend/e2e/README.md`) -- registration, a full source audit with findings/chains/report, path
 confinement, ownership isolation, sign-out and login throttling; run as the `e2e` CI job.
 

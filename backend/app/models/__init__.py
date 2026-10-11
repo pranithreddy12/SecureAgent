@@ -4,6 +4,7 @@ from app.models.audit import AuditLog, ReconnaissanceResult, SecurityAudit
 from app.models.base import Base
 from app.models.finding import Vulnerability
 from app.models.report import SecurityReport
+from app.models.source_project import SourceAuthorization, SourceProject
 from app.models.target import AuthorizationRecord, Target
 from app.models.user import User
 
@@ -14,6 +15,8 @@ __all__ = [
     "ReconnaissanceResult",
     "SecurityAudit",
     "SecurityReport",
+    "SourceAuthorization",
+    "SourceProject",
     "Target",
     "User",
     "Vulnerability",

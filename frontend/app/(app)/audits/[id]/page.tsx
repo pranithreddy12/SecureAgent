@@ -17,8 +17,12 @@ import type { AuditDetail, AuditLogEntry, Finding, Severity } from "@/types/api"
 
 const POLL_MS = 2000;
 const STAGES = [
-  { key: "scan", label: "Analyse source" },
-  { key: "persist", label: "Store findings" },
+  { key: "authorization", label: "Check authorization and scope" },
+  { key: "reconnaissance", label: "Map the application" },
+  { key: "scanner", label: "Analyse source" },
+  { key: "safe_validation", label: "Verify fixes" },
+  { key: "validator", label: "Reduce false positives" },
+  { key: "correlation", label: "Correlate attack chains" },
   { key: "report", label: "Generate report" },
 ];
 
@@ -109,24 +113,31 @@ export default function AuditDetailPage() {
           <div className="mt-4 flex flex-col gap-3">
             <ErrorMessage message={audit.error_message} />
             {audit.status === "failed" && (
-              <Button
-                className="self-start"
-                disabled={retrying}
-                onClick={async () => {
-                  setRetrying(true);
-                  try {
-                    await auditService.retry(id);
-                    setError(null);
-                    setReload((n) => n + 1);
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : "Could not retry the audit");
-                  } finally {
-                    setRetrying(false);
-                  }
-                }}
-              >
-                {retrying ? "Retrying…" : "Retry audit"}
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { resume: false, label: "Retry audit" },
+                  { resume: true, label: "Resume from failed stage" },
+                ].map(({ resume, label }) => (
+                  <Button
+                    key={label}
+                    disabled={retrying}
+                    onClick={async () => {
+                      setRetrying(true);
+                      try {
+                        await auditService.retry(id, { resume });
+                        setError(null);
+                        setReload((n) => n + 1);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Could not retry the audit");
+                      } finally {
+                        setRetrying(false);
+                      }
+                    }}
+                  >
+                    {retrying ? "Retrying…" : label}
+                  </Button>
+                ))}
+              </div>
             )}
           </div>
         )}

@@ -8,7 +8,13 @@ implemented; the target and live-audit endpoints in the full table are still des
 | Method | Path | Purpose |
 |---|---|---|
 | POST | /api/audits/source | `{path, label?, authorization_confirmed, exclude[]}` -> 202; 400 without confirmation or for a path outside `SOURCE_ROOTS`; 503 if `SOURCE_ROOTS` is unset |
-| POST | /api/audits/{id}/retry | Re-run a **failed** source audit with a clean slate (409 otherwise; owner only) |
+| POST | /api/audits/{id}/retry[?resume=true] | Re-run a **failed** source audit: clean slate, or `resume=true` to continue from the failed stage (409 otherwise; owner only) |
+| POST | /api/projects | Register a source project (path under `SOURCE_ROOTS`; limit per user) |
+| GET | /api/projects, /api/projects/{id} | List / detail incl. authorization history |
+| POST | /api/projects/{id}/authorize, /revoke | Append an authorization / revocation record |
+| POST | /api/projects/{id}/audits | Start an audit (403 without a current authorization; 429 over the concurrency limit) |
+| GET | /api/projects/{id}/audits | The project's audits |
+| DELETE | /api/projects/{id} | Delete the project (its audits are kept, unlinked) |
 | GET | /api/audits | Own audits, newest first |
 | GET | /api/audits/{id} | Status, stage state, severity counts, `attack_chains` |
 | GET | /api/audits/{id}/findings | Persisted findings |
