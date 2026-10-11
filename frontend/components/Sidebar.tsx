@@ -6,14 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { authService } from "@/services/auth";
 import type { User } from "@/types/api";
 
-// Items without an href are not built yet; they are shown disabled, never as fake pages.
+// Only pages that exist are listed (ADR-014): findings, logs and reports live on each audit page.
 const NAV: { label: string; href?: string }[] = [
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Targets" },
   { label: "Audits", href: "/audits" },
-  { label: "Findings" },
-  { label: "Reports" },
-  { label: "Activity" },
   { label: "Settings", href: "/settings" },
 ];
 

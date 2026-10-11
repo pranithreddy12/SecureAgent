@@ -2,6 +2,7 @@
 name = "secureagent"
 version = "0.1.0"
 description = "Static application-security scanner (SecureAgent)"
+license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = ["jinja2>=3.1", "pydantic>=2"]
 

@@ -187,3 +187,13 @@ ValidatorAgent, ReportAgent, SecurityReport, Vulnerability.
 - LangGraph — https://langchain-ai.github.io/langgraph/
 
 PPT reference list: PENDING – PPT not provided.
+
+---
+
+## Scope decision addendum (appended 2026-10-11; baseline above unchanged)
+
+The owner chose to deliver SecureAgent as a **grey-box static security auditor** (ADR-014). Sections of this
+baseline describing live-target auditing (targets, live authorization, reconnaissance, OWASP ZAP, Nuclei,
+safe validation, validator, LangGraph orchestration) remain the design of record but are **not delivered**;
+their requirement rows are marked *Deferred* in `docs/REQUIREMENTS_TRACEABILITY.md`. The grey-box scope
+(ADR-008) is delivered. PPT-derived sections remain PENDING.

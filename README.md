@@ -7,6 +7,10 @@ including the logic flaws that pattern-matching scanners miss — before an atta
 
 ## Project status (honest summary)
 
+**Delivered as a grey-box static security auditor** (owner decision, ADR-014). The live-target
+multi-agent pipeline described in the original brief is designed but deliberately **not** part of what is
+delivered.
+
 | Part | State |
 |---|---|
 | **Static analysis engine + CLI** (`secureagent`) | ✅ Built, tested, usable on real repositories |
@@ -69,7 +73,7 @@ output. Put patterns in a `.secureagentignore` file at the scan root. See
 
 ```bash
 cp .env.example .env        # set SECRET_KEY (>= 32 chars), POSTGRES_PASSWORD, ZAP_API_KEY
-docker compose up --build -d      # frontend :3000, backend :8000, postgres, zap
+docker compose up --build -d      # frontend :3000, backend :8000, postgres
 ```
 
 Implemented: register / login / logout / current user (Argon2id + JWT in an httpOnly cookie),
@@ -80,7 +84,7 @@ FastAPI + SQLAlchemy 2 + Alembic; PostgreSQL 16. Full instructions: [docs/deploy
 
 Python 3.12 (3.14 locally) · FastAPI · Pydantic · SQLAlchemy 2 (async) · Alembic · PostgreSQL ·
 Jinja2 + WeasyPrint (reports) · Next.js 16 / React / TypeScript / Tailwind · Docker Compose ·
-OWASP ZAP and Nuclei (containers/binaries defined, integration pending) · LangGraph/LangChain
+OWASP ZAP and Nuclei (deferred; ZAP is behind the `pipeline` compose profile) · LangGraph/LangChain
 (designed, not yet used). Standards: OWASP Top 10, CWE, CVE (via OSV), CVSS (only when supplied).
 
 ## Architecture and documentation
@@ -97,7 +101,7 @@ OWASP ZAP and Nuclei (containers/binaries defined, integration pending) · LangG
 | Database, API | [docs/database.md](docs/database.md), [docs/api.md](docs/api.md) (OpenAPI at `/docs` when running) |
 | Testing, deployment, demo | [docs/testing.md](docs/testing.md), [docs/deployment.md](docs/deployment.md), [docs/demo-guide.md](docs/demo-guide.md) |
 
-## Agent architecture (designed)
+## Agent architecture (designed, deferred -- not part of the delivered scope, ADR-014)
 
 Five agents orchestrated by LangGraph: Reconnaissance, Vulnerability Scanner (ZAP + Nuclei),
 **Safe Validation** (the controlled, non-destructive implementation of the specification's
@@ -130,7 +134,11 @@ cd frontend && npm run e2e           # Playwright against the Docker stack (fron
   sanitizers and resolves cross-file calls heuristically; JS analysis is regex-based.
 - Unprotected-endpoint findings cannot see global middleware, so they are review items.
 - Login throttling and the interrupted-audit sweep are in-process (single API replica). Detector accuracy is
-  measured only on a small author-written corpus. No `LICENSE` yet.
+  measured only on a small author-written corpus.
+
+## License
+
+MIT -- see [LICENSE](LICENSE).
 
 ## Future improvements
 

@@ -74,7 +74,7 @@ workflow (`.github/workflows/ci.yml`, four jobs, green), GitHub Action example.
 ### In Progress
 - Nothing. The 2026-10-11 final close-out is complete; see `docs/PROJECT_CLOSEOUT.md`.
 
-### Blocked
+### Deferred by decision (ADR-014, 2026-10-11) -- was "Blocked"
 - **Phases 4-5 (target management, network-safety validation, authorization)** — the generation of
   `backend/app/security/target_validation.py` and `backend/app/services/target_service.py` was stopped
   twice by an automated safety classifier; the assistant may not regenerate that content. Requirements
@@ -222,6 +222,7 @@ changelog.
 
 | Date | Original | Change | Reason | Impact | Status |
 |---|---|---|---|---|---|
+| 2026-10-11 | Full live multi-agent platform | **Delivered as a grey-box static security auditor** (owner chose Option 1; ADR-014). Live pipeline deferred, not in progress. | Target management cannot be produced by the assistant; static auditor is complete and defensible. | UI lists only built pages; ZAP behind a compose profile; traceability rows marked Deferred; criteria 5, 7, 10, 14 explicitly unmet. | Accepted |
 | 2026-10-02 | Baseline from PPT | Baseline from owner's brief; PPT sections PENDING | PPT not in repo | SPECIFICATION.md partial | Open until PPT supplied |
 | 2026-10-03b | Black-box (DAST) auditor only | **Grey-box**: also ingest the app's source repo + developer description, build an Application Model, and detect business-logic flaws (BOLA/IDOR, function-level & inconsistent authz, workflow bypass, client-trusted values, missing limits, hardcoded secrets, insecure state change). Dynamic scanning retained; source optional but recommended. | Owner's primary goal is finding complex business-logic vulns in developers' own apps; scanners can't infer intended rules. | New agents (Code Intelligence, Business-Logic Reasoning), Application Model artifact, repo-ingestion tool, DB additions (`source_artifacts`, `application_models`, `code_locations`/`detection_source` on vulnerabilities), new deps (tree-sitter, git/zip). Designed in ADR-008 + `docs/business-logic-engine.md`. | Designed; not implemented (prereq: Phases 4–5) |
 
@@ -233,7 +234,8 @@ changelog.
   run (2026-10-09) failed for real reasons, fixed (see §17). Accepted advisory:
   `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm; OSV lists **no patched version**; transitive dev-only dependency of
   eslint-config-next) is recorded in `.secureagent-baseline.json` so CI gates only on NEW high/critical findings.
-- **No `LICENSE`** — a licensing decision for the owner.
+- ~~No `LICENSE`~~ -- **MIT** chosen by the owner 2026-10-11 (copyright line uses the GitHub handle
+  `pranithreddy12`; the owner may replace it with their legal name).
 - **Detector accuracy is measured only on an author-written corpus** (94%/94%); no independent real-world
   rate. Login throttling is in-process (per worker); the interrupted-audit sweep assumes one API process.
 - CVSS is never populated for OSV findings (reported as "not determined"); advisory CVSS vectors are not
@@ -351,5 +353,6 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Acceptance criteria: 14 done, 2 done for source audits only, 8 partial, 4 not built (live pipeline).
 - Honest state: a complete, tested grey-box static security auditor; the live multi-agent pipeline is **not
   built** and is blocked on the two owner-supplied target-management files.
-**Next (owner):** supply the two blocked files (or close as the static auditor); choose a LICENSE; provide
-the PPT. See `docs/PROJECT_CLOSEOUT.md` §5-6.
+**Decision (2026-10-11):** owner chose Option 1 -- closed as a grey-box static security auditor (ADR-014).
+**Next (owner):** provide the PPT for the pending SPECIFICATION sections (LICENSE: MIT, done). Resuming the live
+pipeline (Option 2) needs the two target-management files. See `docs/PROJECT_CLOSEOUT.md` §5-6.

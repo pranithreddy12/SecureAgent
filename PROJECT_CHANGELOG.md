@@ -742,3 +742,16 @@ Append-only. Never rewrite past entries.
 - Verified at close-out: 346 backend tests (1 skipped), 93% coverage, 24 Vitest, 6 Playwright, benchmark
   94%/94%, self-scan 0 new findings, CI green on four jobs.
 - Not done and not doable without the owner: target management files, LICENSE, PPT.
+
+## 2026-10-11 (Owner decision: close as a grey-box static auditor -- ADR-014)
+
+### Changed
+- ADR-014 records the decision; close-out marks Option 1 chosen; memory scope-change log updated.
+- Sidebar lists only pages that exist (Dashboard, Audits, Settings); the ZAP service moved behind the
+  `pipeline` Compose profile so the default stack is only what is delivered.
+- Traceability: live-pipeline rows (R2-R12, R17, R25) marked *Deferred (ADR-014)*; R26 implemented for
+  source audits. `SPECIFICATION.md` gets an appended scope note; baseline text untouched.
+
+### Added (same day)
+- `LICENSE` (MIT, chosen by the owner); `license` metadata in `backend/pyproject.toml`; README section.
+- Copyright line uses the GitHub handle `pranithreddy12`; replace with a legal name if preferred.

@@ -12,7 +12,10 @@ services:
       interval: 5s
       retries: 10
 
+  # Not part of the delivered scope (ADR-014): only for the deferred live-audit pipeline.
+  #   docker compose --profile pipeline up
   zap:
+    profiles: ["pipeline"]
     image: zaproxy/zap-stable
     # API reachable only on the compose network; never published to the host.
     command: >

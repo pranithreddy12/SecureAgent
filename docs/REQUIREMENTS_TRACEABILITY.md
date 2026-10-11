@@ -7,22 +7,22 @@ Status: Planned → In Progress → Implemented → Tested.
 | # | Requirement | Source | Implementation (planned path) | Status |
 |---|---|---|---|---|
 | R1 | User registration / login / me / logout | SPEC §3 | backend/app/api/auth.py, services/user_service.py, core/security.py | Implemented + Tested |
-| R2 | Target CRUD | SPEC §3 | backend/app/api/targets.py | Blocked (see PROJECT_MEMORY §3) |
-| R3 | Authorization confirmation + record | SPEC §13 | backend/app/services/authorization_service.py | Blocked (see PROJECT_MEMORY §3) |
-| R4 | Target safety validation (scheme, private/loopback/link-local/metadata blocking, allowlist) | SPEC §13 | backend/app/security/target_validation.py | Blocked (see PROJECT_MEMORY §3) |
-| R5 | Scope enforcement in every tool | SPEC §13 | backend/app/tools/* | Blocked (see PROJECT_MEMORY §3) |
-| R6 | LangGraph audit workflow + AuditState | SPEC §7, ADR-001 | backend/app/workflows/audit_graph.py | Planned |
-| R7 | Reconnaissance Agent | SPEC §8 | backend/app/agents/reconnaissance_agent.py, tools/recon_tool.py | Planned |
-| R8 | Vulnerability Scanner Agent | SPEC §8 | backend/app/agents/vulnerability_scanner_agent.py | Planned |
-| R9 | OWASP ZAP integration | SPEC §9 | backend/app/tools/zap_tool.py | Planned |
-| R10 | Nuclei integration | SPEC §9 | backend/app/tools/nuclei_tool.py | Planned |
-| R11 | Exploitation Agent → Safe Validation Agent | SPEC §8, ADR-003 | backend/app/agents/safe_validation_agent.py, tools/validation_tool.py | Planned |
-| R12 | Validator Agent / false-positive reduction | SPEC §8 | backend/app/agents/validator_agent.py | Planned |
+| R2 | Target CRUD | SPEC §3 | backend/app/api/targets.py | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
+| R3 | Authorization confirmation + record | SPEC §13 | backend/app/services/authorization_service.py | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
+| R4 | Target safety validation (scheme, private/loopback/link-local/metadata blocking, allowlist) | SPEC §13 | backend/app/security/target_validation.py | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
+| R5 | Scope enforcement in every tool | SPEC §13 | backend/app/tools/* | Deferred -- out of delivered scope (ADR-014); was: Blocked (see PROJECT_MEMORY §3) |
+| R6 | LangGraph audit workflow + AuditState | SPEC §7, ADR-001 | backend/app/workflows/audit_graph.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R7 | Reconnaissance Agent | SPEC §8 | backend/app/agents/reconnaissance_agent.py, tools/recon_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R8 | Vulnerability Scanner Agent | SPEC §8 | backend/app/agents/vulnerability_scanner_agent.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R9 | OWASP ZAP integration | SPEC §9 | backend/app/tools/zap_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R10 | Nuclei integration | SPEC §9 | backend/app/tools/nuclei_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R11 | Exploitation Agent → Safe Validation Agent | SPEC §8, ADR-003 | backend/app/agents/safe_validation_agent.py, tools/validation_tool.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R12 | Validator Agent / false-positive reduction | SPEC §8 | backend/app/agents/validator_agent.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
 | R13 | OWASP / CWE / CVE / CVSS mapping (no fabrication) | SPEC §12 | per-detector metadata in backend/app/analysis/*.py; CVE via OSV; reports/report.html | Implemented + Tested for static findings (CVE only from real advisories; CVSS never populated for OSV findings; no central standards.py) |
 | R14 | Report Agent — HTML + PDF | SPEC §8, §15 | backend/app/reports/ (renderer, template), schemas/report.py, api/audits.py (download); agent pending | In Progress (rendering, persistence and download done for source audits; Report *agent* needs the live pipeline) |
 | R15 | Audit progress tracking + logs | SPEC §3 | services/audit_service.py, api/audits.py, frontend/app/(app)/audits/[id] | Implemented + Tested for source audits (ADR-011); live-audit stages pending |
 | R16 | Background execution | BRIEF §43, ADR-005 | services/audit_service.py, api/audits.py (asyncio task per audit, startup sweep) | Implemented for source audits (single replica; no resume) |
-| R17 | Resumable / idempotent audits | BRIEF §34 | runner + fingerprint constraint | Planned |
+| R17 | Resumable / idempotent audits | BRIEF §34 | runner + fingerprint constraint | Deferred -- out of delivered scope (ADR-014); was: Planned |
 | R18 | PostgreSQL schema + migrations | SPEC §9, ADR-002 | backend/app/models/, backend/alembic/ | Implemented + Tested |
 | R19 | Dashboard + charts | SPEC §15 | frontend/app/(app)/dashboard | In Progress (shell + live health + honest empty state; no data/charts until audits exist) |
 | R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | In Progress (login, register, dashboard with real data, settings, audits list + detail with findings/chains/logs/report done; targets and global findings/activity pages need target management) |
@@ -30,8 +30,8 @@ Status: Planned → In Progress → Implemented → Tested.
 | R22 | Local vulnerable lab target (Juice Shop) | BRIEF §31 | docker-compose `lab` profile | In Progress (service defined) |
 | R23 | Docker Compose deployment | SPEC §15 | docker-compose.yml, docker/ (backend image pinned to requirements.lock) | In Progress (stack builds, runs and is Playwright-tested in CI; `./workspace` mounted for source audits; ZAP/Nuclei unused; Nuclei binary not in image) |
 | R24 | Automated tests incl. security restrictions | SPEC §15 | backend/tests/ (346 tests, 93% coverage), frontend Vitest (24), Playwright (6) | In Progress (auth, throttling, ownership, path confinement, redaction, escaping, suppression, report CSP tested; **target safety restrictions untestable until built**) |
-| R25 | Optional LLM reasoning with deterministic fallback | SPEC §6 | backend/app/agents/llm.py | Planned |
-| R26 | Structured logging per audit ID | BRIEF §33 | backend/app/core/logging.py | Planned |
+| R25 | Optional LLM reasoning with deterministic fallback | SPEC §6 | backend/app/agents/llm.py | Deferred -- out of delivered scope (ADR-014); was: Planned |
+| R26 | Structured logging per audit ID | BRIEF §33 | backend/app/core/logging.py | Implemented for source audits (`[AUDIT-id]` log lines + `audit_logs`); live pipeline deferred |
 | R27 | UML diagrams (7) matching the code | SPEC §16 | docs/diagrams/ | Implemented (validated) |
 | R28 | Academic docs | SPEC §15 | docs/*.md, README, docs/PROJECT_CLOSEOUT.md | Implemented for what exists (architecture, agent-workflow, security-model, database, api, static-analysis, testing, deployment, demo-guide) |
 | R30 | Source repository ingestion (authorized, read-only, limits) | ADR-008 | backend/app/analysis/ingest.py | Implemented + Tested |
@@ -64,3 +64,5 @@ Status: Planned → In Progress → Implemented → Tested.
 | R57 | Verified fix patches (`secureagent fix`, MCP `suggest_fixes`) | ADR-013 | backend/app/analysis/fixes.py, tests/test_fixes.py | Implemented + Tested (7 finding types; single-file verification; behaviour not proven preserved) |
 | R58 | Browser end-to-end tests (Playwright) of the audit journey | SPEC §15 (testing), criteria 1-4, 8-9, 21-23 | frontend/e2e/, playwright.config.ts, CI job `e2e` | Implemented (6 tests; Chromium only) |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
+
+Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted.

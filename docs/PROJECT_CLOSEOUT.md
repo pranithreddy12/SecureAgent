@@ -6,6 +6,9 @@ Evidence at close-out: **346 backend tests pass (1 skipped: PDF, which CI runs),
 24 frontend unit tests · 6 Playwright browser tests · 13 ADRs · detector benchmark 94% precision / 94%
 recall on the bundled corpus · self-scan clean (0 new findings; 1 accepted advisory)**.
 
+**Decision (2026-10-11): the owner chose Option 1 (§6) -- the project is closed as a grey-box static
+security auditor; see ADR-014.** The live pipeline is deferred, not in progress.
+
 This is a blunt statement of what exists, what does not, and why. Nothing here claims more than the
 code does. It supersedes the 2026-10-09 close-out audit (kept in git history).
 
@@ -80,11 +83,11 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 
 ## 5. Remaining work
 
-### A. Owner action required
-1. **Supply `backend/app/security/target_validation.py` and `backend/app/services/target_service.py`**
+### A. Owner action (with Option 1 chosen, only items 2-3 remain for delivery)
+1. *(Only if Option 2 is ever resumed)* **Supply `backend/app/security/target_validation.py` and `backend/app/services/target_service.py`**
    per `docs/target-management-implementation.md`. This single step unblocks criteria 5, 7, 10, 12 (live),
    14 and the live form of 8/9.
-2. **Choose a `LICENSE`.** None exists; this is the owner's call.
+2. ~~Choose a `LICENSE`~~ -- **MIT chosen by the owner (2026-10-11)**; `LICENSE` added.
 3. **Provide the PPT** so the PENDING sections of `SPECIFICATION.md` can be filled and conflicts surfaced.
 4. **Decide the closing framing** (§6).
 5. **Accepted advisory:** `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm), dev-only transitive dependency, no patched
@@ -108,12 +111,12 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 
 ## 6. Two honest ways to close the project
 
-**Option 1 -- close as a grey-box static security auditor (achievable now).** Everything claimed is
+**Option 1 -- close as a grey-box static security auditor (achievable now). ✅ CHOSEN 2026-10-11 (ADR-014).** Everything claimed is
 true and reproducible: `secureagent demo`, `secureagent scan`, `secureagent fix`, the web app's source
 audits, the MCP server, the benchmark. Needs only A2-A5. The README and this document already frame it
 this way. **Recommended.**
 
-**Option 2 -- complete the original live multi-agent platform.** Requires A1, then roughly B1-B5.
+**Option 2 -- complete the original live multi-agent platform (deferred; not chosen).** Requires A1, then roughly B1-B5.
 The only route to criteria 5, 7, 10, 14 and the live forms of 8-9.
 
 ## 7. How to verify this close-out yourself

@@ -3,8 +3,8 @@
 What can be deployed **today**: the web application skeleton (Next.js frontend with
 register/login/dashboard/settings, FastAPI backend with authentication and health endpoints,
 PostgreSQL with migrations) and the `secureagent` command-line scanner. The audit pipeline
-(targets → recon → ZAP/Nuclei → agents) is **not implemented yet**, so the `zap` and `juice-shop`
-services are defined but not used by the backend.
+(targets → recon → ZAP/Nuclei → agents) is **deferred by decision (ADR-014)**, so the `zap` and
+`juice-shop` services are defined but not started by default (`--profile pipeline` / `--profile lab`).
 
 ## Quick start (Docker Compose)
 
@@ -22,7 +22,7 @@ docker compose ps                     # backend should become "healthy"
 | `frontend` | Next.js app; proxies `/api/*` to the backend so the auth cookie is first-party | http://localhost:3000 |
 | `backend` | FastAPI; runs `alembic upgrade head` on start, then serves | http://localhost:8000 (`/docs`, `/api/health`) |
 | `postgres` | PostgreSQL 16, named volume `pgdata` | internal only |
-| `zap` | OWASP ZAP daemon (API key required) — *not yet used by the backend* | internal only |
+| `zap` | OWASP ZAP daemon, profile `pipeline` — *deferred; not used by the backend* | internal only |
 | `juice-shop` | Intentionally vulnerable lab target, profile `lab` — *not yet used* | `docker compose --profile lab up` |
 
 The first backend build is slow on a poor connection (it downloads system packages for PDF
