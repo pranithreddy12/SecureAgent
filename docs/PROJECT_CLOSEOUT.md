@@ -1,143 +1,130 @@
-# SecureAgent – Project Close-out Audit
+# SecureAgent – Project Close-out
 
-Date: 2026-10-09 · Repository state: `main` · First CI run found and led to fixing two failures · Backend tests: **253 collected, 252 pass, 1 skipped
-(PDF; passes in Docker), 0 fail** · Coverage: **93%** · Lint/format/types: clean.
+Date: 2026-10-11 · Repository: `main` (CI green on all four jobs: backend, frontend, self-scan, end-to-end)
 
-This is an audit of the project against the original brief — what is finished, what is not, why,
-and exactly what is left. It is deliberately blunt: nothing here claims more than the code does.
+Evidence at close-out: **346 backend tests pass (1 skipped: PDF, which CI runs), 93% line coverage ·
+24 frontend unit tests · 6 Playwright browser tests · 13 ADRs · detector benchmark 94% precision / 94%
+recall on the bundled corpus · self-scan clean (0 new findings; 1 accepted advisory)**.
+
+This is a blunt statement of what exists, what does not, and why. Nothing here claims more than the
+code does. It supersedes the 2026-10-09 close-out audit (kept in git history).
 
 ## 1. Verdict
 
 | | |
 |---|---|
-| **What exists and works** | A tested, installable **static application-security scanner** (`secureagent`) covering OWASP Top 10 A01–A03 and A05–A10 in Python and JavaScript across five web frameworks, with HTML/PDF/JSON/SARIF output, CI baseline/gating, suppression controls and a bundled demo. Plus a **web-app skeleton**: authentication, PostgreSQL schema + migrations, Docker Compose, a frontend login/dashboard shell. |
-| **What does not exist** | The **live multi-agent audit pipeline**: target management, the authorization gate for audits, reconnaissance, OWASP ZAP and Nuclei integration, safe validation, validator, LangGraph workflow, audit runner/progress, audit logs, audit persistence, and the frontend pages for them. |
-| **Why** | Target management — specifically the network-safety validator and the target service — is the prerequisite for everything above. Generation of those two files was halted twice by an automated safety classifier and the assistant may not regenerate that content. The requirement itself is legitimate and unchanged; the owner must supply the two files (specification: `docs/target-management-implementation.md`). |
-| **Can the project be presented as complete?** | **As "a static-analysis-centred security auditor", yes** — it is real, demonstrable and honest. **As the full multi-agent live-audit platform in the brief, no** — acceptance criteria 5–10, 14, 22, 23 and 27 are unmet. Choose one framing and state it plainly (see §6). |
+| **What exists and works** | A tested, installable **grey-box static application-security auditor**: scanner + CLI (`secureagent`), MCP server, web app with persisted source audits (history, live progress, findings, attack chains, logs, HTML/PDF reports), CI baseline/gating, SARIF, verified fix patches, accuracy benchmark. |
+| **What does not exist** | The **live-target multi-agent pipeline**: target management and live-target authorization, reconnaissance, OWASP ZAP and Nuclei, safe validation, validator agent, LangGraph orchestration. |
+| **Why** | All of it depends on target management (network-safety validation of target URLs). Generating those two files was halted by an automated safety classifier and I may not regenerate that content; the requirement is legitimate and unchanged. The hand-off specification is `docs/target-management-implementation.md`. |
+| **Can it be presented as complete?** | **As "a grey-box static security auditor with business-logic checks", yes** -- it is real, demonstrable, honest and CI-verified. **As the full live multi-agent platform in the original brief, no.** Choose one framing and state it plainly (§6). |
 
-## 2. Acceptance criteria (brief §47) — status of all 28
+## 2. Acceptance criteria (original brief §47) -- all 28
 
-Legend: ✅ done · ◐ partial · ⛔ not built
+Legend: ✅ done · ✅s done for **source audits** only (live-target form blocked) · ◐ partial · ⛔ not built
 
 | # | Criterion | Status | Evidence / gap |
 |---|---|---|---|
-| 1 | Start the project | ✅ | `docker compose up --build` (stack builds, backend healthy); CLI via `pip install -e backend` |
-| 2 | Open the dashboard | ✅ | `/dashboard` with live backend status (no simulated metrics) |
-| 3 | Register | ✅ | `POST /api/auth/register`, `/register` page |
-| 4 | Login | ✅ | Argon2id, JWT httpOnly cookie, `/login` page, sign-out |
+| 1 | Start the project | ✅ | `docker compose up --build`; CLI via `pip install ./backend` |
+| 2 | Open the dashboard | ✅ | `/dashboard`: live health and real audit counts, nothing simulated |
+| 3 | Register | ✅ | `/api/auth/register`, `/register`; Playwright-tested |
+| 4 | Login | ✅ | Argon2id, JWT httpOnly cookie, throttling (429 after 5 failures) |
 | 5 | Create an authorized target | ⛔ | Blocked (target management) |
-| 6 | Confirm authorization | ⛔ | Blocked; schema + `authorization_records` table exist |
-| 7 | Validate target scope | ⛔ | Blocked (`target_validation.py`) |
-| 8 | Start an audit | ✅ (source) / ⛔ (live) | `POST /api/audits/source` + `/audits` UI (ADR-011); live-target audits blocked |
-| 9 | See audit progress | ✅ (source) | Stage progress, polling UI; live pipeline stages not built |
-| 10 | Run reconnaissance | ⛔ | Not built (live recon). Static route extraction exists |
-| 11 | Discover endpoints | ◐ | Static discovery of routes from source in 5 frameworks; no live crawling |
+| 6 | Confirm authorization | ◐ | Source audits require and persist an authorization statement + timestamp (shown in the report); no target authorization |
+| 7 | Validate target scope | ⛔ | Blocked (`target_validation.py`). Source paths are confined to `SOURCE_ROOTS`, which is not target scope |
+| 8 | Start an audit | ✅s | `POST /api/audits/source`, `/audits` UI (ADR-011) |
+| 9 | See audit progress | ✅s | Persisted stages, polling UI, activity log |
+| 10 | Run reconnaissance | ⛔ | Not built (live). Static route extraction exists (see 11) |
+| 11 | Discover endpoints | ◐ | Static route discovery in 5 frameworks + authorization matrix; no live crawling |
 | 12 | Run vulnerability scanning | ◐ | Static engine ✅; ZAP/Nuclei ⛔ |
-| 13 | Produce potential findings | ✅ | All detectors; honest statuses |
-| 14 | Safely validate findings | ⛔ | Safe Validation agent not built (ADR-003 design only) |
-| 15 | Reduce false positives | ◐ | Heuristic status/confidence, de-dup, suppression, baseline; no Validator agent |
-| 16 | Assign severity | ✅ | Per detector; never inflated |
+| 13 | Produce potential findings | ✅ | All detectors; honest statuses (never `confirmed` from static analysis) |
+| 14 | Safely validate findings | ⛔ | Safe Validation agent not built (ADR-003 design only). *Fix* verification exists (ADR-013) but is a different thing |
+| 15 | Reduce false positives | ◐ | Heuristic status/confidence, de-duplication, suppression, baseline, measured benchmark; no Validator agent |
+| 16 | Assign severity | ✅ | Per detector; chains never exceed their worst member |
 | 17 | Map OWASP/CWE | ✅ | Every finding carries OWASP category + CWE |
-| 18 | CVE/CVSS where appropriate | ◐ | CVE from real OSV advisories ✅; **CVSS is never populated** for OSV findings (reported "CVSS not determined") |
-| 19 | Generate remediation | ✅ | Per finding type, grouped in the report |
-| 20 | Professional report | ✅ | 19 sections, risk rating, Fix-first, ToC, DEMO labelling |
-| 21 | Download PDF/HTML | ✅ | `GET /api/audits/{id}/report` + UI links; CLI too |
-| 22 | View historical audits | ✅ | `GET /api/audits`, `/audits` history table |
+| 18 | CVE/CVSS where appropriate | ◐ | CVE only from real OSV advisories ✅; CVSS never populated ("CVSS not determined") |
+| 19 | Generate remediation | ✅ | Per type, grouped in the report, plus verified patches for 7 types |
+| 20 | Professional report | ✅ | 19 sections, risk rating, fix-first, attack chains, authorization matrix, DEMO labelling |
+| 21 | Download PDF/HTML | ✅ | `GET /api/audits/{id}/report?format=html\|pdf`, UI links, CLI |
+| 22 | View historical audits | ✅ | `GET /api/audits`, history table |
 | 23 | View audit logs | ✅ | `GET /api/audits/{id}/logs`, activity log on the audit page |
-| 24 | Run DEMO MODE without external credentials | ◐ | `secureagent demo` ✅ (offline); fixture demo of the agent pipeline ⛔ |
-| 25 | Run automated tests | ✅ | `pytest` (253) |
-| 26 | Run through Docker Compose | ◐ | Stack runs; ZAP/juice-shop defined but unused; Nuclei binary not in image |
-| 27 | Recover from a failed audit stage | ⛔ | Designed (`stage_state`); no runner |
-| 28 | Preserve context across sessions | ✅ | Memory, changelog, 9 ADRs, traceability, close-out |
+| 24 | Run DEMO MODE without external credentials | ◐ | `secureagent demo` offline ✅; no fixture-driven demo of the agent pipeline |
+| 25 | Run automated tests | ✅ | pytest + Vitest + Playwright, all in CI |
+| 26 | Run through Docker Compose | ◐ | Stack runs and is e2e-tested; ZAP/juice-shop defined but unused, Nuclei not in the image |
+| 27 | Recover from a failed audit stage | ◐ | Failures are recorded (status, generic error, log) and audits interrupted by a restart are marked failed; no resume/retry |
+| 28 | Preserve context across sessions | ✅ | Memory, changelog, 13 ADRs, traceability R1-R58, this close-out |
 
-**Tally (updated 2026-10-11, after ADR-011): ✅ 16 · ◐ 7 · ⛔ 5** (criteria 8 and 9 are counted done for
-source audits only; their live-target form remains blocked). Previously ✅ 11 · ◐ 8 · ⛔ 9.
+**Tally: ✅ 14 · ✅s 2 · ◐ 8 · ⛔ 4** (28). At the 2026-10-09 close-out it was ✅ 11 · ◐ 8 · ⛔ 9.
 
-## 3. Phases (brief §36)
+## 3. What was delivered since the 2026-10-09 close-out
 
-0–3 done · **4–5 blocked** · 6–12 not started (depend on 4–5) · 13 rendering done, Report *agent*
-pending · 14 shell done · 15 not started · 16 static demo done · 17 partial · 18 partial · 19 not
-done · 20 done for existing code. Beyond the brief's list (scope change 2026-10-03b, ADR-008): the
-grey-box static engine, CLI, CI gating, SARIF.
+| Area | Delivered |
+|---|---|
+| Detection depth | Business-logic detectors (client-trusted values, mass assignment, privilege fields), JSON intent spec, authorization matrix + inconsistent-authorization outliers, workflow-order heuristic, attack chains (ADR-010, ADR-012) |
+| Trust | Accuracy benchmark with a deliberately imperfect corpus (`docs/benchmark.md`); self-scan caught and fixed 3 false positives in its own code, the benchmark found 2 more gaps |
+| Product | Persisted source audits end to end: API, runner, migration, UI, report download (ADR-011); login throttling; interrupted-audit sweep; admin bootstrap |
+| Developer workflow | MCP server (`scan_snippet`, `scan_path`, `suggest_fixes`, `authorization_matrix`); verified fix patches (ADR-013) |
+| Quality | 346 backend / 24 unit / 6 browser tests; four-job CI |
 
-## 4. What this audit found and fixed (2026-10-09)
+## 4. Bugs the project's own tooling found in its own code
 
-The audit method was to *use* the product on itself and to test the *installed* artifact — which
-found defects 200+ unit tests had not:
-
-| Finding | Severity | Fix |
-|---|---|---|
-| **Installed `secureagent scan` crashed on a clean machine** — the scanner imported the ORM package (SQLAlchemy) via a shared enum module; the dev virtualenv masked it | High (the main command was broken for any real user) | Enums moved to `app/core/enums.py`; ADR-009; `test_cli_standalone.py` (runs with web-stack imports poisoned) |
-| **`poetry.lock` and `Pipfile.lock` were never scanned** — `.lock` was classed as a binary extension; unit tests bypassed ingestion | High (silent false negatives in SCA) | Removed; end-to-end regression test |
-| Handlers sharing a method name across classes (`get`, `post`) were collapsed and some never analysed | Medium | Handler loops walk all function nodes |
-| Secret false positives: `{PLACEHOLDER}`, `credentials: "same-origin"`; one key reported twice | Medium (noise erodes trust) | Rules fixed + tests |
-| No way to suppress findings except a baseline | Medium (not adoptable on real repos) | `--exclude`, `.secureagentignore`, inline `secureagent: ignore`, always counted |
-| Backend dependencies unpinned → SCA saw none; builds not reproducible | Medium (supply chain) | `requirements.lock` (45 pins on python:3.12), Docker installs it; live OSV check: clean |
-| CLI crashed on non-ASCII output on Windows consoles (earlier) | Medium | UTF-8 reconfigure |
-| Swallowed exception in the CLI (flagged by its own A09 check) | Low | `contextlib.suppress` |
-| Documentation drift: stale traceability rows, missing changelog entry, 200-line memory §3 | Medium (breaks "context across sessions") | Corrected; memory restructured |
-| Missing required docs (`testing.md`, `deployment.md`), partial README, no repo CI | Medium | Written; CI workflow added |
-| `frontend/AGENTS.md`, `frontend/CLAUDE.md` tracked (tool-generated) | Low (owner asked for no Claude traces) | Untracked + git-ignored (first attempt was silently undone by a `git reset`; redone and verified against HEAD) |
-| First GitHub CI run: frontend `tsc` failed on a clean checkout; self-scan gate failed on `braces` | Medium (CI red) | `npm run typecheck`; baseline for the unpatched dev-only advisory |
-
-Report polish delivered in the same pass: risk rating, "Fix first" priorities, hotspots, ToC,
-consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages).
+| Finding | Fix |
+|---|---|
+| Installed CLI crashed without SQLAlchemy (enums in the ORM package) | Enums moved to a stdlib module; test that poisons web-stack imports (ADR-009) |
+| `poetry.lock`/`Pipfile.lock` never scanned (`.lock` treated as binary) | Fixed + ingestion regression test |
+| Python open redirect never reported; `eval("literal")` flagged | Found by the first benchmark run; fixed |
+| Parameterised SQLAlchemy `select()` reported as SQL injection | Fixed (nested `text()` still flagged) |
+| `user: CurrentUser` FastAPI alias not recognised as an auth guard | Fixed |
+| Env-var *names* (`PASSWORD_ENV = "APP_PASSWORD"`) reported as secrets | Fixed |
+| Chain severities all inflated to CRITICAL (first draft) | Chains never exceed their worst member (ADR-012) |
+| Vitest 3 pulled critical advisories (tinypool RCE gadget) | Vitest 5 + `@types/node@^22` |
 
 ## 5. Remaining work
 
-### A. Owner action required (blocks everything else)
+### A. Owner action required
 1. **Supply `backend/app/security/target_validation.py` and `backend/app/services/target_service.py`**
-   per `docs/target-management-implementation.md` (signatures, rules, required tests). Mostly stdlib
-   `ipaddress` + CRUD with ownership checks.
-2. **Decide the closing framing** (see §6).
-3. **Choose a `LICENSE`** (none exists; this is the owner's call).
-4. **Provide the PPT** so the PENDING sections of `SPECIFICATION.md` can be filled and any conflicts
-   with this implementation surfaced.
-5. **CI is green** (second run, commit 64f118b: backend, frontend, self-scan all pass). First run (2026-10-09): backend passed; frontend and self-scan failed on real
-   issues (Next route types before `tsc`; the `braces` advisory) — both fixed and re-pushed; check the
-   Actions tab for the second run. `braces 3.0.3` has **no patched version** (OSV `last_affected: 3.0.3`),
-   is a dev-only transitive dependency, and is accepted in `.secureagent-baseline.json`; revisit when a fix ships.
+   per `docs/target-management-implementation.md`. This single step unblocks criteria 5, 7, 10, 12 (live),
+   14 and the live form of 8/9.
+2. **Choose a `LICENSE`.** None exists; this is the owner's call.
+3. **Provide the PPT** so the PENDING sections of `SPECIFICATION.md` can be filled and conflicts surfaced.
+4. **Decide the closing framing** (§6).
+5. **Accepted advisory:** `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm), dev-only transitive dependency, no patched
+   version exists; recorded in `.secureagent-baseline.json`. Revisit when a fix ships.
 
 ### B. Assistant can build once A1 exists (in order)
-1. Authorization service + `/api/targets`, `/authorize`, `/validate` + tests (the security-restriction tests the brief requires).
-2. Audit entity/API (`/api/audits*`), background runner with stage persistence (ADR-005), audit logs with `[AUDIT-id]` structured logging.
-3. Reconnaissance tool/agent; ZAP and Nuclei integration (safe, scope-checked, no `shell=True`); Nuclei in the image.
-4. Safe Validation agent (ADR-003), Validator agent, Report agent; LangGraph workflow wiring the existing static engine as the Code Intelligence stage.
-5. Frontend: targets/audits/findings/reports/activity pages, dashboard data and charts, progress polling.
-6. Optional LLM reasoning with deterministic fallback; fixture-driven demo of the pipeline.
+1. Authorization service + `/api/targets`, `/authorize`, `/validate` + the security-restriction tests.
+2. Live-audit entity/runner reusing the ADR-011 runner and stage persistence.
+3. Recon, ZAP and Nuclei integration (scope-checked, no `shell=True`); Nuclei in the image.
+4. Safe Validation, Validator and Report agents; LangGraph workflow wiring the static engine as the
+   Code Intelligence stage.
+5. Targets/findings/reports pages; optional LLM reasoning with deterministic fallback.
 
-### C. Independent of the blocker (can be done any time)
-- (Done 2026-10-11) Playwright browser e2e: 6 tests, `e2e` CI job.
-- Production cookie/CORS checklist. (Login throttling and the admin bootstrap command were built 2026-10-11.)
-- Detector accuracy on **public** vulnerable corpora. A benchmark harness and a small author-written
-  corpus exist (`secureagent benchmark`, `docs/benchmark.md`: 94% precision / 94% recall on that corpus);
-  an independent corpus has not been run.
-- Parse OSV CVSS vectors into scores (so CVSS can be shown when reliably determined).
-- JS AST-based analysis (replace regex heuristics); sanitizer modelling in taint.
-- Client-trusted-value, mass-assignment, the intent spec and the workflow-order heuristic are built
-  (ADR-010, Python only); JS/TS logic detectors and model-layer state machines are not.
+### C. Independent improvements (any time)
+- Detector accuracy on an **independent** labelled corpus (the bundled one is author-written).
+- Parse OSV CVSS vectors into scores; JS/TS AST-based analysis and sanitizer modelling in taint.
+- Zip upload for source audits; audit resume/retry; multi-worker-safe throttling and sweep.
+- Authorization matrix grouping beyond the first path segment (currently flags public GETs among guarded siblings).
+- Accessibility: `Field` puts hint text inside the label (screen readers announce it as the field name).
+- Browsers other than Chromium in e2e; frontend coverage reporting.
 
 ## 6. Two honest ways to close the project
 
-**Option 1 — close as a static-analysis-centred auditor (achievable now).** Present SecureAgent as a
-grey-box *source-code* security auditor: the working scanner, reports, CI integration, demo and the
-web skeleton, with the live-audit pipeline documented as designed future work. Everything claimed is
-true and reproducible (`secureagent demo`, `secureagent scan backend --exclude tests/`). Requires only
-A2–A5 above. The README and this document already frame it this way.
+**Option 1 -- close as a grey-box static security auditor (achievable now).** Everything claimed is
+true and reproducible: `secureagent demo`, `secureagent scan`, `secureagent fix`, the web app's source
+audits, the MCP server, the benchmark. Needs only A2-A5. The README and this document already frame it
+this way. **Recommended.**
 
-**Option 2 — complete the original multi-agent platform.** Requires A1, then roughly work items B1–B6.
-This is the larger body of work and the only route to criteria 5–10, 14, 22–23, 27.
+**Option 2 -- complete the original live multi-agent platform.** Requires A1, then roughly B1-B5.
+The only route to criteria 5, 7, 10, 14 and the live forms of 8-9.
 
-Recommendation: ship Option 1 now (it is complete and defensible), and treat Option 2 as a clearly
-labelled second phase once the two files exist.
-
-## 7. How to verify this audit yourself
+## 7. How to verify this close-out yourself
 
 ```bash
-make testdb && cd backend && python -m pytest -q          # 252 passed, 1 skipped
+make testdb && cd backend && python -m pytest -q            # 346 passed, 1 skipped
 python -m coverage run --source=app -m pytest -q && python -m coverage report   # ~93%
-secureagent scan . --no-osv                                # clean (exit 0); suppression counted
-secureagent scan backend --exclude tests/                  # live OSV check of the pinned lock
-secureagent demo --report demo.html                        # labelled DEMO report
-git ls-files | grep -iE "claude|agents.md"                 # nothing tracked
+secureagent scan . --baseline .secureagent-baseline.json --fail-on high         # 0 new (online OSV)
+secureagent benchmark backend/benchmark/corpus              # 94% / 94%, known misses listed
+secureagent demo                                            # labelled DEMO report (34 findings)
+cd frontend && npm test && npm run typecheck && npm run build
+docker compose up --build -d backend frontend && npm run e2e   # needs ./workspace/shop (frontend/e2e/README.md)
+git ls-files | grep -iE "claude|agents.md"                  # nothing tracked
 ```

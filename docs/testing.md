@@ -6,9 +6,9 @@ badges, audit list/detail pages incl. polling and the authorization gate); CI ru
 `frontend/e2e/README.md`) -- registration, a full source audit with findings/chains/report, path
 confinement, ownership isolation, sign-out and login throttling; run as the `e2e` CI job.
 
-Backend status as of 2026-10-09: **253 backend tests: 252 pass, 1 skipped, 0 fail** (the skipped PDF test needs
-the Pango libraries and passes in the Docker image), **93% line coverage** of `backend/app`.
-The frontend has **no automated tests yet** (see *Gaps*).
+Backend status as of 2026-10-11: **346 backend tests: 345 pass, 1 skipped, 0 fail** (the skipped PDF test needs
+the Pango libraries; CI runs it), **93% line coverage** of `backend/app`.
+Frontend: **24 Vitest + 6 Playwright** tests (see above).
 
 ## Running the tests
 
@@ -92,10 +92,10 @@ tests.
 
 ## Gaps (also tracked in `docs/PROJECT_CLOSEOUT.md`)
 
-1. **Frontend** — 0 tests. Lint, type-check and build pass; behaviour was verified manually in a
-   browser (login, register, redirects, sign-out).
-2. **End-to-end** — no automated browser or full-stack test.
-3. **Audit pipeline** — agents, LangGraph workflow, ZAP and Nuclei integrations do not exist, so
+1. **Frontend** — component/unit coverage is not measured; only the audit pages, API client and badges
+   have unit tests. Playwright runs on Chromium only.
+2. **Accuracy** — measured on an author-written corpus only (`docs/benchmark.md`).
+3. **Live audit pipeline** — agents, LangGraph workflow, ZAP and Nuclei integrations do not exist, so
    have no tests.
 4. **Coverage** — lowest files: `schemas/target.py` (0%, awaiting the blocked endpoints),
    `core/database.py` (69%), `analysis/dependencies.py` (78%), `analysis/osv.py` (84%; the

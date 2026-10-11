@@ -729,3 +729,16 @@ Append-only. Never rewrite past entries.
 - Selectors use `input[name=...]` for the form fields because `Field` puts the hint text inside the
   label, so exact label matching on "Password" fails (accessibility improvement left for later).
 - Next.js's route announcer also has `role="alert"`; app errors are located as `p[role=alert]`.
+
+## 2026-10-11 (Final close-out)
+
+### Changed
+- `docs/PROJECT_CLOSEOUT.md` rewritten against the current code: all 28 criteria re-assessed
+  (14 done, 2 done for source audits only, 8 partial, 4 not built), what was delivered since the
+  2026-10-09 audit, bugs the project's own tooling found, remaining work, verification commands.
+- `PROJECT_MEMORY.md`: phase table, open issues and session summary brought up to date.
+
+### Notes
+- Verified at close-out: 346 backend tests (1 skipped), 93% coverage, 24 Vitest, 6 Playwright, benchmark
+  94%/94%, self-scan 0 new findings, CI green on four jobs.
+- Not done and not doable without the owner: target management files, LICENSE, PPT.

@@ -82,9 +82,9 @@ secureagent scan .                # see docs/static-analysis.md and docs/ci/gith
 
 - Single backend replica by design (ADR-005): audits will run as in-process background tasks.
 - Terminate TLS in front of the stack (reverse proxy) and set `COOKIE_SECURE=true`.
-- There is **no login rate limiting or account lockout** yet; add one (reverse proxy or
-  application) before exposing registration publicly.
-- There is no admin bootstrap command: every registered user is an `auditor`.
+- Failed sign-ins are throttled in-process (5 per 15 minutes per address+email, 429 with `Retry-After`);
+  add a reverse-proxy limit as well before exposing registration publicly.
+- Registration always creates an `auditor`; create administrators with `python -m app.manage create-admin`.
 - The Nuclei binary is not in the backend image yet (the Nuclei integration is not built).
 - Back up the `pgdata` volume; `reports` is a volume for generated report files.
 

@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-09 (close-out audit; memory restructured)
+Last updated: 2026-10-11 (final close-out; see docs/PROJECT_CLOSEOUT.md)
 
 ## 1. Project Identity
 
@@ -69,10 +69,10 @@ consolidated by type, grouped remediation, compact CVE/CVSS sections; DEMO label
 **Project infrastructure**: SPECIFICATION (PPT sections still PENDING), memory, changelog, 8 ADRs,
 traceability, 7 validated UML diagrams, docs (architecture, agent-workflow, security-model, database, api,
 static-analysis, business-logic-engine, testing, deployment, demo-guide, closeout), README, repo CI
-workflow (`.github/workflows/ci.yml`, **not yet run on GitHub**), GitHub Action example.
+workflow (`.github/workflows/ci.yml`, four jobs, green), GitHub Action example.
 
 ### In Progress
-- Nothing. The 2026-10-09 close-out pass is complete; see `docs/PROJECT_CLOSEOUT.md`.
+- Nothing. The 2026-10-11 final close-out is complete; see `docs/PROJECT_CLOSEOUT.md`.
 
 ### Blocked
 - **Phases 4-5 (target management, network-safety validation, authorization)** — the generation of
@@ -85,11 +85,10 @@ workflow (`.github/workflows/ci.yml`, **not yet run on GitHub**), GitHub Action 
   workflow, audit runner, progress) depend on targets/authorization; **not started**.
 
 ### Planned
-- Everything blocked above; frontend pages for targets/audits/findings/reports/activity; dashboard data;
-  structured per-audit logging; optional LLM reasoning; frontend tests; login rate limiting; admin bootstrap.
-- Grey-box business-logic engine beyond what exists (ADR-008/010): workflow-order detection, a UI/API for
-  the developer-intent input (the JSON spec + CLI flag exist), Application Model persistence, JS/TS logic
-  detectors, authorization matrix, finding chaining, verified-fix patches.
+- Everything blocked above; targets/global findings/reports/activity pages; live-audit structured logging;
+  optional LLM reasoning. (Frontend tests, e2e, login throttling and admin bootstrap are done.)
+- Grey-box business-logic engine beyond what exists (ADR-008/010/012/013): a UI/API for the developer-intent
+  input (the JSON spec + CLI flag exist), Application Model persistence, JS/TS logic detectors.
 
 ### Deferred
 - Continuous / scheduled audits and CI/CD-triggered audits (architecture is extensible only).
@@ -182,20 +181,20 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 |---|---|
 | 0 Requirements & architecture | Done |
 | 1 Repository structure | Done |
-| 2 Database & migrations | Done |
-| 3 Authentication | Done |
+| 2 Database & migrations | Done (2 migrations: initial, source audits) |
+| 3 Authentication | Done (+ login throttling, admin bootstrap) |
 | 4 Target management | **Blocked** (see §3) |
-| 5 Authorization & restrictions | **Blocked** (see §3) |
+| 5 Authorization & restrictions | **Blocked** for live targets; source-audit authorization gate done |
 | 6-12 Agents, workflow, recon, ZAP, Nuclei, validation, validator | Not started (depend on 4-5) |
-| 13 Report generation | Rendering layer + polish done; Report *agent* pending audits |
-| 14 Frontend | Auth pages + shell done; data pages pending their APIs |
-| 15 Audit progress | Not started |
-| 16 Demo mode | Static-engine demo done; fixture demo of the agent pipeline pending |
-| 17 Testing | 253 backend tests, 93% coverage; no frontend/e2e tests |
-| 18 Docker integration | Compose + images build and run; pipeline services unused |
-| 19 End-to-end | Not done |
-| 20 Documentation | Done for what exists (UML, guides, closeout) |
-| Extra: grey-box static engine, CLI, CI gating, SARIF | Done (beyond the original phase list; scope change 2026-10-03b) |
+| 13 Report generation | Done for source audits (persisted + downloadable); Report *agent* pending the live pipeline |
+| 14 Frontend | Auth, dashboard (real data), audits list/detail; targets/global pages pending their APIs |
+| 15 Audit progress | Done for source audits (stages, polling, activity log) |
+| 16 Demo mode | CLI demo done; fixture demo of the agent pipeline pending |
+| 17 Testing | 346 backend (93% cov.) + 24 Vitest + 6 Playwright, all in CI |
+| 18 Docker integration | Compose runs and is e2e-tested; ZAP/Nuclei unused |
+| 19 End-to-end | Done for the source-audit journey (Playwright, CI job `e2e`) |
+| 20 Documentation | Done (13 ADRs, UML, guides, traceability R1-R58, close-out) |
+| Extra: grey-box static engine, CLI, CI gating, SARIF, MCP, benchmark, business-logic detectors, chains, fix patches | Done (scope change 2026-10-03b, ADR-008, 010-013) |
 
 ## 14. Architecture Decisions
 
@@ -230,14 +229,13 @@ changelog.
 - **PPT not provided**: `SPECIFICATION.md` sections marked PENDING stay unfilled; conflicts with the PPT
   are unknown. Provide the PPT and reconcile.
 - **Target management blocked** (see §3) — the single dependency for the live audit pipeline.
-- **CI**: first GitHub run (2026-10-09, commit 0539485) passed backend and failed frontend + self-scan for
-  real reasons, fixed (see §17); **second run (commit 64f118b) is green on all three jobs**. Accepted advisory:
+- **CI**: four jobs (backend, frontend, self-scan, e2e), **green at close-out (commit 5403c07)**; the first
+  run (2026-10-09) failed for real reasons, fixed (see §17). Accepted advisory:
   `braces 3.0.3` (GHSA-vfj7-8cjw-p6xm; OSV lists **no patched version**; transitive dev-only dependency of
   eslint-config-next) is recorded in `.secureagent-baseline.json` so CI gates only on NEW high/critical findings.
 - **No `LICENSE`** — a licensing decision for the owner.
-- **No login rate limiting / account lockout; no admin bootstrap** (every user is an `auditor`).
-- **Frontend has 0 automated tests**; only manual browser verification.
-- **No detector accuracy benchmark** on public corpora; false-positive/negative rates are unmeasured.
+- **Detector accuracy is measured only on an author-written corpus** (94%/94%); no independent real-world
+  rate. Login throttling is in-process (per worker); the interrupted-audit sweep assumes one API process.
 - CVSS is never populated for OSV findings (reported as "not determined"); advisory CVSS vectors are not
   parsed to a score.
 - Local dev DB contains test users (`smoke*@example.com`, `uitest@example.com`).
@@ -265,15 +263,14 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
   commit. Lesson: verify against `git ls-tree HEAD` after the final commit, not before.
 
 ## 18. Testing Status
-- **Backend: 270 tests collected (2026-10-10, after ADR-010; the 17 new tests and all static tests pass locally;
-  the 27 DB-backed tests could not run locally because Docker was off -- CI is the authority).** Last full run
-  with the DB (2026-10-09): 253 collected, 252 pass, 1 skipped, 93% line coverage. The skipped test is
+- **Backend: 346 passed, 1 skipped, 0 failed; 93% line coverage (2026-10-11, local run with the DB; CI green).**
+  Frontend: 24 Vitest + 6 Playwright. The skipped test is
   PDF rendering, which needs Pango (passes in the backend Docker image). DB-backed tests need
   `make testdb` (PostgreSQL on :55432); they build the schema via the real Alembic migration.
 - Static-analysis tests use snippets + the pinned demo; OSV is tested through an injected fake transport
   (a live OSV query was verified manually). Per-area table in `docs/testing.md`.
-- **Not tested / absent**: frontend (0 tests; lint, tsc and build pass), end-to-end, the audit pipeline,
-  target safety validation (does not exist). Lowest coverage: `schemas/target.py` 0% (unused),
+- **Not tested / absent**: the live audit pipeline and target safety validation (do not exist); frontend
+  coverage is not measured (24 unit + 6 browser tests). Lowest coverage: `schemas/target.py` 0% (unused),
   `core/database.py` 69%, `analysis/dependencies.py` 78%, `analysis/osv.py` 84%.
 - Verified manually: Docker Compose stack runs; auth through the frontend proxy; UI flows in a browser;
   clean-virtualenv install of the CLI (`scan`, `demo --report`); live OSV scan of this repo's own lockfiles.
@@ -344,23 +341,15 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Prefer a script file over a long shell heredoc for multi-line edits in this environment.
 
 ## 22. Current Session Summary
-2026-10-09 close-out pass (report polish + audit of remaining work):
-- Report polish: risk rating, "Fix first" top priorities, hotspots, table of contents, findings
-  consolidated by type with grouped remediation, compact CVE/CVSS sections, denser finding blocks
-  (demo PDF 33 -> 25 pages).
-- Dogfooding the scanner on this repository found and fixed real bugs (see §17): clean-install crash of
-  the CLI, `.lock` files never scanned, handler-name collisions, two secret false positives; added
-  `--exclude`, `.secureagentignore` and inline `secureagent: ignore`; pinned backend dependencies.
-- Added missing required docs (`testing.md`, `deployment.md`), a complete README, the repo CI workflow
-  (first run found two real failures, fixed), an env-contract test, `docs/PROJECT_CLOSEOUT.md`; untracked tool-generated agent files per the
-  owner's "no Claude traces" preference; corrected stale traceability/changelog entries.
-- Honest state: the project delivers a working, tested static-analysis security scanner plus a web skeleton;
-  the live multi-agent audit pipeline (and therefore acceptance criteria 5-10, 14, 22-23, 27) is **not built**
-  and is blocked on the two target-management files.
-2026-10-11: persisted source audits end to end (API, runner, migration, frontend), fixed two detector
-false positives that the self-scan found in that new code (parameterised SQLAlchemy expressions;
-`CurrentUser` auth aliases), report titles use proper acronyms (baseline fingerprints include titles, so
-existing baselines of taint/sink findings must be regenerated).
-**Next:** owner supplies the two blocked files (or decides to close the project as static-analysis-centred);
-verify the CI workflow on GitHub; choose a LICENSE; provide the PPT. See `docs/PROJECT_CLOSEOUT.md`.
-
+2026-10-11 final close-out. Work since the 2026-10-09 audit (details in `PROJECT_CHANGELOG.md`):
+- Detection: business-logic detectors + intent spec (ADR-010), authorization matrix, workflow-order heuristic,
+  attack chains (ADR-012); MCP server; accuracy benchmark; verified fix patches (ADR-013).
+- Product: persisted source audits end to end (ADR-011) -- API, runner, migration, audit pages, report
+  download; login throttling; interrupted-audit sweep; admin bootstrap.
+- Quality: 346 backend / 24 Vitest / 6 Playwright tests; four-job CI, green. The project's own scanner found
+  and fixed 3 false positives in its code; the benchmark found 2 detector gaps.
+- Acceptance criteria: 14 done, 2 done for source audits only, 8 partial, 4 not built (live pipeline).
+- Honest state: a complete, tested grey-box static security auditor; the live multi-agent pipeline is **not
+  built** and is blocked on the two owner-supplied target-management files.
+**Next (owner):** supply the two blocked files (or close as the static auditor); choose a LICENSE; provide
+the PPT. See `docs/PROJECT_CLOSEOUT.md` §5-6.

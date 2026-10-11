@@ -21,7 +21,8 @@ The multi-agent live-audit architecture from the project specification is fully 
 prerequisite — target management with the network-safety validator — has not been built.
 `docs/target-management-implementation.md` is the hand-off specification for those two files.
 Nothing in this repository claims otherwise. See [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md)
-for the complete status against the original requirements.
+for the complete status against the original requirements (28 criteria: 14 done, 2 done for source
+audits only, 8 partial, 4 not built).
 
 ## What the scanner finds
 
@@ -116,17 +117,20 @@ redaction everywhere, read-only scanning, escaped reports.
 
 ```bash
 make testdb                      # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q    # ~290 tests; ~93% coverage
-cd frontend && npm run lint && npm run typecheck && npm run build
+cd backend && python -m pytest -q    # 346 tests; ~93% coverage
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build
+cd frontend && npm run e2e           # Playwright against the Docker stack (frontend/e2e/README.md)
 ```
 
 ## Known limitations
 
-- The live audit pipeline, ZAP/Nuclei integration, LLM reasoning and audit-progress UI do not exist yet.
+- The live-target audit pipeline (targets, recon, ZAP/Nuclei, safe validation, LangGraph) and LLM reasoning
+  do not exist yet; the web app runs **source** audits only.
 - Static taint is intraprocedural-plus (within/across files, return values) but does not model
   sanitizers and resolves cross-file calls heuristically; JS analysis is regex-based.
 - Unprotected-endpoint findings cannot see global middleware, so they are review items.
-- Frontend has no automated tests; no login rate limiting; no admin bootstrap; no `LICENSE` yet.
+- Login throttling and the interrupted-audit sweep are in-process (single API replica). Detector accuracy is
+  measured only on a small author-written corpus. No `LICENSE` yet.
 
 ## Future improvements
 

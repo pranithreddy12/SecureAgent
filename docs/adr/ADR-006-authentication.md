@@ -31,4 +31,5 @@ The frontend proxies `/api/*` (same origin), so cookies are first-party.
 
 ## Consequences
 - A stolen token stays valid until expiry (default 60 min).
-- No admin bootstrap path yet (see PROJECT_MEMORY open issues).
+- ~~No admin bootstrap path yet~~ -- added 2026-10-11: `python -m app.manage create-admin` (password from
+  `SECUREAGENT_ADMIN_PASSWORD` or a prompt, never argv). Failed sign-ins are throttled in-process (429).

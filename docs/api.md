@@ -1,6 +1,22 @@
 # SecureAgent – REST API Design
 
-Status: **Partially implemented** — health and `/api/auth/*` done (Phase 3); rest designed. Base path `/api`. JSON. OpenAPI docs at `/docs`.
+Status: **Partially implemented** — health, `/api/auth/*` and the **source-audit** endpoints below are
+implemented; the target and live-audit endpoints in the full table are still design only.
+
+**Implemented source-audit API (ADR-011)** -- all owner-scoped (another user's audit is a 404):
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | /api/audits/source | `{path, label?, authorization_confirmed, exclude[]}` -> 202; 400 without confirmation or for a path outside `SOURCE_ROOTS`; 503 if `SOURCE_ROOTS` is unset |
+| GET | /api/audits | Own audits, newest first |
+| GET | /api/audits/{id} | Status, stage state, severity counts, `attack_chains` |
+| GET | /api/audits/{id}/findings | Persisted findings |
+| GET | /api/audits/{id}/logs | Activity log |
+| GET | /api/audits/{id}/report?format=html\|pdf&download= | Report (CSP-locked HTML, or PDF where Pango is available) |
+
+The design table below describes the *full* target-based API; `POST /api/audits {target_id}`,
+`/start`, `/stop` and `/status` do not exist.
+ Base path `/api`. JSON. OpenAPI docs at `/docs`.
 
 Authentication: JWT (HS256, `SECRET_KEY`) issued on login, returned in an httpOnly,
 `SameSite=Lax` cookie (`Secure` when `COOKIE_SECURE=true`). `Authorization: Bearer`

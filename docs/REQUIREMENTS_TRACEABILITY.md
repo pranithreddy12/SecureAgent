@@ -19,17 +19,17 @@ Status: Planned → In Progress → Implemented → Tested.
 | R11 | Exploitation Agent → Safe Validation Agent | SPEC §8, ADR-003 | backend/app/agents/safe_validation_agent.py, tools/validation_tool.py | Planned |
 | R12 | Validator Agent / false-positive reduction | SPEC §8 | backend/app/agents/validator_agent.py | Planned |
 | R13 | OWASP / CWE / CVE / CVSS mapping (no fabrication) | SPEC §12 | per-detector metadata in backend/app/analysis/*.py; CVE via OSV; reports/report.html | Implemented + Tested for static findings (CVE only from real advisories; CVSS never populated for OSV findings; no central standards.py) |
-| R14 | Report Agent — HTML + PDF | SPEC §8, §15 | backend/app/reports/ (renderer, template), schemas/report.py; agent pending | In Progress (rendering done + tested) |
-| R15 | Audit progress tracking + logs | SPEC §3 | services/audit_runner.py, api/audits.py | Planned |
-| R16 | Background execution | BRIEF §43, ADR-005 | backend/app/workflows/runner.py | Planned |
+| R14 | Report Agent — HTML + PDF | SPEC §8, §15 | backend/app/reports/ (renderer, template), schemas/report.py, api/audits.py (download); agent pending | In Progress (rendering, persistence and download done for source audits; Report *agent* needs the live pipeline) |
+| R15 | Audit progress tracking + logs | SPEC §3 | services/audit_service.py, api/audits.py, frontend/app/(app)/audits/[id] | Implemented + Tested for source audits (ADR-011); live-audit stages pending |
+| R16 | Background execution | BRIEF §43, ADR-005 | services/audit_service.py, api/audits.py (asyncio task per audit, startup sweep) | Implemented for source audits (single replica; no resume) |
 | R17 | Resumable / idempotent audits | BRIEF §34 | runner + fingerprint constraint | Planned |
 | R18 | PostgreSQL schema + migrations | SPEC §9, ADR-002 | backend/app/models/, backend/alembic/ | Implemented + Tested |
 | R19 | Dashboard + charts | SPEC §15 | frontend/app/(app)/dashboard | In Progress (shell + live health + honest empty state; no data/charts until audits exist) |
-| R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | In Progress (login, register, dashboard shell, settings done) |
+| R20 | Targets / audits / findings / reports / activity / settings UI | SPEC §15 | frontend/app/* | In Progress (login, register, dashboard with real data, settings, audits list + detail with findings/chains/logs/report done; targets and global findings/activity pages need target management) |
 | R21 | Demo mode, clearly labelled | SPEC §15, ADR-004 | backend/app/demo/, cli `demo`, docs/demo-guide.md | In Progress (static-engine demo implemented + tested; fixture demo of the live agent pipeline pending targets) |
 | R22 | Local vulnerable lab target (Juice Shop) | BRIEF §31 | docker-compose `lab` profile | In Progress (service defined) |
-| R23 | Docker Compose deployment | SPEC §15 | docker-compose.yml, docker/ (backend image pinned to requirements.lock) | In Progress (stack builds and runs; ZAP/Nuclei unused; Nuclei binary not in image) |
-| R24 | Automated tests incl. security restrictions | SPEC §15 | backend/tests/ (253 tests, 93% coverage) | In Progress (auth/redaction/escaping/suppression tested; **target safety restrictions untestable until built**; no frontend/e2e tests) |
+| R23 | Docker Compose deployment | SPEC §15 | docker-compose.yml, docker/ (backend image pinned to requirements.lock) | In Progress (stack builds, runs and is Playwright-tested in CI; `./workspace` mounted for source audits; ZAP/Nuclei unused; Nuclei binary not in image) |
+| R24 | Automated tests incl. security restrictions | SPEC §15 | backend/tests/ (346 tests, 93% coverage), frontend Vitest (24), Playwright (6) | In Progress (auth, throttling, ownership, path confinement, redaction, escaping, suppression, report CSP tested; **target safety restrictions untestable until built**) |
 | R25 | Optional LLM reasoning with deterministic fallback | SPEC §6 | backend/app/agents/llm.py | Planned |
 | R26 | Structured logging per audit ID | BRIEF §33 | backend/app/core/logging.py | Planned |
 | R27 | UML diagrams (7) matching the code | SPEC §16 | docs/diagrams/ | Implemented (validated) |
@@ -51,7 +51,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R44 | Report polish: risk rating, Fix-first priorities, grouped remediation, ToC | project (report quality) | backend/app/schemas/report.py, reports/templates/report.html | Implemented + Tested |
 | R45 | Dependency-light installable scanner (no web stack required) | ADR-009 | backend/app/core/enums.py, pyproject.toml, tests/test_cli_standalone.py | Implemented + Tested |
 | R46 | Reproducible backend build (pinned lock) | project (supply chain) | backend/requirements.lock, docker/backend.Dockerfile | Implemented |
-| R47 | Repo CI workflow (backend, frontend, self-scan) | project | .github/workflows/ci.yml | Implemented; first run: backend green, two real failures found and fixed; second run green on all jobs |
+| R47 | Repo CI workflow (backend, frontend, self-scan, e2e) | project | .github/workflows/ci.yml | Implemented; four jobs green at close-out (first run found two real failures, fixed) |
 | R48 | Business-logic detectors (mass assignment, client-trusted privilege/value) and developer intent spec | ADR-008, ADR-010 (OWASP A01/A04) | backend/app/analysis/business_logic.py, intent.py, tests/test_business_logic.py | Implemented + Tested (Python only; workflow-order not built) |
 | R49 | Authorization matrix + inconsistent-authorization outliers | ADR-010 (OWASP A01) | backend/app/analysis/authz_matrix.py, tests/test_authz_matrix.py | Implemented + Tested (heuristic; Python and JS route extractors) |
 | R50 | Detector accuracy benchmark (labelled corpus, precision/recall, CI floor) | project (trust) | backend/app/analysis/benchmark.py, backend/benchmark/corpus/, tests/test_benchmark.py, docs/benchmark.md | Implemented + Tested (bundled corpus is author-written: regression guard, not a real-world detection rate) |
