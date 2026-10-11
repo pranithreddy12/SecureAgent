@@ -1,4 +1,4 @@
-.PHONY: up down lab logs backend-dev frontend-dev testdb migrate test lint build test-frontend create-admin
+.PHONY: up down lab logs backend-dev frontend-dev testdb migrate test lint build test-frontend e2e create-admin
 
 up:            ## build and start the stack
 	docker compose up --build -d
@@ -36,6 +36,9 @@ build:
 
 test-frontend:
 	cd frontend && npm test
+
+e2e:           ## Playwright against the running stack (see frontend/e2e/README.md)
+	cd frontend && npm run e2e
 
 create-admin:  ## make create-admin EMAIL=you@example.com NAME="Your Name"
 	cd backend && .venv/Scripts/python -m app.manage create-admin --email $(EMAIL) --name "$(NAME)"

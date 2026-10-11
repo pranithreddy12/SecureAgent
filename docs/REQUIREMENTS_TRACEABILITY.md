@@ -62,4 +62,5 @@ Status: Planned → In Progress → Implemented → Tested.
 | R55 | Frontend component/unit tests (Vitest + Testing Library) | SPEC §15 (testing) | frontend/**/*.test.ts(x), vitest.config.mts, CI step | Implemented (24 tests; no browser e2e) |
 | R56 | Admin bootstrap command (password via env/prompt, never argv) | SPEC §10 (security model) | backend/app/manage.py, tests/test_manage.py | Implemented + Tested |
 | R57 | Verified fix patches (`secureagent fix`, MCP `suggest_fixes`) | ADR-013 | backend/app/analysis/fixes.py, tests/test_fixes.py | Implemented + Tested (7 finding types; single-file verification; behaviour not proven preserved) |
+| R58 | Browser end-to-end tests (Playwright) of the audit journey | SPEC §15 (testing), criteria 1-4, 8-9, 21-23 | frontend/e2e/, playwright.config.ts, CI job `e2e` | Implemented (6 tests; Chromium only) |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |

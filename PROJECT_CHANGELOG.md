@@ -713,3 +713,19 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Injection/IDOR/authorization findings are intentionally not auto-fixed (the correct fix is
   application-specific).
+
+## 2026-10-11 (Playwright end-to-end tests)
+
+### Added
+- `frontend/e2e/audit-flow.spec.ts` (6 tests, real Chrome/Chromium against the Docker stack): redirect to
+  sign-in, full journey (register -> source audit -> progress -> findings, honest CVE/CVSS text, attack
+  chains with fix-first, activity log, report tab, HTML download headers incl. CSP, history, dashboard),
+  out-of-root path rejection, another user gets "Audit not found" / 404, sign-out, wrong-password errors
+  then 429 throttling.
+- `playwright.config.ts`, `npm run e2e`, `frontend/e2e/README.md`, CI job `e2e` (compose up, seed
+  workspace, install Chromium, run, upload report on failure).
+
+### Notes
+- Selectors use `input[name=...]` for the form fields because `Field` puts the hint text inside the
+  label, so exact label matching on "Password" fails (accessibility improvement left for later).
+- Next.js's route announcer also has `role="alert"`; app errors are located as `p[role=alert]`.
