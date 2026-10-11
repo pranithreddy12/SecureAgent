@@ -67,6 +67,8 @@ Status: Planned → In Progress → Implemented → Tested.
 | R60 | Sanitizer modelling in taint (casts, quoting, allow-list guards) | ADR-008 | backend/app/analysis/taint.py, sinks.py, tests/test_sanitizers.py | Implemented + Tested (not tracked per vulnerability kind) |
 | R61 | Retry a failed source audit (clean slate, same authorization) | BRIEF §34 (recovery) | api/audits.py, services/audit_service.py, tests/test_audits.py | Implemented + Tested |
 | R62 | Accessible form fields (hint described-by, not in the label) | WCAG 1.3.1 / 4.1.2 | frontend/components/ui.tsx, e2e exact-label locators | Implemented + Tested |
+| R63 | Source reconnaissance (application model): technologies, inputs, outbound hosts, env vars | ADR-015 (static counterpart of SPEC reconnaissance) | backend/app/analysis/recon.py, tests/test_recon_validation.py, report sections 6-7, audit page | Implemented + Tested. **Does not satisfy live reconnaissance (R7), which stays Deferred** |
+| R64 | Rule-based finding validation (test/example/dev-only code reclassified as informational) | ADR-015 | backend/app/analysis/validation.py, tests/test_recon_validation.py | Implemented + Tested. **Does not satisfy Safe Validation (R11), which stays Deferred** |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted.

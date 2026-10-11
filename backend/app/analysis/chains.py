@@ -14,7 +14,7 @@ import re
 from collections import defaultdict
 
 from app.analysis.routes import Route
-from app.core.enums import Severity
+from app.core.enums import FindingStatus, Severity
 from app.schemas.report import AttackChain, ChainMember, ReportFinding, type_label
 
 _LOCATION = re.compile(r"^(?P<file>.*):(?P<line>\d+)$")
@@ -71,6 +71,7 @@ class _RouteIndex:
 
 
 def find_chains(findings: list[ReportFinding], routes: list[Route]) -> list[AttackChain]:
+    findings = [f for f in findings if f.status is not FindingStatus.INFORMATIONAL]
     index = _RouteIndex(routes)
     chains: list[AttackChain] = []
     seen: set[tuple[str, ...]] = set()

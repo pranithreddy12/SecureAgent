@@ -76,6 +76,8 @@ export interface AuditDetail extends Audit {
   finding_counts: Partial<Record<Severity, number>>;
   total_findings: number;
   attack_chains: AttackChain[];
+  application_model: Record<string, string[]>;
+  validation_notes: string[];
 }
 
 export interface Finding {

@@ -123,6 +123,8 @@ async def get_audit(audit_id: uuid.UUID, db: DbSession, user: CurrentUser):
     detail = AuditDetail.model_validate(audit)
     detail.finding_counts = counts
     detail.total_findings = sum(counts.values())
+    detail.application_model = (audit.stage_state or {}).get("application_model", {})
+    detail.validation_notes = (audit.stage_state or {}).get("validation_notes", [])
     detail.attack_chains = [
         AttackChain.model_validate(c) for c in (audit.stage_state or {}).get("attack_chains", [])
     ]

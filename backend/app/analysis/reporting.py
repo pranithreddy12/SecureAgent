@@ -9,7 +9,9 @@ from datetime import UTC, datetime
 
 from app.analysis.authz_matrix import build_matrix
 from app.analysis.chains import find_chains
+from app.analysis.routes import PRIVILEGED_PATH
 from app.analysis.scanner import ScanResult
+from app.analysis.validation import validate_findings
 from app.core.enums import FindingStatus, Severity
 from app.schemas.report import (
     CvssScore,
@@ -304,7 +306,17 @@ def scan_to_report_context(
     findings += [_sink_finding(f) for f in result.ordered_sink_findings]
     findings += [_route_finding(f) for f in result.ordered_route_findings]
 
+    findings, validation = validate_findings(findings)
     endpoints = sorted({f"{r.method} {r.path}" for r in result.routes})
+    model = result.app_model
+    interesting = sorted(
+        {f"{r.method} {r.path}" for r in result.routes if PRIVILEGED_PATH.search(r.path)}
+    )
+    validation_notes = [
+        f"{n} finding(s) reclassified as informational by rule '{rule}' "
+        "(see each finding's reason)."
+        for rule, n in sorted(validation.items())
+    ]
     limitations = [
         "Static source analysis only; no live target was tested in this report.",
         "Authorization may be enforced by global middleware this analyser cannot observe, "
@@ -339,10 +351,17 @@ def scan_to_report_context(
             "Security misconfiguration detection (debug, CORS, JWT, CSRF, autoescape)",
             "Logging & monitoring checks (sensitive data in logs, swallowed exceptions)",
             "Route and authorization extraction",
-            "Business-logic checks (client-trusted values, mass assignment)",
+            "Business-logic checks (client-trusted values, mass assignment, workflow order)",
+            "Source reconnaissance: technologies, inputs, outbound hosts, environment variables",
+            "Rule-based validation: test/example/dev-only findings reclassified as informational",
         ],
-        technologies=sorted({d.ecosystem for d in result.dependencies}),
+        technologies=sorted({d.ecosystem for d in result.dependencies} | model.technologies),
         endpoints=endpoints,
+        parameters=sorted(model.parameters),
+        interesting_paths=interesting,
+        outbound_hosts=sorted(model.outbound_hosts),
+        environment_variables=sorted(model.env_vars),
+        validation_notes=validation_notes,
         findings=findings,
         attack_chains=find_chains(findings, result.routes),
         authorization_matrix=_matrix_view(result),

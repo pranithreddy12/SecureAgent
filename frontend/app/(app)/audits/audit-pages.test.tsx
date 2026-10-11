@@ -48,6 +48,8 @@ const base: AuditDetail = {
   finding_counts: { high: 1 },
   total_findings: 1,
   attack_chains: [],
+  application_model: {},
+  validation_notes: [],
 };
 
 const finding: Finding = {
@@ -87,6 +89,19 @@ describe("AuditDetailPage", () => {
     expect(screen.getByText("View report")).toHaveAttribute("href", "/api/audits/audit-1/report");
     expect(screen.getByText(/no specific CVE/)).toBeInTheDocument();
     expect(screen.getByText(/CVSS not determined/)).toBeInTheDocument();
+  });
+
+  it("shows the static reconnaissance model and the validation notes", async () => {
+    service.get.mockResolvedValue({
+      ...base,
+      application_model: { technologies: ["Flask"], parameters: ["query:q", "path:order_id"] },
+      validation_notes: ["2 finding(s) reclassified as informational by rule 'test_or_example_code'."],
+    });
+    render(<AuditDetailPage />);
+    expect(await screen.findByText("Source reconnaissance")).toBeInTheDocument();
+    expect(screen.getByText("query:q, path:order_id")).toBeInTheDocument();
+    expect(screen.getByText(/no running\s+system was contacted/)).toBeInTheDocument();
+    expect(screen.getByText(/reclassified as informational/)).toBeInTheDocument();
   });
 
   it("renders attack chains with their fix-first advice and assumptions", async () => {

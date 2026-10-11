@@ -28,6 +28,7 @@ from app.analysis.intent import (
 from app.analysis.logging_checks import LoggingFinding, scan_logging
 from app.analysis.misconfig import MisconfigFinding, scan_misconfig
 from app.analysis.osv import OsvClient, OsvError, Vuln
+from app.analysis.recon import ApplicationModel
 from app.analysis.routes import Route, RouteFinding, extract_routes, route_findings
 from app.analysis.secrets import SecretFinding
 from app.analysis.sinks import SinkFinding, scan_sinks
@@ -80,6 +81,7 @@ class ScanResult:
     logic_findings: list[LogicFinding] = field(default_factory=list)
     intent_rules: int = 0  # developer intent rules evaluated (0 = no spec supplied)
     superseded: int = 0  # generic unguarded-route findings replaced by a more specific one
+    app_model: ApplicationModel = field(default_factory=ApplicationModel)
     dependencies: list[Dependency] = field(default_factory=list)
     dependency_findings: list[DependencyFinding] = field(default_factory=list)
     osv_note: str | None = None
@@ -227,6 +229,7 @@ def scan_repo(
         if marked:
             ignored_lines[file.relpath] = marked
         result.secret_findings.extend(secrets.scan_text(file.relpath, text))
+        result.app_model.absorb_file(file.relpath, text)
         result.routes.extend(extract_routes(file.relpath, text))
         result.sink_findings.extend(scan_sinks(file.relpath, text))
         result.idor_findings.extend(analyze_access_control(file.relpath, text))
@@ -242,6 +245,10 @@ def scan_repo(
     # Taint runs once over the whole project so flow can cross files.
     result.taint_findings = analyze_taint_project(taint_sources)
     result.route_findings = route_findings(result.routes)
+    for route in result.routes:
+        result.app_model.absorb_route_path(route.path)
+    for dep in result.dependencies:
+        result.app_model.absorb_dependency(dep.name)
     result.logic_findings.extend(authz_outliers(result.routes))
     result.logic_findings.extend(evaluate_intent(rules, result.routes, result.idor_findings))
     _dedupe_sinks_superseded_by_taint(result)

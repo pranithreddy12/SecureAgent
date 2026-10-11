@@ -51,6 +51,8 @@ class AuditDetail(AuditOut):
     finding_counts: dict[str, int] = {}
     total_findings: int = 0
     attack_chains: list[AttackChain] = []
+    application_model: dict[str, list[str]] = {}
+    validation_notes: list[str] = []
 
 
 class FindingOut(BaseModel):

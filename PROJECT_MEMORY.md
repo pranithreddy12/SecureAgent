@@ -356,6 +356,11 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 **Next (owner):** provide the PPT for the pending SPECIFICATION sections (LICENSE: MIT, done). Resuming the live
 pipeline (Option 2) needs the two target-management files. See `docs/PROJECT_CLOSEOUT.md` §5-6.
 
+**Static reconnaissance + rule-based validation (2026-10-11, ADR-015):** `analysis/recon.py` (application
+model) and `analysis/validation.py` (test/example/dev-only findings -> informational). They are the in-scope
+static counterparts of criteria 10/14 and explicitly do **not** satisfy them (live recon / safe validation stay
+deferred).
+
 **Post-close-out polish (2026-10-11):** CVSS v3 scoring from advisory vectors, sanitizer modelling, matrix
 refinement, audit retry, accessible form fields (see `PROJECT_CHANGELOG.md`). Tally now 15 done, 2 source-only,
 7 partial, 4 not built.

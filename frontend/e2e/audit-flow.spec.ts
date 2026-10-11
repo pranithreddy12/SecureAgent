@@ -73,6 +73,10 @@ test.describe("register, audit and review", () => {
     await page.getByText(/reachable without authentication/).first().click();
     await expect(page.getByText("Fix first:").first()).toBeVisible();
 
+    // Static reconnaissance model is shown and says no live system was contacted.
+    await expect(page.getByText("Source reconnaissance")).toBeVisible();
+    await expect(page.getByText(/no running\s+system was contacted/)).toBeVisible();
+
     // Activity log shows the staged run.
     await expect(page.getByText(/scan_completed/)).toBeVisible();
 

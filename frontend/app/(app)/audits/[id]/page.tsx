@@ -153,6 +153,37 @@ export default function AuditDetailPage() {
         </Card>
       )}
 
+      {Object.values(audit.application_model).some((v) => v.length > 0) && (
+        <Card title="Source reconnaissance">
+          <p className="mb-3 text-xs text-muted">
+            What the code reveals about the application. Read from source files only; no running
+            system was contacted.
+          </p>
+          <dl className="flex flex-col gap-2 text-sm">
+            {[
+              ["technologies", "Technologies"],
+              ["parameters", "Inputs read"],
+              ["outbound_hosts", "Outbound hosts"],
+              ["environment_variables", "Environment variables"],
+            ].map(([key, label]) =>
+              (audit.application_model[key] ?? []).length > 0 ? (
+                <div key={key}>
+                  <dt className="text-xs uppercase text-muted">{label}</dt>
+                  <dd className="font-mono text-xs">{audit.application_model[key].join(", ")}</dd>
+                </div>
+              ) : null,
+            )}
+          </dl>
+          {audit.validation_notes.length > 0 && (
+            <ul className="mt-3 list-disc pl-5 text-xs text-muted">
+              {audit.validation_notes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
       {audit.attack_chains.length > 0 && (
         <Card title={`Attack chains (${audit.attack_chains.length})`}>
           <p className="mb-3 text-xs text-muted">

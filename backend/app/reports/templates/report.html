@@ -144,6 +144,9 @@
   <div class="stat"><b>{{ r.forms | length }}</b>Forms</div>
   <div class="stat"><b>{{ r.parameters | length }}</b>Parameters</div>
 </div>
+{% if r.parameters %}<h3>Inputs read by the application</h3><p class="small">{% for p in r.parameters %}<code>{{ p }}</code>{{ ", " if not loop.last else "" }}{% endfor %}</p>{% endif %}
+{% if r.outbound_hosts %}<h3>Outbound hosts referenced in code</h3><p class="small">{% for h in r.outbound_hosts %}<code>{{ h }}</code>{{ ", " if not loop.last else "" }}{% endfor %}</p>{% endif %}
+{% if r.environment_variables %}<h3>Environment variables read</h3><p class="small">{% for v in r.environment_variables %}<code>{{ v }}</code>{{ ", " if not loop.last else "" }}{% endfor %}</p>{% endif %}
 {% if r.authorization_matrix %}
 <h3>Authorization matrix</h3>
 <p class="muted small">Routes grouped by resource. &ldquo;open&rdquo; means no authorization guard was detected statically; global middleware cannot be seen.</p>

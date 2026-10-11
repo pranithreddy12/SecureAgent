@@ -169,6 +169,9 @@ class ReportContext(BaseModel):
     interesting_paths: list[str] = []
     findings: list[ReportFinding] = []
     attack_chains: list[AttackChain] = []
+    outbound_hosts: list[str] = []
+    environment_variables: list[str] = []
+    validation_notes: list[str] = []
     authorization_matrix: list[MatrixGroupView] = []
     limitations: list[str] = []
     timeline: list[TimelineEntry] = []
@@ -193,9 +196,15 @@ class ReportContext(BaseModel):
     @property
     def risk_rating(self) -> str:
         """Highest severity among reportable findings (never inflated beyond the evidence)."""
-        counts = self.severity_counts
+        # Findings reclassified as informational (test/example code, dev-only config) describe
+        # no production risk, so they do not drive the overall rating.
+        live = {
+            f.severity
+            for f in self.reportable_findings
+            if f.status is not FindingStatus.INFORMATIONAL
+        }
         for sev in SEVERITY_ORDER:
-            if counts[sev]:
+            if sev in live:
                 return RISK_LABELS[sev]
         return "None identified"
 

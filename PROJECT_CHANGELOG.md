@@ -776,3 +776,21 @@ Append-only. Never rewrite past entries.
 - `Field` component: hint is `aria-describedby`, not part of the label (screen readers announced
   "Password At least 10 characters"); verified by exact-label Playwright locators.
 - Benchmark corpus: 35 TP / 1 FP / 2 FN = 97% precision, 95% recall (was 94% / 94%).
+
+## 2026-10-11 (Static reconnaissance and rule-based validation -- ADR-015)
+
+### Added
+- `app/analysis/recon.py`: application model (technologies, inputs read, outbound hosts, environment
+  variables) from source only; report sections 6-7, `scan --recon`, JSON `application_model`, MCP
+  `application_model`, audit-page card ("no running system was contacted").
+- `app/analysis/validation.py`: findings in test/fixture/example code or dev-only debug config become
+  `informational` (reason recorded, confidence halved). They no longer drive the risk rating, attack chains
+  or `--fail-on`. Never promotes to `confirmed`, never deletes.
+- 11 new tests; audit API returns `application_model` and `validation_notes`.
+
+### Decisions
+- Requested "run reconnaissance" / "safely validate findings" mean *live* probing, which needs the target
+  authorization gate that is not part of the delivered scope (ADR-014); not built. The static counterparts
+  are named as such and criteria 10 and 14 are **not** marked met.
+- A "two detectors agree => likely" rule was rejected: detectors share inputs, so agreement is not
+  independent evidence.

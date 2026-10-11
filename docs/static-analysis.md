@@ -103,6 +103,15 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
 
+## Source reconnaissance and rule-based validation
+
+- **Source reconnaissance** (`recon.py`, ADR-015): technologies, inputs read, outbound hosts, environment
+  variables and privileged routes, from source files only (`scan --recon`, report sections 6-7, MCP
+  `application_model`). It never contacts a running system; it is *not* live reconnaissance.
+- **Rule-based validation** (`validation.py`): findings in test/fixture/example code, or a debug flag in a
+  development-only config file, become `informational` with the reason recorded. They no longer drive the
+  risk rating, form chains or fail `--fail-on`. It cannot confirm exploitability and never promotes a finding.
+
 ## Sanitizers and CVSS
 
 - **Sanitizer modelling (taint).** `int/float/bool/Decimal/UUID/len/ord`, `shlex.quote`, `secure_filename`,

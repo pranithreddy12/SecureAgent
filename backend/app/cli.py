@@ -22,6 +22,7 @@ from dataclasses import asdict
 from app.analysis.ingest import IngestError
 from app.analysis.intent import IntentError
 from app.analysis.scanner import ScanResult, scan_repo
+from app.core.enums import FindingStatus
 
 _COLORS = {
     "critical": "\033[1;31m",
@@ -214,6 +215,7 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
             for f in result.ordered_logic_findings
         ],
         "intent_rules_evaluated": result.intent_rules,
+        "application_model": result.app_model.summary(),
         "attack_chains": [
             c.model_dump(mode="json") for c in scan_to_report_context(result).attack_chains
         ],
@@ -363,6 +365,21 @@ def _run_benchmark(args) -> int:
     return 0
 
 
+def _render_recon(result: ScanResult) -> str:
+    model = result.app_model.summary()
+    labels = {
+        "technologies": "Technologies",
+        "parameters": "Inputs read",
+        "outbound_hosts": "Outbound hosts",
+        "environment_variables": "Environment variables",
+    }
+    lines = ["Source reconnaissance (static; no live system was contacted):"]
+    for key, label in labels.items():
+        values = model[key]
+        lines.append(f"  {label} ({len(values)}): " + (", ".join(values) if values else "none"))
+    return "\n".join(lines)
+
+
 def _render_matrix(result: ScanResult) -> str:
     from app.analysis.authz_matrix import build_matrix
 
@@ -484,6 +501,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit non-zero only if a new finding at or above this severity remains.",
     )
     scan.add_argument(
+        "--recon",
+        action="store_true",
+        help="Also print the source reconnaissance model (technologies, inputs, hosts, env vars).",
+    )
+    scan.add_argument(
         "--matrix",
         action="store_true",
         help="Also print the authorization matrix (route x guard, grouped by resource).",
@@ -568,6 +590,8 @@ def main(argv: list[str] | None = None) -> int:
             report += f"\nBaseline: {suppressed} suppressed, {len(new_items)} new."
         if args.matrix:
             report += "\n\n" + _render_matrix(result)
+        if args.recon:
+            report += "\n\n" + _render_recon(result)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:
@@ -583,7 +607,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: could not render report: {exc}", file=sys.stderr)
             return 2
 
-    gating = new_items if args.baseline else items
+    # Findings reclassified as informational (test/example/dev-only code) never fail a gate.
+    gating = [
+        (fp, f)
+        for fp, f in (new_items if args.baseline else items)
+        if f.status is not FindingStatus.INFORMATIONAL
+    ]
     if args.fail_on:
         failed = any(fails_threshold(f.severity.value, args.fail_on) for _, f in gating)
     else:

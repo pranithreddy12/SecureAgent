@@ -82,6 +82,19 @@ TOOLS = [
         },
     },
     {
+        "name": "application_model",
+        "description": (
+            "Static reconnaissance of a source directory: technologies, inputs read (query/body/"
+            "path/header/cookie names), outbound hosts and environment variables. Reads files "
+            "only; never contacts a running system."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+    },
+    {
         "name": "authorization_matrix",
         "description": "Route x guard grid for a source directory, grouped by resource.",
         "inputSchema": {
@@ -257,10 +270,26 @@ def tool_suggest_fixes(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def tool_application_model(args: dict[str, Any]) -> dict[str, Any]:
+    from app.analysis.scanner import scan_repo
+
+    root = confine(str(args.get("path", "")))
+    if not root.is_dir():
+        raise ToolError(f"not a directory: {root}")
+    result = scan_repo(str(root), check_osv=False)
+    return {
+        **result.app_model.summary(),
+        "routes": len(result.routes),
+        "guarded_routes": sum(1 for r in result.routes if r.protected),
+        "note": "Static model from source files; no running system was contacted.",
+    }
+
+
 HANDLERS = {
     "scan_snippet": tool_scan_snippet,
     "scan_path": tool_scan_path,
     "suggest_fixes": tool_suggest_fixes,
+    "application_model": tool_application_model,
     "authorization_matrix": tool_authorization_matrix,
 }
 

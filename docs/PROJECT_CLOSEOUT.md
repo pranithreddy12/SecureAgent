@@ -2,8 +2,8 @@
 
 Date: 2026-10-11 · Repository: `main` (CI green on all four jobs: backend, frontend, self-scan, end-to-end)
 
-Evidence at close-out: **379 backend tests pass (1 skipped: PDF, which CI runs), 93% line coverage ·
-25 frontend unit tests · 6 Playwright browser tests · 14 ADRs · detector benchmark 97% precision / 95%
+Evidence at close-out: **386 backend tests pass (1 skipped: PDF, which CI runs), 93% line coverage ·
+26 frontend unit tests · 6 Playwright browser tests · 15 ADRs · detector benchmark 97% precision / 95%
 recall on the bundled corpus · self-scan clean (0 new findings; 1 accepted advisory)**.
 
 **Decision (2026-10-11): the owner chose Option 1 (§6) -- the project is closed as a grey-box static
@@ -36,12 +36,12 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | 7 | Validate target scope | ⛔ | Blocked (`target_validation.py`). Source paths are confined to `SOURCE_ROOTS`, which is not target scope |
 | 8 | Start an audit | ✅s | `POST /api/audits/source`, `/audits` UI (ADR-011) |
 | 9 | See audit progress | ✅s | Persisted stages, polling UI, activity log |
-| 10 | Run reconnaissance | ⛔ | Not built (live). Static route extraction exists (see 11) |
+| 10 | Run reconnaissance | ⛔ | **Live** reconnaissance not built (needs the target gate, ADR-014). A *static* source reconnaissance / application model exists (ADR-015) and is not counted as meeting this |
 | 11 | Discover endpoints | ◐ | Static route discovery in 5 frameworks + authorization matrix; no live crawling |
 | 12 | Run vulnerability scanning | ◐ | Static engine ✅; ZAP/Nuclei ⛔ |
 | 13 | Produce potential findings | ✅ | All detectors; honest statuses (never `confirmed` from static analysis) |
-| 14 | Safely validate findings | ⛔ | Safe Validation agent not built (ADR-003 design only). *Fix* verification exists (ADR-013) but is a different thing |
-| 15 | Reduce false positives | ◐ | Heuristic status/confidence, de-duplication, suppression, baseline, measured benchmark; no Validator agent |
+| 14 | Safely validate findings | ⛔ | Safe Validation (against a running target) not built (ADR-003 design only). Rule-based reclassification of test/dev-only findings (ADR-015) and fix verification (ADR-013) exist but are different things |
+| 15 | Reduce false positives | ◐ | Heuristic status/confidence, de-duplication, suppression, baseline, sanitizer modelling, rule-based validation (ADR-015), measured benchmark; no dynamic Validator |
 | 16 | Assign severity | ✅ | Per detector; chains never exceed their worst member |
 | 17 | Map OWASP/CWE | ✅ | Every finding carries OWASP category + CWE |
 | 18 | CVE/CVSS where appropriate | ✅ | CVE only from real OSV advisories; CVSS computed from the advisory's own v3 vector (real `braces` check: 7.5, matching the published score); no vector -> "not determined" |
@@ -54,7 +54,7 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | 25 | Run automated tests | ✅ | pytest + Vitest + Playwright, all in CI |
 | 26 | Run through Docker Compose | ◐ | Stack runs and is e2e-tested; ZAP/juice-shop defined but unused, Nuclei not in the image |
 | 27 | Recover from a failed audit stage | ◐ | Failures are recorded; interrupted audits are marked failed; **a failed audit can be retried** (clean slate, same authorization). No stage-level resume |
-| 28 | Preserve context across sessions | ✅ | Memory, changelog, 14 ADRs, traceability R1-R62, this close-out |
+| 28 | Preserve context across sessions | ✅ | Memory, changelog, 15 ADRs, traceability R1-R64, this close-out |
 
 **Tally: ✅ 15 · ✅s 2 · ◐ 7 · ⛔ 4** (28). At the 2026-10-09 close-out it was ✅ 11 · ◐ 8 · ⛔ 9.
 
