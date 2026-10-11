@@ -1,50 +1,11 @@
-# SecureAgent – Multi-Agent AI Application Security Auditor
+# SecureAgent – Application Security Auditor
 
 SecureAgent helps developers find and fix vulnerabilities in **their own** applications —
 including the logic flaws that pattern-matching scanners miss — before an attacker does.
+It reads your source (it never executes it), explains *why* each finding was flagged, correlates
+findings into attack chains, proposes verified fixes, and reports honestly.
 
 > **Use only on systems and source code you own or are explicitly authorized to test.**
-
-## Project status (honest summary)
-
-**Delivered as a grey-box static security auditor** (owner decision, ADR-014). The live-target
-multi-agent pipeline described in the original brief is designed but deliberately **not** part of what is
-delivered.
-
-| Part | State |
-|---|---|
-| **Static analysis engine + CLI** (`secureagent`) | ✅ Built, tested, usable on real repositories |
-| Reports (HTML / PDF / JSON / SARIF), CI baseline & gating, demo | ✅ Built, tested |
-| Authentication, PostgreSQL schema + migrations, Docker Compose, frontend login/dashboard shell | ✅ Built, tested |
-| **Source audits in the web app**: register a project, confirm authorization, run a LangGraph pipeline (deterministic stages + two opt-in AI stages) (reconnaissance, scanner, fix verification, validator, correlation, report), live progress, findings, activity log, history, resume from a failed stage, HTML/PDF report | ✅ Built, tested, verified end to end in Docker (ADR-011, ADR-016) |
-| MCP server (`secureagent-mcp`), accuracy benchmark, business-logic + workflow-order detectors, authorization matrix, attack chains, verified fix patches | ✅ Built, tested |
-| **Live audit pipeline**: targets, live-target authorization, reconnaissance, OWASP ZAP, Nuclei, safe validation, validator, LangGraph orchestration | ⛔ **Designed but not implemented** — blocked on target management (see below) |
-
-The multi-agent live-audit architecture from the project specification is fully designed
-(`docs/agent-workflow.md`, `docs/security-model.md`, ADR-001/003/005/008) but its first
-prerequisite — target management with the network-safety validator — has not been built.
-`docs/target-management-implementation.md` is the hand-off specification for those two files.
-Nothing in this repository claims otherwise. See [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md)
-for the complete status against the original requirements (28 criteria: 15 done, 2 done for source
-audits only, 7 partial, 4 not built).
-
-## What the scanner finds
-
-`secureagent scan` is read-only static analysis (it never executes the scanned code):
-
-- **Hardcoded secrets** — provider keys and high-entropy credentials (always redacted).
-- **Vulnerable dependencies** — lockfiles checked against the public [OSV](https://osv.dev) database.
-- **Injection by data flow** — untrusted input reaching SQL/command/code/SSRF/path/redirect sinks,
-  across helper functions, return values and files (Python), plus a JavaScript/TypeScript heuristic.
-- **Broken access control** — IDOR / missing ownership checks, endpoints with no visible
-  authorization (FastAPI, Flask, Django/DRF, Express, NestJS).
-- **Dangerous code** — insecure deserialization, `shell=True`, `eval`, weak hashing, disabled TLS, XXE.
-- **Misconfiguration** — debug mode, wildcard CORS, JWT verification off, CSRF off, insecure cookies.
-- **Logging failures** — secrets in logs, swallowed exceptions.
-
-Findings are honest: static analysis alone is never reported as `confirmed`; heuristic ones say
-so; CVE/CVSS values are shown only from real advisory data. Coverage maps to OWASP Top 10
-A01–A03 and A05–A10 (A04 partially). Details and limits: [docs/static-analysis.md](docs/static-analysis.md).
 
 ## Try it on your own project (two commands)
 
@@ -56,121 +17,128 @@ pip install "git+https://github.com/pranithreddy12/SecureAgent.git#subdirectory=
 cd /path/to/your/project && secureagent
 ```
 
-That scans the current directory (read-only, nothing is executed) and **opens the HTML report in your
-browser**. `secureagent PATH` does the same for another folder. Without installing anything permanently:
-`pipx run --spec "git+https://github.com/pranithreddy12/SecureAgent.git#subdirectory=backend" secureagent .`
+That scans the current directory (read-only) and **opens the HTML report in your browser**.
+`secureagent PATH` does the same for another folder. Needs Python 3.12+; no database, no Docker.
+The report is written to your temp directory, not into your project.
 
-Needs Python 3.12+. The report is written to your temp directory (not into your project). Use
-`secureagent scan --help` for output formats, CI gating and suppression.
+## What it is (and is not)
 
-## Quick start (development)
+**Delivered as a grey-box static security auditor** (owner decision, ADR-014): a deterministic engine
+plus optional, advisory AI layers. The original brief's *live-target* pipeline (URL targets, live
+reconnaissance, OWASP ZAP, Nuclei, exploit-style validation) is designed but deliberately **not** built.
+The complete inventory, with evidence and limits, is in [docs/OVERVIEW.md](docs/OVERVIEW.md); the verdict
+against the original 28 acceptance criteria (15 done, 7 done for source audits only, 6 partial, 0 not
+built) is in [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md).
 
-```bash
-cd backend && python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements-dev.txt     # Linux/macOS: .venv/bin/python
-pip install -e .                                                # provides the `secureagent` command
+## What it finds
 
-secureagent demo                              # no setup: scans a bundled, deliberately vulnerable sample app
-secureagent scan /path/to/your/repo           # human-readable
-secureagent scan . --report report.html       # professional report (add --pdf for PDF)
-secureagent scan . --matrix                     # route x guard authorization matrix
-secureagent fix .                             # verified patches as diffs (add --apply to write them)
-secureagent scan . --since origin/main         # only findings NEW compared with a git ref (PR review)
-secureagent suppress . --list                  # every finding with a short id
-secureagent review . --dry-run                 # LLM second opinion: show exactly what would be sent
-ANTHROPIC_API_KEY=... secureagent review . --report ai.html   # opt-in; asks before sending code
-secureagent suppress . --id 3f9a1c0b --reason "cache key only, never a password" --expires 2027-01-01
-secureagent benchmark backend/benchmark/corpus # measured precision/recall on the bundled corpus
-secureagent scan . --format sarif --output secureagent.sarif        # GitHub code scanning
-secureagent scan . --write-baseline .secureagent-baseline.json      # accept today's findings
-secureagent scan . --baseline .secureagent-baseline.json --fail-on high   # CI: fail on NEW high+
-secureagent scan . --exclude "tests/" --no-osv                      # skip paths / work offline
-```
+All static and read-only. Findings are `likely` / `suspicious` / `informational` — static analysis alone is
+never `confirmed`, and CVE/CVSS appear only from real advisory data.
 
-Suppression is never silent: excluded files and `# secureagent: ignore` lines are counted in the
-output. Put patterns in a `.secureagentignore` file at the scan root. See
-[docs/demo-guide.md](docs/demo-guide.md) and [docs/ci/github-actions-example.yml](docs/ci/github-actions-example.yml).
-
-## The web application (current state)
-
-```bash
-cp .env.example .env        # set SECRET_KEY (>= 32 chars), POSTGRES_PASSWORD, ZAP_API_KEY
-docker compose up --build -d      # frontend :3000, backend :8000, postgres
-```
-
-Implemented: register / login / logout / current user (Argon2id + JWT in an httpOnly cookie),
-dashboard with live backend status, settings. Stack: Next.js 16 + React + TypeScript + Tailwind;
-FastAPI + SQLAlchemy 2 + Alembic; PostgreSQL 16. Full instructions: [docs/deployment.md](docs/deployment.md).
-
-## Technology stack
-
-Python 3.12 (3.14 locally) · FastAPI · Pydantic · SQLAlchemy 2 (async) · Alembic · PostgreSQL ·
-Jinja2 + WeasyPrint (reports) · Next.js 16 / React / TypeScript / Tailwind · Docker Compose ·
-OWASP ZAP and Nuclei (deferred; ZAP is behind the `pipeline` compose profile) · LangGraph/LangChain
-(designed, not yet used). Standards: OWASP Top 10, CWE, CVE (via OSV), CVSS (only when supplied).
-
-## Architecture and documentation
-
-| Topic | Document |
+| Area | Examples |
 |---|---|
-| Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) |
-| Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
-| **Close-out audit (what is done, what remains)** | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Architecture, agent workflow, security model | [docs/architecture.md](docs/architecture.md), [docs/agent-workflow.md](docs/agent-workflow.md), [docs/security-model.md](docs/security-model.md) |
-| Business-logic engine design (grey-box) | [docs/business-logic-engine.md](docs/business-logic-engine.md) |
-| UML diagrams (7, matching the code) | [docs/diagrams/](docs/diagrams/) |
-| Database, API | [docs/database.md](docs/database.md), [docs/api.md](docs/api.md) (OpenAPI at `/docs` when running) |
-| Testing, deployment, demo | [docs/testing.md](docs/testing.md), [docs/deployment.md](docs/deployment.md), [docs/demo-guide.md](docs/demo-guide.md) |
+| Secrets | provider keys, hardcoded credentials (always redacted; git-ignored files shown as informational) |
+| Dependencies | known vulnerabilities via OSV, with CVSS v3 computed from the advisory's own vector |
+| Injection | SQL / command / code / SSRF / path traversal / open redirect, by data flow across helpers and files, **with the source→sink path shown** |
+| Access control | IDOR, unguarded routes (FastAPI, Flask, Express, Django/DRF, NestJS), inconsistent guards, **authorization matrix** |
+| Business logic | mass assignment, client-trusted prices/roles, workflow-order gaps, your own rules via an **intent spec** |
+| Correlation | **attack chains**: an unguarded route that reaches an injection, credentialed CORS + CSRF off |
+| Misconfiguration | debug mode, CORS, JWT verification, CSRF, cookies; secrets in logs, swallowed exceptions |
 
-## Agent architecture (designed, deferred -- not part of the delivered scope, ADR-014)
-
-Five agents orchestrated by LangGraph: Reconnaissance, Vulnerability Scanner (ZAP + Nuclei),
-**Safe Validation** (the controlled, non-destructive implementation of the specification's
-"Exploitation Agent"), Validator (false-positive reduction) and Report. The static engine in this
-repository is the working core that the grey-box design (ADR-008) folds into that pipeline.
-
-## Security model
-
-Authorized testing only. The designed controls (authorization gate at API, workflow and tool
-layers; blocking of private/loopback/link-local/metadata targets; scope enforcement; no control
-bypass) are specified in [docs/security-model.md](docs/security-model.md); the **network-level
-ones are part of the unbuilt target-management work**. Implemented: Argon2id password hashing,
-indistinguishable login failures, JWT hardening (alg pinned), ownership-scoped schema, secret
-redaction everywhere, read-only scanning, escaped reports.
-
-## Running the tests
+## The commands
 
 ```bash
-make testdb                      # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q    # 472 tests; ~93% coverage
-cd frontend && npm run lint && npm run typecheck && npm test && npm run build
-cd frontend && npm run e2e           # Playwright against the Docker stack (frontend/e2e/README.md)
+secureagent                                   # scan "." and open the report
+secureagent scan . --report report.html       # report (add --pdf for PDF)
+secureagent scan . --matrix --recon           # route x guard matrix; technologies, inputs, hosts
+secureagent scan . --since origin/main        # only findings NEW compared with a git ref (PR review)
+secureagent scan . --baseline .secureagent-baseline.json --fail-on high   # CI gate on new high+
+secureagent scan . --format sarif --output secureagent.sarif              # GitHub code scanning
+secureagent fix .                             # verified patches as diffs (--apply writes them)
+secureagent suppress . --list                 # findings with short ids
+secureagent suppress . --id 3f9a1c0b --reason "cache key only" --expires 2027-01-01
+secureagent review . --dry-run                # LLM second opinion: show exactly what would be sent
+secureagent demo                              # a labelled, deliberately vulnerable sample app
+secureagent benchmark backend/benchmark/corpus
 ```
+
+Suppression is never silent: excluded files and `# secureagent: ignore` lines are counted in the output;
+justified suppressions live in a reviewable `secureagent-suppressions.json`.
+
+## Use it from Claude Code (MCP)
+
+```bash
+claude mcp add secureagent -- secureagent-mcp
+```
+
+Tools: `scan_snippet` (check code you just wrote), `scan_path`, `scan_diff`, `suggest_fixes`,
+`application_model`, `authorization_matrix`. Read-only, confined to the working directory, offline by default.
+See [docs/mcp.md](docs/mcp.md).
+
+## The web application
+
+```bash
+cp .env.example .env            # set SECRET_KEY (>= 32 chars) and POSTGRES_PASSWORD
+mkdir -p workspace && cp -r /path/to/project workspace/myapp     # mounted read-only at /workspace
+docker compose up --build -d backend frontend                    # http://localhost:3000
+```
+
+Register a project, confirm authorization (append-only, revocable), start an audit, watch the staged
+pipeline (LangGraph; authorization gate → reconnaissance → scanner → fix verification → validator →
+correlation → report, plus two **opt-in** AI stages), and download the HTML/PDF report. Failed audits can be
+retried or resumed from the failed stage. Set `LLM_API_KEY` to offer the optional AI review/summary.
+Details: [docs/deployment.md](docs/deployment.md).
+
+## Honesty and safety model
+
+- Read-only: scanned code is never executed; paths are confined to `SOURCE_ROOTS`.
+- Findings are never `confirmed` by static analysis; chains never exceed their worst member's severity.
+- Secrets are redacted everywhere and never sent to an LLM.
+- AI is **opt-in, consented and advisory**: it cannot change a finding's status, the baseline or the CI gate,
+  and its evidence quote must exist in the code that was sent.
+- Authentication: Argon2id, JWT in an httpOnly cookie, login throttling, owner-scoped data.
 
 ## Known limitations
 
-- The live-target audit pipeline (targets, recon, ZAP/Nuclei, safe validation, LangGraph) and LLM reasoning
-  do not exist yet; the web app runs **source** audits only.
-- Static taint is intraprocedural-plus (within/across files, return values) but does not model
-  sanitizers and resolves cross-file calls heuristically; JS analysis is regex-based.
-- Unprotected-endpoint findings cannot see global middleware, so they are review items.
-- Login throttling and the interrupted-audit sweep are in-process (single API replica). Detector accuracy is
-  measured only on a small author-written corpus.
+- Python is analysed deeply; JavaScript/TypeScript is regex-based and shallower.
+- Global middleware and framework defaults are invisible, so "unguarded" findings are review items.
+- Detector accuracy is measured on an **author-written** corpus (97% / 95%); the first real-project scan had
+  far lower precision, which is why a round of fixes followed (`tests/test_realworld_fp.py`). No independent
+  detection rate or LLM accuracy has been measured yet (`docs/paper/PAPER_PLAN.md`).
+- Web audits read a directory mounted under `SOURCE_ROOTS`; there is no zip upload yet.
+- Login throttling and the interrupted-audit sweep assume a single API replica.
+
+## Tests
+
+```bash
+make testdb                              # throwaway PostgreSQL (needs Docker)
+cd backend && python -m pytest -q        # 470 passed, 2 skipped; ~94% coverage of tracked code
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 36 unit tests
+cd frontend && npm run e2e               # 7 Playwright tests against the Docker stack
+```
+
+CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent scanning itself, and e2e.
+
+## Documentation
+
+| Topic | Document |
+|---|---|
+| **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
+| Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (18 ADRs) |
+| Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
+| Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
+| Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |
+| Accuracy, benchmark, paper plan | [docs/benchmark.md](docs/benchmark.md), [docs/paper/PAPER_PLAN.md](docs/paper/PAPER_PLAN.md) |
+| MCP, deployment, API, testing, demo | [docs/mcp.md](docs/mcp.md), [docs/deployment.md](docs/deployment.md), [docs/api.md](docs/api.md), [docs/testing.md](docs/testing.md), [docs/demo-guide.md](docs/demo-guide.md) |
+| Architecture, security model, UML | [docs/architecture.md](docs/architecture.md), [docs/security-model.md](docs/security-model.md), [docs/diagrams/](docs/diagrams/) |
+
+## Technology
+
+Python 3.12 · FastAPI · Pydantic · SQLAlchemy 2 (async) · Alembic · PostgreSQL · LangGraph · Jinja2 +
+WeasyPrint · Next.js 16 / React / TypeScript / Tailwind · Docker Compose · Vitest · Playwright.
+Standards: OWASP Top 10, CWE, CVE (via OSV), CVSS v3 (computed from published vectors).
 
 ## License
 
-MIT -- see [LICENSE](LICENSE).
-
-## Future improvements
-
-Target management and the audit pipeline; scheduled/continuous audits; SSE progress streaming;
-authenticated scanning with test credentials; deeper dataflow (sanitizer modelling); more languages.
-
-## Academic demonstration
-
-1. `secureagent demo --report demo.html` — a real scan of a deliberately vulnerable fake app, labelled
-   *DEMO / SIMULATED SECURITY AUDIT* (script in [docs/demo-guide.md](docs/demo-guide.md)).
-2. `secureagent scan backend --exclude tests/` — SecureAgent auditing its own backend, including its
-   pinned dependencies against OSV (clean at the time of writing).
-3. Walk the UML in [docs/diagrams/](docs/diagrams/) and the honest status table above.
+MIT — see [LICENSE](LICENSE).

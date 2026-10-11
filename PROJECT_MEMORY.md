@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-11 (final close-out; see docs/PROJECT_CLOSEOUT.md)
+Last updated: 2026-10-12 (inventory of everything built: docs/OVERVIEW.md; verdict: docs/PROJECT_CLOSEOUT.md)
 
 ## 1. Project Identity
 
@@ -193,7 +193,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 17 Testing | 465 backend (93% cov.) + 33 Vitest + 7 Playwright, all in CI |
 | 18 Docker integration | Compose runs and is e2e-tested; ZAP/Nuclei unused |
 | 19 End-to-end | Done for the source-audit journey (Playwright, CI job `e2e`) |
-| 20 Documentation | Done (13 ADRs, UML, guides, traceability R1-R58, close-out) |
+| 20 Documentation | Done (18 ADRs, UML, guides, traceability R1-R69, close-out, OVERVIEW) |
 | Extra: grey-box static engine, CLI, CI gating, SARIF, MCP, benchmark, business-logic detectors, chains, fix patches | Done (scope change 2026-10-03b, ADR-008, 010-013) |
 
 ## 14. Architecture Decisions
@@ -209,6 +209,15 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-007 | Report: Pydantic context → Jinja2 HTML → WeasyPrint PDF | Accepted |
 | ADR-008 | Grey-box: source-code analysis + dev intent for business-logic flaws | Accepted |
 | ADR-009 | Scanner CLI is dependency-light; independent of the web stack | Accepted |
+| ADR-010 | Business-logic detectors and the intent spec | Accepted |
+| ADR-011 | Persisted source audits (no live target) | Accepted |
+| ADR-012 | Attack chains are an interpretation layer; no severity escalation | Accepted |
+| ADR-013 | Verified fix patches | Accepted |
+| ADR-014 | Close as a grey-box static auditor; live pipeline deferred | Accepted |
+| ADR-015 | Static reconnaissance and rule-based validation | Accepted |
+| ADR-016 | Source-only agent pipeline (phases 4-12) | Accepted |
+| ADR-017 | Opt-in LLM review: consented, redacted, evidence-verified | Accepted |
+| ADR-018 | Opt-in AI validator and report-narrative stages | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -313,6 +322,12 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Deep taint/dataflow SAST (CodeQL-class) — ADR-008 takes a lighter structural
   Application Model; full dataflow analysis is future work.
 - More language grammars for Code Intelligence beyond the initial stack(s).
+- **Zip/code upload in the web UI** (proposed, not built): safe extraction (zip-slip, bombs, size and file
+  limits), ephemeral workspace deleted after the audit, per-user quota. Needs an ADR before building.
+- **MCP `explain_finding`** (handler source + resolved helpers) and a UI "mark as false positive" that writes
+  `secureagent-suppressions.json` (proposed, not built).
+- Measure real-world precision/recall on independent projects and the LLM layer's accuracy (paper RQ1-RQ5).
+- Live-target pipeline (ADR-014/015) -- blocked on the owner-supplied target-management files.
 
 ## 21. Lessons Learned
 
@@ -344,6 +359,16 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Scripted doc edits that fail halfway leave docs partly updated; make edit scripts all-or-nothing
   (write only at the end) and re-verify with grep afterwards.
 - Prefer a script file over a long shell heredoc for multi-line edits in this environment.
+- **Shell escaping silently corrupts backslash-bearing source.** Heredocs collapsed `\\` and turned a regex
+  `\b` into a literal backspace, disabling the over-claim filter without any error. Write such code with
+  the file tools and keep a test that proves the filter fires.
+- **Concurrent sessions share one working tree.** Another session's untracked files appeared; a whole-tree
+  `ruff format` touched them. Scope formatters to own paths and commit explicit paths, never `git add -A`.
+- **Author-written benchmarks flatter the detector.** 97%/95% on the corpus; the first real project gave 204
+  findings, mostly false positives. Treat real-world scans as the precision test and keep each fixed class
+  as a regression test.
+- **Deterministic first, LLM advisory.** AI output must be consented, redacted, quote-verified and unable
+  to change status, severity or the gate; advisory stages degrade instead of failing the audit.
 
 ## 22. Current Session Summary
 2026-10-11 final close-out. Work since the 2026-10-09 audit (details in `PROJECT_CHANGELOG.md`):
@@ -390,3 +415,14 @@ deferred).
 **Post-close-out polish (2026-10-11):** CVSS v3 scoring from advisory vectors, sanitizer modelling, matrix
 refinement, audit retry, accessible form fields (see `PROJECT_CHANGELOG.md`). Tally now 15 done, 2 source-only,
 7 partial, 4 not built.
+
+**AI layers and consolidation (2026-10-12, ADR-017/018):** `secureagent review` (CLI) and opt-in `ai_validator` /
+`ai_narrative` pipeline stages (fake transport only; no live call, accuracy unmeasured). Also added: taint paths,
+sanitizer modelling, justified expiring suppressions, git diff mode (`--since`), one-command `secureagent`,
+real-world false-positive fixes, MIT licence, paper plan (`docs/paper/PAPER_PLAN.md`), `docs/OVERVIEW.md`.
+Evidence: 470 backend tests (2 skipped), 36 Vitest, 7 Playwright, 4-job CI, 18 ADRs, traceability R1-R69,
+acceptance criteria 15 done / 7 source-only / 6 partial / 0 not built.
+**Open (owner):** PPT for pending SPECIFICATION sections; first live run of `review`/AI stages; independent
+evaluation for the paper; decision on zip upload / `explain_finding` (see section 20); the untracked files from
+the other session stay untouched.
+

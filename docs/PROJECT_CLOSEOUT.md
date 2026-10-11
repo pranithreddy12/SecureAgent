@@ -66,7 +66,7 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | Trust | Accuracy benchmark with a deliberately imperfect corpus (`docs/benchmark.md`); self-scan caught and fixed 3 false positives in its own code, the benchmark found 2 more gaps |
 | Product | Persisted source audits end to end: API, runner, migration, UI, report download (ADR-011); login throttling; interrupted-audit sweep; admin bootstrap |
 | Developer workflow | MCP server (`scan_snippet`, `scan_path`, `suggest_fixes`, `authorization_matrix`); verified fix patches (ADR-013) |
-| Quality | 346 backend / 24 unit / 6 browser tests; four-job CI |
+| Quality | 470 backend (2 skipped) / 36 unit / 7 browser tests; four-job CI |
 
 ## 4. Bugs the project's own tooling found in its own code
 

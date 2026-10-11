@@ -932,3 +932,15 @@ Every false-positive class was traced to a detector defect and fixed, with regre
 ### Notes
 - Not evaluated: no live provider call, accuracy unmeasured (RQ5). The scanner and authorization gate
   remain deterministic by design.
+
+## 2026-10-12 (documentation consolidation)
+
+### Added
+- `docs/OVERVIEW.md`: single inventory of interfaces, detectors, trust mechanisms, web app, AI features,
+  evidence, non-goals, ADR list and document map.
+
+### Changed
+- `README.md` rewritten for the delivered product (capabilities, commands, MCP, web app, honesty model, real
+  limitations, current test counts). `PROJECT_MEMORY.md`: ADR-010..018 table, future improvements, lessons
+  (shell escaping, concurrent sessions, benchmark optimism, deterministic-first), session summary.
+
