@@ -19,6 +19,7 @@ read from ``ANTHROPIC_API_KEY`` only (never a command-line argument, never logge
 from __future__ import annotations
 
 import ast
+import contextlib
 import hashlib
 import json
 import os
@@ -346,11 +347,10 @@ class Reviewer:
     def save_cache(self) -> None:
         if not self.cache_path:
             return
-        try:
+        # A cache that cannot be written only costs a repeat call.
+        with contextlib.suppress(OSError):
             self.cache_path.parent.mkdir(parents=True, exist_ok=True)
             self.cache_path.write_text(json.dumps(self._cache), encoding="utf-8")
-        except OSError:
-            pass  # a cache that cannot be written only costs a repeat call
 
 
 def default_cache_path() -> Path:
