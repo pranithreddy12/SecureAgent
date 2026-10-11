@@ -4,3 +4,4 @@
 # fixtures. They are not application code and are not reachable at runtime.
 backend/tests/
 backend/benchmark/
+workspace/
