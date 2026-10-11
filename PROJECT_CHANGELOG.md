@@ -594,3 +594,24 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Tools/transport only (no resources, prompts, HTTP). Implemented by hand to keep ADR-009's dependency
   set; the official SDK can be added behind an optional extra if more of the protocol is needed.
+
+## 2026-10-11 (Persisted source audits -- ADR-011)
+
+### Added
+- Source audits: `POST /api/audits/source` (authorization confirmation required, path confined to
+  `SOURCE_ROOTS`), `GET /api/audits`, `/{id}`, `/{id}/findings`, `/{id}/logs`, `/{id}/report`
+  (HTML/PDF; CSP-locked). Per-user ownership (other users get 404).
+- Runner (`services/audit_service.py`): asyncio task, scan in a worker thread, stages persisted in
+  `stage_state`, `audit_logs` with `[AUDIT-id]` logging, generic failure messages (no paths).
+- Migration `b7c1d2e3f4a5`: nullable `target_id`, `audit_type`, source/authorization columns, CHECKs.
+- `SOURCE_ROOTS` setting; docker-compose mounts `./workspace` read-only at `/workspace`.
+- `app/core/paths.py` shared path confinement.
+
+### Fixed (found by scanning the new code with SecureAgent itself)
+- `db.execute(select(...).where(col == tainted))` was reported as SQL injection; SQLAlchemy
+  expressions are parameterised (a nested `text(f"...")` is still flagged).
+- A FastAPI `user: CurrentUser` annotation was not recognised as an auth guard.
+
+### Notes
+- Audits left `running` by a process crash are not recovered yet.
+- Full local suite: 305 passed, 1 skipped (PDF).

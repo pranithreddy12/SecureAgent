@@ -17,15 +17,25 @@ if TYPE_CHECKING:
 
 class SecurityAudit(Base):
     __tablename__ = "security_audits"
-    __table_args__ = (CheckConstraint("progress BETWEEN 0 AND 100", name="progress_range"),)
+    __table_args__ = (
+        CheckConstraint("progress BETWEEN 0 AND 100", name="progress_range"),
+        CheckConstraint("audit_type IN ('live', 'source')", name="audit_type_values"),
+        # A live audit always has a target; a source audit (ADR-011) has none.
+        CheckConstraint("audit_type = 'source' OR target_id IS NOT NULL", name="live_needs_target"),
+    )
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    target_id: Mapped[uuid.UUID] = mapped_column(
+    target_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("targets.id", ondelete="CASCADE"), index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
+    audit_type: Mapped[str] = mapped_column(String(16), default="live", server_default="live")
+    source_label: Mapped[str | None] = mapped_column(String(255))
+    source_path: Mapped[str | None] = mapped_column(String(1024))
+    authorization_statement: Mapped[str | None] = mapped_column(Text)
+    authorized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[AuditStatus] = mapped_column(
         str_enum(AuditStatus, "audit_status"),
         default=AuditStatus.QUEUED,
@@ -42,7 +52,7 @@ class SecurityAudit(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = timestamp_col()
 
-    target: Mapped["Target"] = relationship(back_populates="audits")
+    target: Mapped["Target | None"] = relationship(back_populates="audits")
     recon_result: Mapped["ReconnaissanceResult | None"] = relationship(
         back_populates="audit", cascade="all, delete-orphan", passive_deletes=True
     )

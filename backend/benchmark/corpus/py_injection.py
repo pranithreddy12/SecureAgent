@@ -168,3 +168,16 @@ def s_allowlisted_host():
     if host not in ALLOWED_HOSTS:
         return "denied", 403
     return requests.get("https://" + host).text
+
+
+@app.route("/s/orm_expression")
+def s_orm_expression():
+    # SQLAlchemy binds the value as a parameter; reporting this would be a false positive.
+    name = request.args.get("name")
+    return str(session.execute(select(User).where(User.name == name)).all())
+
+
+@app.route("/v/orm_text")
+def v_orm_text():
+    name = request.args.get("name")
+    return str(session.execute(select(User).where(text(f"name = '{name}'"))).all())  # VULN:sql_injection

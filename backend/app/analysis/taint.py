@@ -349,7 +349,11 @@ def _check_sink(
     kw = {k.arg: k.value for k in call.keywords if k.arg}
     a0 = args[0] if args else None
 
-    if last in {"execute", "executemany", "executescript", "raw"} and _tainted(a0, tainted, ctx):
+    if (
+        last in {"execute", "executemany", "executescript", "raw"}
+        and _tainted(a0, tainted, ctx)
+        and not _is_parameterised_orm_expr(a0, tainted, ctx)
+    ):
         return "sql_injection", name
     if last == "text" and _tainted(a0, tainted, ctx):
         return "sql_injection", name
@@ -382,6 +386,29 @@ def _check_sink(
     ) and _tainted(a0, tainted, ctx):
         return "path_traversal", name
     return None
+
+
+_ORM_ROOTS = {"select", "insert", "update", "delete", "exists", "union", "union_all"}
+_RAW_SQL_BUILDERS = {"text", "literal_column", "literal"}
+
+
+def _is_parameterised_orm_expr(node, tainted: set[str], ctx: _Ctx | None) -> bool:
+    """``select(...).where(col == value)``: SQLAlchemy binds ``value`` as a parameter, so a
+    tainted value inside it is not SQL injection. Raw-SQL builders nested inside (``text(f"..")``)
+    keep the finding."""
+    root = node
+    while isinstance(root, ast.Call) or isinstance(root, ast.Attribute):
+        root = root.func if isinstance(root, ast.Call) else root.value
+    if not (isinstance(root, ast.Name) and root.id in _ORM_ROOTS):
+        return False
+    for sub in ast.walk(node):
+        if (
+            isinstance(sub, ast.Call)
+            and (_dotted(sub.func) or "").rsplit(".", 1)[-1] in _RAW_SQL_BUILDERS
+            and any(_tainted(a, tainted, ctx) for a in sub.args)
+        ):
+            return False
+    return True
 
 
 def _is_http_call(name: str, last: str) -> bool:

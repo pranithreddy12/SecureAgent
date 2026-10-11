@@ -19,7 +19,7 @@ STATE_CHANGING = {"POST", "PUT", "PATCH", "DELETE"}
 
 # Names that indicate an authorization/authentication check is applied.
 AUTH_HINT = re.compile(
-    r"(?i)(auth|login_required|jwt_required|require[_s]?|current_user|permission|"
+    r"(?i)(auth|login_required|jwt_required|require[_s]?|current_?user|permission|"
     r"is_authenticated|verify_token|ensure_|protected|bearer|oauth|admin_required|"
     r"session_required|authenticated|guard|restrict)"
 )

@@ -32,11 +32,21 @@ class Settings(BaseSettings):
     max_crawl_depth: int = Field(3, ge=0)
     requests_per_second: float = Field(5, gt=0)
 
+    # Directories the server may analyse as source audits (ADR-011). Empty = feature disabled.
+    source_roots: Annotated[list[str], NoDecode] = []
+
     allow_private_targets: bool = False
     target_allowlist: Annotated[list[str], NoDecode] = []
 
     demo_mode: bool = False
     reports_dir: str = "reports"
+
+    @field_validator("source_roots", mode="before")
+    @classmethod
+    def _split_roots(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [p.strip() for p in v.split(",") if p.strip()]
+        return v
 
     @field_validator("target_allowlist", mode="before")
     @classmethod

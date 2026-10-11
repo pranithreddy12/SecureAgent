@@ -29,8 +29,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ZAP_URL: http://zap:8080
       REPORTS_DIR: /app/reports
+      SOURCE_ROOTS: /workspace
     volumes:
       - reports:/app/reports
+      # Put the code to audit under ./workspace; it is mounted read-only (ADR-011).
+      - ./workspace:/workspace:ro
     ports:
       - "8000:8000"
     depends_on:
