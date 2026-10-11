@@ -46,7 +46,24 @@ Findings are honest: static analysis alone is never reported as `confirmed`; heu
 so; CVE/CVSS values are shown only from real advisory data. Coverage maps to OWASP Top 10
 A01–A03 and A05–A10 (A04 partially). Details and limits: [docs/static-analysis.md](docs/static-analysis.md).
 
-## Quick start
+## Try it on your own project (two commands)
+
+```bash
+pip install "git+https://github.com/pranithreddy12/SecureAgent.git#subdirectory=backend"
+```
+
+```bash
+cd /path/to/your/project && secureagent
+```
+
+That scans the current directory (read-only, nothing is executed) and **opens the HTML report in your
+browser**. `secureagent PATH` does the same for another folder. Without installing anything permanently:
+`pipx run --spec "git+https://github.com/pranithreddy12/SecureAgent.git#subdirectory=backend" secureagent .`
+
+Needs Python 3.12+. The report is written to your temp directory (not into your project). Use
+`secureagent scan --help` for output formats, CI gating and suppression.
+
+## Quick start (development)
 
 ```bash
 cd backend && python -m venv .venv

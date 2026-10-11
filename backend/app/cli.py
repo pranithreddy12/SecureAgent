@@ -453,6 +453,40 @@ def _write_report(
         print(f"Wrote PDF report to {pdf_path}", file=sys.stderr)
 
 
+def _open_report(result: ScanResult, scanned: str, written: str | None) -> bool:
+    """Render the HTML report (unless --report already did) and open it in the default browser."""
+    import tempfile
+    import webbrowser
+    from pathlib import Path
+
+    path = written
+    if not path:
+        name = Path(scanned).resolve().name or "project"
+        path = os.path.join(tempfile.gettempdir(), f"secureagent-{name}.html")
+        try:
+            _write_report(result, path, None)
+        except (OSError, ImportError) as exc:
+            print(f"error: could not render report: {exc}", file=sys.stderr)
+            return False
+    uri = Path(path).resolve().as_uri()
+    if not webbrowser.open(uri):
+        print(f"Open the report in your browser: {uri}", file=sys.stderr)
+    return True
+
+
+_COMMANDS = {"scan", "demo", "benchmark", "fix", "-h", "--help"}
+
+
+def _expand_shorthand(argv: list[str]) -> list[str]:
+    """``secureagent`` -> scan the current directory and open the report;
+    ``secureagent PATH`` -> scan PATH and open the report. Explicit subcommands are untouched."""
+    if not argv:
+        return ["scan", ".", "--open", "--exit-zero"]
+    if argv[0] not in _COMMANDS and not argv[0].startswith("-"):
+        return ["scan", *argv, "--open", "--exit-zero"]
+    return argv
+
+
 def _force_utf8_output() -> None:
     # Reports use typographic characters; a legacy console (Windows cp1252) would
     # otherwise raise UnicodeEncodeError. Degrade gracefully if reconfigure is absent.
@@ -466,7 +500,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="secureagent", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     scan = sub.add_parser("scan", help="Static scan of a source tree.")
-    scan.add_argument("path", help="Directory to scan (you must be authorized to analyse it).")
+    scan.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Directory to scan (default: the current directory). You must be authorized to "
+        "analyse it.",
+    )
+    scan.add_argument(
+        "--exit-zero",
+        action="store_true",
+        help="Exit 0 even when findings exist (interactive use; CI should gate with --fail-on).",
+    )
+    scan.add_argument(
+        "--open",
+        action="store_true",
+        help="Write the HTML report to a temporary file and open it in your browser.",
+    )
     scan.add_argument("--format", choices=["text", "json", "sarif"], default="text")
     scan.add_argument("--output", help="Write the text/JSON result to this file instead of stdout.")
     scan.add_argument("--report", help="Write a professional HTML report to this path.")
@@ -541,7 +591,7 @@ def main(argv: list[str] | None = None) -> int:
         "--online", action="store_true", help="Also query OSV for the sample's pinned dependencies."
     )
     demo.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_expand_shorthand(sys.argv[1:] if argv is None else argv))
     if args.command == "demo":
         return _run_demo(args)
     if args.command == "benchmark":
@@ -606,6 +656,9 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ImportError) as exc:
             print(f"error: could not render report: {exc}", file=sys.stderr)
             return 2
+    if args.open:
+        if not _open_report(result, args.path, args.report):
+            return 2
 
     # Findings reclassified as informational (test/example/dev-only code) never fail a gate.
     gating = [
@@ -613,6 +666,8 @@ def main(argv: list[str] | None = None) -> int:
         for fp, f in (new_items if args.baseline else items)
         if f.status is not FindingStatus.INFORMATIONAL
     ]
+    if args.exit_zero:
+        return 0
     if args.fail_on:
         failed = any(fails_threshold(f.severity.value, args.fail_on) for _, f in gating)
     else:

@@ -818,3 +818,13 @@ Append-only. Never rewrite past entries.
 ### Notes
 - ZAP (phase 9) and Nuclei (phase 10) have no source-file meaning and are marked not applicable.
 - Concurrent-session incident recorded in PROJECT_MEMORY (untracked files not authored here; not committed).
+
+## 2026-10-11 (Two-command usage)
+
+### Added
+- `secureagent` with no arguments scans the current directory and opens the HTML report in the
+  browser; `secureagent PATH` does the same for another folder. `scan` defaults its path to `.`.
+- `scan --open` (report to a temp file, never into the project) and `--exit-zero` (interactive use; the
+  shorthand implies it so a shell does not show findings as an error). CI still gates with `--fail-on`.
+- README: one-line install straight from GitHub (`pip install git+...#subdirectory=backend`) and a
+  `pipx run` variant; no clone, no Docker, no database.
