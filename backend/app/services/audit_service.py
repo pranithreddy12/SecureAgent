@@ -222,3 +222,22 @@ async def finding_counts(db: AsyncSession, audit_id: uuid.UUID) -> dict[str, int
         .group_by(Vulnerability.severity)
     )
     return {sev.value: n for sev, n in rows.all()}
+
+
+async def fail_interrupted(db: AsyncSession) -> int:
+    """Startup sweep: source audits left queued/running by a dead process can never finish
+    (runner tasks do not survive a restart), so mark them failed instead of showing them forever."""
+    rows = await db.scalars(
+        select(SecurityAudit).where(
+            SecurityAudit.audit_type == "source",
+            SecurityAudit.status.in_([AuditStatus.QUEUED, AuditStatus.RUNNING]),
+        )
+    )
+    audits = list(rows)
+    for audit in audits:
+        audit.status = AuditStatus.FAILED
+        audit.error_message = "Interrupted by a server restart. Start the audit again."
+        audit.completed_at = _utcnow()
+        await _log(db, audit.id, "interrupted", audit.error_message, LogStatus.ERROR)
+    await db.commit()
+    return len(audits)

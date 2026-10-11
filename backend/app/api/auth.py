@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
+from app.core.ratelimit import login_limiter
 from app.core.security import COOKIE_NAME, create_access_token
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenOut, UserOut
 from app.services import user_service
@@ -20,11 +21,24 @@ async def register(data: RegisterRequest, db: DbSession):  # secureagent: ignore
 
 # Public by design: this is how a caller obtains a session.
 @router.post("/login", response_model=TokenOut)
-async def login(data: LoginRequest, response: Response, db: DbSession):  # secureagent: ignore
+async def login(
+    data: LoginRequest, request: Request, response: Response, db: DbSession
+):  # secureagent: ignore
+    client = request.client.host if request.client else "unknown"
+    key = f"{client}|{data.email.lower()}"
+    wait = login_limiter.retry_after(key)
+    if wait:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many failed sign-in attempts. Try again later.",
+            headers={"Retry-After": str(wait)},
+        )
     user = await user_service.authenticate(db, data.email, data.password)
     if user is None:
+        login_limiter.record_failure(key)
         # Same message for unknown email and wrong password (no account enumeration).
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+    login_limiter.reset(key)
     settings = get_settings()
     token = create_access_token(user.id)
     response.set_cookie(

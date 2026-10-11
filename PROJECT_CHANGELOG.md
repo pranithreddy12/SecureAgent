@@ -629,3 +629,16 @@ Append-only. Never rewrite past entries.
 - Report finding titles use proper acronyms ("SSRF", "Disabled TLS verification" instead of
   "Ssrf", "Disabled Tls Verification"). Baseline fingerprints include the title, so baselines that
   contain taint or sink findings must be regenerated (`--write-baseline`).
+
+## 2026-10-11 (Hardening: login throttling, interrupted-audit sweep)
+
+### Added
+- `app/core/ratelimit.py`: 5 failed sign-ins per (client address, email) per 15 minutes returns 429 with
+  `Retry-After`; success clears the counter; bounded memory. In-process, so per worker.
+- Startup sweep (`audit_service.fail_interrupted`, run from the app lifespan): source audits left
+  queued/running by a dead process are marked failed ("Interrupted by a server restart").
+- `tests/test_hardening.py` (7 tests).
+
+### Notes
+- The sweep assumes a single API process (as in docker-compose); with several workers a restart of one
+  would fail audits running on another. Per-audit heartbeat/ownership is the upgrade path.
