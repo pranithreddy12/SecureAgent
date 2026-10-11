@@ -14,6 +14,9 @@ export const projectService = {
   revoke: (id: string) => api<AuthorizationEntry>(`/projects/${id}/revoke`, { method: "POST" }),
   remove: (id: string) => api<void>(`/projects/${id}`, { method: "DELETE" }),
   audits: (id: string) => api<Audit[]>(`/projects/${id}/audits`),
-  startAudit: (id: string, exclude: string[]) =>
-    api<Audit>(`/projects/${id}/audits`, { method: "POST", body: JSON.stringify({ exclude }) }),
+  startAudit: (id: string, exclude: string[], aiReview = false) =>
+    api<Audit>(`/projects/${id}/audits`, {
+      method: "POST",
+      body: JSON.stringify({ exclude, ai_review: aiReview }),
+    }),
 };

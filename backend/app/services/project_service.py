@@ -134,6 +134,7 @@ async def start_audit(
         project_id=project.id,
         authorization_statement=latest.statement,
         authorized_at=latest.timestamp,
+        ai_review=data.ai_review,
     )
 
 

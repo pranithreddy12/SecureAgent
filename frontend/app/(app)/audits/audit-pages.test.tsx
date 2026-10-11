@@ -50,6 +50,7 @@ const base: AuditDetail = {
   attack_chains: [],
   application_model: {},
   validation_notes: [],
+  ai: { enabled: false, model: null, reviewed: 0, summary_written: false, problems: [] },
 };
 
 const finding: Finding = {
@@ -71,6 +72,7 @@ const finding: Finding = {
   cvss: null,
   remediation: "Use parameterised queries.",
   sources: [],
+  ai_review: null,
 };
 
 beforeEach(() => {
@@ -102,6 +104,40 @@ describe("AuditDetailPage", () => {
     expect(screen.getByText("query:q, path:order_id")).toBeInTheDocument();
     expect(screen.getByText(/no running\s+system was contacted/)).toBeInTheDocument();
     expect(screen.getByText(/reclassified as informational/)).toBeInTheDocument();
+  });
+
+  it("shows the AI review card and a finding's AI second opinion, labelled as advisory", async () => {
+    service.get.mockResolvedValue({
+      ...base,
+      ai: {
+        enabled: true,
+        model: "claude-x",
+        reviewed: 1,
+        summary_written: true,
+        problems: ["could not reach the API: URLError"],
+      },
+    });
+    service.findings.mockResolvedValue([
+      {
+        ...finding,
+        ai_review: {
+          verdict: "false_positive",
+          confidence: 0.9,
+          reason: "Bound upstream.",
+          quote: "cur.execute(sql, params)",
+          quote_verified: true,
+          model: "claude-x",
+          note: "",
+        },
+      },
+    ]);
+    render(<AuditDetailPage />);
+    expect(await screen.findByText("AI review")).toBeInTheDocument();
+    expect(screen.getByText(/1 finding\(s\) reviewed by claude-x/)).toBeInTheDocument();
+    expect(screen.getByText(/never change a/)).toBeInTheDocument();
+    expect(screen.getByText(/could not reach the API/)).toBeInTheDocument();
+    expect(screen.getByText(/AI second opinion \(claude-x\)/)).toBeInTheDocument();
+    expect(screen.getByText("cur.execute(sql, params)")).toBeInTheDocument();
   });
 
   it("renders attack chains with their fix-first advice and assumptions", async () => {
@@ -198,6 +234,7 @@ describe("AuditsPage", () => {
       label: undefined,
       authorization_confirmed: true,
       exclude: ["tests/*", "*.min.js"],
+      ai_review: false,
     });
   });
 

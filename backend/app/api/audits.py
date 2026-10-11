@@ -81,6 +81,11 @@ async def create_source_audit(
         ) from None
     except audit_service.SourcePathRejected as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+    except audit_service.AIUnavailable:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "AI review is not configured on this server (no LLM_API_KEY).",
+        ) from None
     except audit_service.TooManyActiveAudits:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
@@ -130,6 +135,14 @@ async def get_audit(audit_id: uuid.UUID, db: DbSession, user: CurrentUser):
     detail.finding_counts = counts
     detail.total_findings = sum(counts.values())
     detail.application_model = (audit.stage_state or {}).get("application_model", {})
+    ai = (audit.stage_state or {}).get("ai") or {}
+    detail.ai = {
+        "enabled": bool(ai.get("consent")),
+        "model": ai.get("model"),
+        "reviewed": ai.get("reviewed", 0),
+        "summary_written": bool((ai.get("narrative") or {}).get("text")),
+        "problems": [p for p in (ai.get("validator_problem"), ai.get("summary_problem")) if p],
+    }
     detail.validation_notes = (audit.stage_state or {}).get("validation_notes", [])
     detail.attack_chains = [
         AttackChain.model_validate(c) for c in (audit.stage_state or {}).get("attack_chains", [])
@@ -145,7 +158,12 @@ async def list_findings(audit_id: uuid.UUID, db: DbSession, user: CurrentUser):
         .where(Vulnerability.audit_id == audit_id)
         .order_by(Vulnerability.severity, Vulnerability.endpoint)
     )
-    return list(rows)
+    out = []
+    for row in rows:
+        item = FindingOut.model_validate(row)
+        item.ai_review = (row.validation_result or {}).get("ai_review")
+        out.append(item)
+    return out
 
 
 @router.get("/{audit_id}/logs", response_model=list[LogOut])

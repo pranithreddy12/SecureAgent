@@ -28,6 +28,7 @@ class AuthorizeRequest(BaseModel):
 
 class ProjectAudit(BaseModel):
     exclude: list[str] = Field(default_factory=list, max_length=50)
+    ai_review: bool = False
 
     @field_validator("exclude")
     @classmethod

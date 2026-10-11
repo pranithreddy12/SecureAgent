@@ -112,6 +112,11 @@ async def start_project_audit(
         audit = await project_service.start_audit(db, user, project, data)
     except project_service.ProjectError as exc:
         raise _http(exc) from None
+    except audit_service.AIUnavailable:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "AI review is not configured on this server (no LLM_API_KEY).",
+        ) from None
     except audit_service.TooManyActiveAudits:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,

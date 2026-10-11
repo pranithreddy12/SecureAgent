@@ -78,6 +78,25 @@ export interface AuditDetail extends Audit {
   attack_chains: AttackChain[];
   application_model: Record<string, string[]>;
   validation_notes: string[];
+  ai: AiStatus;
+}
+
+export interface AiStatus {
+  enabled: boolean;
+  model: string | null;
+  reviewed: number;
+  summary_written: boolean;
+  problems: string[];
+}
+
+export interface AiReview {
+  verdict: "true_positive" | "false_positive" | "unclear";
+  confidence: number;
+  reason: string;
+  quote: string;
+  quote_verified: boolean;
+  model: string;
+  note: string;
 }
 
 export interface Finding {
@@ -99,6 +118,7 @@ export interface Finding {
   cvss: { score: number; vector?: string | null; version?: string | null } | null;
   remediation: string | null;
   sources: string[];
+  ai_review: AiReview | null;
 }
 
 export interface AuditLogEntry {
@@ -137,4 +157,5 @@ export interface SourceAuditRequest {
   label?: string;
   authorization_confirmed: boolean;
   exclude: string[];
+  ai_review?: boolean;
 }

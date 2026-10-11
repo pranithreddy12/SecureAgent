@@ -904,3 +904,31 @@ Every false-positive class was traced to a detector defect and fixed, with regre
 - The verdict never changes status, severity, fingerprint, suppression or the CI gate.
 - Not evaluated: a live model call has not been run by the project, and accuracy is unmeasured (RQ5).
 - Stdlib HTTP only; no SDK dependency.
+
+## 2026-10-12 (AI validator and report-narrative stages in the pipeline -- ADR-018)
+
+### Added
+- Two **opt-in** LangGraph stages: `ai_validator` (a quote-verified second opinion on the 15 most severe
+  reviewable findings, stored in `validation_result.ai_review`) and `ai_narrative` (an executive summary
+  written from a **code-free** fact sheet). Pipeline is now `... validator -> ai_validator -> correlation
+  -> ai_narrative -> report`.
+- Per-audit consent (`ai_review: true`; UI checkbox, unticked, shown only when the server has
+  `LLM_API_KEY`); 400 when requested without a server key; consent + timestamp stored and logged.
+- Advisory stages **degrade, never fail the audit**: API/network/key errors, unusable or over-claiming
+  narratives ("confirmed", "exploited", code fences, JSON) and unexpected exceptions are recorded and the
+  deterministic result stands.
+- API: `FindingOut.ai_review`, `AuditDetail.ai` (enabled, model, reviewed, summary_written, problems).
+  Report: AI review block per finding; summary labelled "Written by AI ... authoritative findings below".
+- Frontend: consent checkbox, AI review card, per-finding second opinion, two new timeline stages.
+- Tests: 7 backend (fake transport: skipped unless requested, refusal without key, no authority over
+  status, no secrets/code in payloads, over-claiming narrative falls back, outage degrades, stage bug
+  degrades), 4 frontend; Playwright confirms the consent is not offered without a key.
+
+### Fixed
+- A regex written through a shell escape became a literal backspace (`\x08`) and silently disabled the
+  over-claim filter; found by the test, now covered. (Lesson: backslash-bearing source goes through the
+  file tools, not shell heredocs.)
+
+### Notes
+- Not evaluated: no live provider call, accuracy unmeasured (RQ5). The scanner and authorization gate
+  remain deterministic by design.

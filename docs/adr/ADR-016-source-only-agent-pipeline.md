@@ -34,6 +34,11 @@ LangGraph specifics: a conditional entry edge routes to the first stage without 
 explicitly disabled by default (`LANGCHAIN_TRACING_V2=false`, `LANGSMITH_TRACING=false`) so audit
 data cannot reach a third party through a stray developer environment variable.
 
+## Update (2026-10-12)
+
+Two optional AI stages (`ai_validator`, `ai_narrative`) were added in ADR-018. The stages named above stay
+deterministic; the AI stages are opt-in, advisory and degrade without failing the audit.
+
 ## Not delivered (explicit)
 
 - **Live targets, live reconnaissance, ZAP, Nuclei, exploit-style validation** -- unchanged from

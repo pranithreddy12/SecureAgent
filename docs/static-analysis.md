@@ -129,6 +129,14 @@ never sent. A verdict whose quote is not in the code that was sent is discarded.
 the finding (`--report` writes an HTML report with it) and **never** changes status, baseline or gating.
 Unevaluated: use verdicts as hints.
 
+## AI stages in the web pipeline (opt-in)
+
+Operators set `LLM_API_KEY` (and optionally `LLM_MODEL`); users then see an unticked **AI review** checkbox
+when starting an audit. With it ticked the pipeline adds an AI validator (second opinion per finding, shown
+beside it) and an AI summary (written from titles/counts/locations only, no source). They are advisory:
+they cannot change a finding's status or the gate, and any failure leaves the deterministic report intact.
+See ADR-018. Unevaluated.
+
 ## Real-world calibration
 
 The first independent scan (a developer's own multi-project directory) drove a round of precision fixes

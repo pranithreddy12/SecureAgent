@@ -85,7 +85,7 @@
 
 <h2 id="s1">1. Executive Summary</h2>
 <p>{{ r.executive_summary or r.default_executive_summary() }}</p>
-{% if not r.executive_summary %}<p class="muted">AI narrative unavailable; deterministic summary used.</p>{% endif %}
+{% if not r.executive_summary %}<p class="muted">AI narrative unavailable; deterministic summary used.</p>{% elif r.executive_summary_source %}<p class="muted small">Written by {{ r.executive_summary_source }} from the structured findings only (no source code was used). The findings below are authoritative.</p>{% endif %}
 
 <div class="glance">
   <div><span class="risk risk-{{ r.risk_rating | lower | replace(' ', '-') }}">{{ r.risk_rating }}</span>

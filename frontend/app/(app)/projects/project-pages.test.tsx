@@ -17,6 +17,9 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+const system = vi.hoisted(() => ({ health: vi.fn() }));
+vi.mock("@/services/auth", () => ({ systemService: system, authService: {} }));
+
 const service = vi.hoisted(() => ({
   list: vi.fn(),
   get: vi.fn(),
@@ -50,6 +53,7 @@ beforeEach(() => {
   Object.values(service).forEach((fn) => fn.mockReset());
   service.list.mockResolvedValue([]);
   service.audits.mockResolvedValue([]);
+  system.health.mockResolvedValue({ status: "ok", demo_mode: false, llm_configured: false });
 });
 
 describe("ProjectsPage", () => {
@@ -128,7 +132,26 @@ describe("ProjectPage", () => {
     await userEvent.type(await screen.findByLabelText(/Exclude patterns/), "tests/*, *.min.js");
     await userEvent.click(screen.getByRole("button", { name: /start audit/i }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/audits/audit-9"));
-    expect(service.startAudit).toHaveBeenCalledWith("proj-1", ["tests/*", "*.min.js"]);
+    expect(service.startAudit).toHaveBeenCalledWith("proj-1", ["tests/*", "*.min.js"], false);
+  });
+
+  it("hides the AI consent when the server has no LLM key", async () => {
+    service.get.mockResolvedValue({ ...base, authorization_confirmed: true });
+    render(<ProjectPage />);
+    await screen.findByRole("button", { name: /start audit/i });
+    expect(screen.queryByText(/AI review \(optional\)/)).not.toBeInTheDocument();
+  });
+
+  it("sends ai_review only when the user ticks the consent", async () => {
+    system.health.mockResolvedValue({ status: "ok", demo_mode: false, llm_configured: true });
+    service.get.mockResolvedValue({ ...base, authorization_confirmed: true });
+    service.startAudit.mockResolvedValue({ id: "audit-3" });
+    render(<ProjectPage />);
+    const consent = await screen.findByLabelText(/AI review \(optional\)/);
+    expect(consent).not.toBeChecked(); // never pre-ticked
+    await userEvent.click(consent);
+    await userEvent.click(screen.getByRole("button", { name: /start audit/i }));
+    await waitFor(() => expect(service.startAudit).toHaveBeenCalledWith("proj-1", [], true));
   });
 
   it("surfaces a refused audit (e.g. concurrency limit)", async () => {

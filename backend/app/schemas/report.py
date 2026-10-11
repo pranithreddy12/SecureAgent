@@ -173,6 +173,7 @@ class ReportContext(BaseModel):
     authorization_statement: str
 
     executive_summary: str | None = None
+    executive_summary_source: str | None = None  # e.g. "AI (claude-...)"; None = deterministic
     methodology: list[str] = []
     technologies: list[str] = []
     endpoints: list[str] = []

@@ -417,7 +417,7 @@ def _run_review(args) -> int:
     candidates.sort(key=lambda f: (order.get(f.severity.value, 9), -f.confidence, f.endpoint))
     prepared = []
     for f in candidates[: max(args.limit, 0)]:
-        path = _evidence_path(f.evidence)
+        path = lr.evidence_path(f.evidence)
         context = lr.build_context(args.path, f, path)
         if context is not None:
             prepared.append((f, path, context))
@@ -505,15 +505,6 @@ def _run_review(args) -> int:
         f"Reviewed {len(reviewed)} finding(s). Reminder: verdicts are unverified second opinions."
     )
     return 0
-
-
-def _evidence_path(evidence: str | None) -> tuple[str, ...]:
-    """The taint path steps embedded in a finding's evidence text."""
-    marker = "How the input gets here:"
-    if not evidence or marker not in evidence:
-        return ()
-    steps = evidence.split(marker, 1)[1].strip().splitlines()
-    return tuple(s.strip().split(". ", 1)[-1] for s in steps if s.strip())
 
 
 def _run_suppress(args) -> int:

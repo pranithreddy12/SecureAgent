@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { AuditStatusLabel } from "@/components/badges";
+import { AiConsent } from "@/components/AiConsent";
 import { Button, Card, ErrorMessage, Field } from "@/components/ui";
 import { projectService } from "@/services/projects";
 import type { Audit, ProjectDetail } from "@/types/api";
@@ -15,6 +16,7 @@ export default function ProjectPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [audits, setAudits] = useState<Audit[]>([]);
   const [confirmed, setConfirmed] = useState(false);
+  const [ai, setAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -61,7 +63,7 @@ export default function ProjectPage() {
     setBusy(true);
     setError(null);
     try {
-      const audit = await projectService.startAudit(id, exclude);
+      const audit = await projectService.startAudit(id, exclude, ai);
       router.push(`/audits/${audit.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start the audit");
@@ -142,6 +144,7 @@ export default function ProjectPage() {
             placeholder="tests/*, *.min.js"
             hint="Comma-separated globs of files to skip."
           />
+          <AiConsent checked={ai} onChange={setAi} />
           <Button
             type="submit"
             className="self-start"

@@ -22,7 +22,9 @@ const STAGES = [
   { key: "scanner", label: "Analyse source" },
   { key: "safe_validation", label: "Verify fixes" },
   { key: "validator", label: "Reduce false positives" },
+  { key: "ai_validator", label: "AI review of findings (opt-in)" },
   { key: "correlation", label: "Correlate attack chains" },
+  { key: "ai_narrative", label: "AI summary (opt-in)" },
   { key: "report", label: "Generate report" },
 ];
 
@@ -164,6 +166,26 @@ export default function AuditDetailPage() {
         </Card>
       )}
 
+      {audit.ai.enabled && (
+        <Card title="AI review">
+          <p className="text-sm">
+            {audit.ai.reviewed} finding(s) reviewed by {audit.ai.model ?? "the configured model"};
+            summary {audit.ai.summary_written ? "written by AI" : "not written (deterministic summary used)"}.
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            AI verdicts are unverified second opinions shown beside each finding. They never change a
+            finding&apos;s status, severity or the build gate.
+          </p>
+          {audit.ai.problems.length > 0 && (
+            <ul className="mt-2 list-disc pl-5 text-xs text-warning">
+              {audit.ai.problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
       {Object.values(audit.application_model).some((v) => v.length > 0) && (
         <Card title="Source reconnaissance">
           <p className="mb-3 text-xs text-muted">
@@ -277,6 +299,23 @@ export default function AuditDetailPage() {
                       <p>
                         <span className="font-semibold">Impact: </span>
                         {f.impact}
+                      </p>
+                    )}
+                    {f.ai_review && (
+                      <p className="rounded border border-border p-2 text-xs">
+                        <span className="font-semibold">
+                          AI second opinion ({f.ai_review.model}):{" "}
+                          {f.ai_review.verdict.replace("_", " ")} (
+                          {(f.ai_review.confidence * 100).toFixed(0)}%)
+                        </span>{" "}
+                        {f.ai_review.reason}
+                        {f.ai_review.quote && (
+                          <>
+                            <br />
+                            <code>{f.ai_review.quote}</code>
+                            {!f.ai_review.quote_verified && " (not found in the code that was sent)"}
+                          </>
+                        )}
                       </p>
                     )}
                     {f.evidence && (

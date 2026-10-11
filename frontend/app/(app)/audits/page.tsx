@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { AuditStatusLabel } from "@/components/badges";
+import { AiConsent } from "@/components/AiConsent";
 import { Button, Card, ErrorMessage, Field } from "@/components/ui";
 import { auditService } from "@/services/audits";
 import type { Audit } from "@/types/api";
@@ -20,6 +21,7 @@ export default function AuditsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [ai, setAi] = useState(false);
 
   const load = useCallback(() => {
     auditService.list().then(setAudits, (e) => setListError(e.message));
@@ -42,6 +44,7 @@ export default function AuditsPage() {
         label: String(form.get("label") ?? "").trim() || undefined,
         authorization_confirmed: confirmed,
         exclude,
+        ai_review: ai,
       });
       router.push(`/audits/${audit.id}`);
     } catch (err) {
@@ -85,6 +88,7 @@ export default function AuditsPage() {
             />
             <span>{STATEMENT}</span>
           </label>
+          <AiConsent checked={ai} onChange={setAi} />
           <ErrorMessage message={error} />
           <Button type="submit" disabled={busy || !confirmed} className="self-start">
             {busy ? "Starting…" : "Start audit"}

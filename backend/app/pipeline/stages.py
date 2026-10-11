@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import delete
 
+from app.analysis import llm_review as lr
 from app.analysis.baseline import fingerprint
 from app.analysis.chains import find_chains
 from app.analysis.dependencies import is_lockfile, parse_dependencies
@@ -58,6 +60,7 @@ class StageSpec:
     label: str
     progress: int
     run: Callable[[Ctx], Awaitable[None]]
+    advisory: bool = False  # AI stages: failure degrades instead of failing the audit
 
 
 def _root(audit) -> str:
@@ -266,6 +269,113 @@ async def validator(ctx: Ctx) -> None:
     ctx.notes["validator"] = f"{sum(applied.values())} reclassified"
 
 
+# --------------------------------------------------------------------------- AI (opt-in)
+#
+# The two AI stages are *advisory*: they never change a finding's status, severity or the gate, and
+# a failure (no key, network down, unusable answer) is recorded and skipped -- it never fails the
+# audit. They run only when the audit was created with explicit consent (stage_state["ai"]).
+
+
+def _severity_rank(row) -> tuple[int, float]:
+    order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
+    return order.get(row.severity.value, 9), -row.confidence
+
+
+async def _ai_settings(ctx: Ctx):
+    audit = await ctx.audit()
+    ai = (audit.stage_state or {}).get("ai") or {}
+    if not ai.get("consent"):
+        return audit, None, "skipped: AI review was not requested for this audit"
+    settings = get_settings()
+    if not settings.llm_api_key:
+        return audit, None, "skipped: no LLM key is configured on this server"
+    reviewer = lr.Reviewer(
+        api_key=settings.llm_api_key,
+        model=settings.llm_model or lr.DEFAULT_MODEL,
+        transport=lr.http_transport,  # looked up now so tests can replace it
+        cache_path=lr.default_cache_path(),
+    )
+    return audit, (reviewer, ai), None
+
+
+async def _record_ai(ctx: Ctx, audit, **fields) -> None:
+    state = dict(audit.stage_state or {})
+    ai = dict(state.get("ai") or {})
+    ai.update(fields)
+    state["ai"] = ai
+    audit.stage_state = state
+    await ctx.db.flush()
+
+
+async def ai_validator(ctx: Ctx) -> None:
+    """Second opinion on the most severe findings (ADR-018). Stored beside the finding only."""
+    audit, configured, why = await _ai_settings(ctx)
+    if configured is None:
+        ctx.notes["ai_validator"] = why
+        return
+    reviewer, ai = configured
+    limit = int(ai.get("limit", 15))
+    rows = [
+        r
+        for r in await ctx.finding_rows()
+        if r.type in lr.REVIEWABLE
+        and r.status not in (FindingStatus.INFORMATIONAL, FindingStatus.FALSE_POSITIVE)
+    ]
+    rows.sort(key=_severity_rank)
+    reviewed = 0
+    problem = None
+    for row in rows[:limit]:
+        finding = to_report_finding(row)
+        path = lr.evidence_path(finding.evidence)
+        context = lr.build_context(_root(audit), finding, path)
+        if context is None:
+            continue
+        try:
+            review = await asyncio.to_thread(reviewer.review, finding, context, path)
+        except lr.ReviewError as exc:
+            problem = str(exc)
+            break
+        row.validation_result = {**(row.validation_result or {}), "ai_review": asdict(review)}
+        reviewed += 1
+    await asyncio.to_thread(reviewer.save_cache)
+    await _record_ai(ctx, audit, model=reviewer.model, reviewed=reviewed, validator_problem=problem)
+    ctx.notes["ai_validator"] = f"reviewed {reviewed} finding(s)" + (
+        f"; stopped: {problem}" if problem else ""
+    )
+
+
+async def ai_narrative(ctx: Ctx) -> None:
+    """Executive summary from a code-free fact sheet (titles, counts, locations)."""
+    audit, configured, why = await _ai_settings(ctx)
+    if configured is None:
+        ctx.notes["ai_narrative"] = why
+        return
+    reviewer, _ai = configured
+    recon = await _recon(ctx)
+    context = await build_context(ctx.db, audit, recon, await ctx.finding_rows())
+    facts = lr.narrative_facts(context)
+    try:
+        text = await asyncio.to_thread(lr.narrate, reviewer, facts)
+    except lr.ReviewError as exc:
+        await _record_ai(ctx, audit, summary_problem=str(exc))
+        ctx.notes["ai_narrative"] = f"unavailable: {exc}; the deterministic summary is used"
+        return
+    if not text:
+        await _record_ai(ctx, audit, summary_problem="the answer was unusable")
+        ctx.notes["ai_narrative"] = "unusable answer; the deterministic summary is used"
+        return
+    await _record_ai(
+        ctx,
+        audit,
+        narrative={
+            "text": text,
+            "model": reviewer.model,
+            "generated_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    ctx.notes["ai_narrative"] = "summary written from the structured findings"
+
+
 # --------------------------------------------------------------------------- correlation
 
 
@@ -327,8 +437,19 @@ STAGES: list[StageSpec] = [
         "scanner", "vulnerability-scanner-agent", "Analyse source", 50, vulnerability_scanner
     ),
     StageSpec("safe_validation", "safe-validation-agent", "Verify fixes", 65, safe_validation),
-    StageSpec("validator", "validator-agent", "Reduce false positives", 75, validator),
-    StageSpec("correlation", "correlation-agent", "Correlate attack chains", 85, correlation),
+    StageSpec("validator", "validator-agent", "Reduce false positives", 72, validator),
+    StageSpec(
+        "ai_validator",
+        "ai-validator-agent",
+        "AI review of findings (opt-in)",
+        80,
+        ai_validator,
+        True,
+    ),
+    StageSpec("correlation", "correlation-agent", "Correlate attack chains", 86, correlation),
+    StageSpec(
+        "ai_narrative", "ai-report-narrative-agent", "AI summary (opt-in)", 91, ai_narrative, True
+    ),
     StageSpec("report", "report-agent", "Generate report", 95, report),
 ]
 STAGE_NAMES = [s.name for s in STAGES]

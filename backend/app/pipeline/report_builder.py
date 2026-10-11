@@ -26,7 +26,9 @@ AGENT_LABELS = {
     "scanner": "Static analysis (secrets, dependencies, injection, access control, business logic)",
     "safe_validation": "Fix verification (patch parses, re-scan shows the finding gone)",
     "validator": "Rule-based validation (test/example/dev-only code reclassified)",
+    "ai_validator": "AI review of findings (opt-in second opinion; never changes status)",
     "correlation": "Attack-chain correlation",
+    "ai_narrative": "AI-written executive summary (opt-in; from structured findings only)",
     "report": "Report generation",
 }
 
@@ -104,6 +106,7 @@ async def build_context(
         "so unprotected-endpoint findings require manual confirmation.",
         "Dependency advisories (OSV) are not queried by server-side audits.",
     ]
+    narrative = (state.get("ai") or {}).get("narrative") or {}
     now = datetime.now(UTC)
     return ReportContext(
         audit_id=str(audit.id),
@@ -127,6 +130,8 @@ async def build_context(
         outbound_hosts=list(model.get("outbound_hosts", [])),
         environment_variables=list(model.get("environment_variables", [])),
         validation_notes=list(state.get("validation_notes", [])),
+        executive_summary=narrative.get("text") or None,
+        executive_summary_source=(f"AI ({narrative['model']})" if narrative.get("text") else None),
         findings=findings,
         attack_chains=chains,
         authorization_matrix=matrix,

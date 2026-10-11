@@ -79,6 +79,15 @@ def _node(ctx: Ctx, spec: StageSpec):
             return {"failed": True}
         except Exception as exc:  # noqa: BLE001 - an agent must never crash the workflow
             logger.exception("[AUDIT-%s] %s failed", ctx.audit_id, spec.name)
+            if spec.advisory:
+                # Advisory (AI) stages degrade: the deterministic result stands on its own.
+                await ctx.db.rollback()
+                ctx.notes[spec.name] = f"skipped after an error ({type(exc).__name__})"
+                await _mark(
+                    ctx, spec.name, completed_at=_now().isoformat(), note=ctx.notes[spec.name]
+                )
+                await _log(ctx, spec.agent, "degraded", ctx.notes[spec.name], LogStatus.WARNING)
+                return {}
             await _fail(ctx, spec, f"{spec.label} failed unexpectedly ({type(exc).__name__}).")
             return {"failed": True}
         note = ctx.notes.get(spec.name)

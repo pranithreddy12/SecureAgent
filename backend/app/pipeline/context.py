@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SecurityAudit, Vulnerability
-from app.schemas.report import CvssScore, ReportFinding
+from app.schemas.report import AIReview, CvssScore, ReportFinding
 
 
 class PipelineState(TypedDict, total=False):
@@ -68,4 +68,9 @@ def to_report_finding(row: Vulnerability) -> ReportFinding:
         cvss=CvssScore(**row.cvss) if row.cvss else None,
         remediation=row.remediation,
         sources=list(row.sources or []),
+        ai_review=(
+            AIReview(**(row.validation_result or {})["ai_review"])
+            if (row.validation_result or {}).get("ai_review")
+            else None
+        ),
     )

@@ -16,7 +16,7 @@ delivered.
 | **Static analysis engine + CLI** (`secureagent`) | ✅ Built, tested, usable on real repositories |
 | Reports (HTML / PDF / JSON / SARIF), CI baseline & gating, demo | ✅ Built, tested |
 | Authentication, PostgreSQL schema + migrations, Docker Compose, frontend login/dashboard shell | ✅ Built, tested |
-| **Source audits in the web app**: register a project, confirm authorization, run a 7-agent LangGraph pipeline (reconnaissance, scanner, fix verification, validator, correlation, report), live progress, findings, activity log, history, resume from a failed stage, HTML/PDF report | ✅ Built, tested, verified end to end in Docker (ADR-011, ADR-016) |
+| **Source audits in the web app**: register a project, confirm authorization, run a LangGraph pipeline (deterministic stages + two opt-in AI stages) (reconnaissance, scanner, fix verification, validator, correlation, report), live progress, findings, activity log, history, resume from a failed stage, HTML/PDF report | ✅ Built, tested, verified end to end in Docker (ADR-011, ADR-016) |
 | MCP server (`secureagent-mcp`), accuracy benchmark, business-logic + workflow-order detectors, authorization matrix, attack chains, verified fix patches | ✅ Built, tested |
 | **Live audit pipeline**: targets, live-target authorization, reconnaissance, OWASP ZAP, Nuclei, safe validation, validator, LangGraph orchestration | ⛔ **Designed but not implemented** — blocked on target management (see below) |
 
@@ -143,7 +143,7 @@ redaction everywhere, read-only scanning, escaped reports.
 
 ```bash
 make testdb                      # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q    # 465 tests; ~93% coverage
+cd backend && python -m pytest -q    # 472 tests; ~93% coverage
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 cd frontend && npm run e2e           # Playwright against the Docker stack (frontend/e2e/README.md)
 ```

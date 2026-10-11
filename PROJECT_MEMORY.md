@@ -372,6 +372,10 @@ reconnaissance -> scanner -> safe_validation -> validator -> correlation -> repo
 (`POST /api/audits/{id}/retry?resume=true`), migration `c8d2e4f6a1b3`, frontend `/projects`. ZAP/Nuclei are
 not applicable to source files. LangGraph tracing is disabled by default.
 
+**AI stages (2026-10-12, ADR-018):** opt-in `ai_validator` and `ai_narrative` in the LangGraph pipeline; per-audit
+consent, operator-held key, advisory (degrade, never fail), no authority over status/gate; unevaluated, fake
+transport only.
+
 **LLM review (2026-10-12, ADR-017):** `secureagent review` -- opt-in, consented, redacted, evidence-verified second
 opinion; never affects status or gating; unevaluated (no live run yet).
 

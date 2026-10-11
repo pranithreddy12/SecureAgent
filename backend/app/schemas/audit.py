@@ -20,6 +20,8 @@ class SourceAuditCreate(BaseModel):
     label: str | None = Field(default=None, max_length=255)
     authorization_confirmed: bool
     exclude: list[str] = Field(default_factory=list, max_length=50)
+    # Opt in to AI review of findings and an AI-written summary (code excerpts leave the server).
+    ai_review: bool = False
 
     @field_validator("exclude")
     @classmethod
@@ -53,6 +55,7 @@ class AuditDetail(AuditOut):
     attack_chains: list[AttackChain] = []
     application_model: dict[str, list[str]] = {}
     validation_notes: list[str] = []
+    ai: dict[str, Any] = {}  # {enabled, model, reviewed, summary_written, notes}
 
 
 class FindingOut(BaseModel):
@@ -76,6 +79,7 @@ class FindingOut(BaseModel):
     cvss: dict[str, Any] | None
     remediation: str | None
     sources: list[str]
+    ai_review: dict[str, Any] | None = None
 
 
 class LogOut(BaseModel):

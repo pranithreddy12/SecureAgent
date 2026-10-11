@@ -51,6 +51,10 @@ async def _log(
     logger.info("[AUDIT-%s] %s: %s", audit_id, action, message)
 
 
+class AIUnavailable(Exception):
+    """AI review was requested but the server has no LLM key configured."""
+
+
 class TooManyActiveAudits(Exception):
     """The user already has MAX_CONCURRENT_SCANS audits queued or running."""
 
@@ -65,8 +69,11 @@ async def create_source_audit(
     project_id: uuid.UUID | None = None,
     authorization_statement: str = AUTHORIZATION_STATEMENT,
     authorized_at: datetime | None = None,
+    ai_review: bool = False,
 ) -> SecurityAudit:
     """Queue a source audit for an already-confined directory."""
+    if ai_review and not get_settings().llm_api_key:
+        raise AIUnavailable
     limit = get_settings().max_concurrent_scans
     active = await db.scalar(
         select(func.count())
@@ -89,11 +96,26 @@ async def create_source_audit(
         authorized_at=authorized_at or _utcnow(),
         status=AuditStatus.QUEUED,
         progress=0,
-        stage_state={"exclude": exclude},
+        stage_state={
+            "exclude": exclude,
+            **(
+                {"ai": {"consent": True, "consented_at": _utcnow().isoformat(), "limit": 15}}
+                if ai_review
+                else {}
+            ),
+        },
     )
     db.add(audit)
     await db.flush()
     await _log(db, audit.id, "queued", "Source audit queued (authorization confirmed).")
+    if ai_review:
+        await _log(
+            db,
+            audit.id,
+            "ai_consent",
+            "AI review requested: code excerpts of the most severe findings will be sent to "
+            "the configured LLM provider.",
+        )
     await db.commit()
     return audit
 
@@ -112,7 +134,12 @@ async def create_source_audit_from_request(
     if not resolved.is_dir():
         raise SourcePathRejected("path is not a directory")
     return await create_source_audit(
-        db, user, path=str(resolved), label=data.label, exclude=data.exclude
+        db,
+        user,
+        path=str(resolved),
+        label=data.label,
+        exclude=data.exclude,
+        ai_review=data.ai_review,
     )
 
 

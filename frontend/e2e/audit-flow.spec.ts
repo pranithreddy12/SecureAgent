@@ -172,6 +172,8 @@ test.describe("register, audit and review", () => {
     await page.getByRole("button", { name: "Confirm authorization" }).click();
     await expect(page.getByRole("button", { name: "Revoke authorization" })).toBeVisible();
     await expect(start).toBeEnabled();
+    // No LLM key on this server: the AI-review opt-in must not even be offered.
+    await expect(page.getByText("AI review (optional)")).toHaveCount(0);
     const projectUrl = page.url();
 
     await start.click();
