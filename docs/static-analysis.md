@@ -103,6 +103,12 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
 
+## Verified fix patches
+
+`secureagent fix PATH` proposes deterministic patches for weak hashes, TLS/JWT verification, `yaml.load`,
+debug/CSRF flags and hardcoded Python secrets, verifies each (parses, re-scan shows the finding gone and
+nothing new) and writes only verified ones with `--apply`. Every change lists what to check. See ADR-013.
+
 ## Attack chains
 
 `chains.py` links findings that are worse together (unguarded route + injection in the same handler,

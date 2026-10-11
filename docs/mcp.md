@@ -10,6 +10,7 @@ SecureAgent's static analyser can be called directly by an AI coding assistant o
 |---|---|
 | `scan_snippet` | Analyse a code string (`code`, optional `filename`, e.g. `app.py`, `server.js`). |
 | `scan_path` | Analyse a directory (`path`, optional `exclude`, `intent`, `include_osv`). |
+| `suggest_fixes` | Verified patches (unified diffs + caveats) for deterministic findings; never writes files. |
 | `authorization_matrix` | Route × guard grid for a directory, grouped by resource. |
 
 Findings carry `severity`, `status` (`likely` / `suspicious`, never `confirmed`), `confidence`,

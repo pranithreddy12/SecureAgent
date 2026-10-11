@@ -13,7 +13,7 @@ including the logic flaws that pattern-matching scanners miss — before an atta
 | Reports (HTML / PDF / JSON / SARIF), CI baseline & gating, demo | ✅ Built, tested |
 | Authentication, PostgreSQL schema + migrations, Docker Compose, frontend login/dashboard shell | ✅ Built, tested |
 | **Source audits in the web app**: start an audit on a mounted directory, live progress, findings, activity log, history, HTML/PDF report download | ✅ Built, tested, verified end to end in Docker (ADR-011) |
-| MCP server (`secureagent-mcp`), accuracy benchmark, business-logic detectors, authorization matrix | ✅ Built, tested |
+| MCP server (`secureagent-mcp`), accuracy benchmark, business-logic + workflow-order detectors, authorization matrix, attack chains, verified fix patches | ✅ Built, tested |
 | **Live audit pipeline**: targets, live-target authorization, reconnaissance, OWASP ZAP, Nuclei, safe validation, validator, LangGraph orchestration | ⛔ **Designed but not implemented** — blocked on target management (see below) |
 
 The multi-agent live-audit architecture from the project specification is fully designed
@@ -51,6 +51,9 @@ pip install -e .                                                # provides the `
 secureagent demo                              # no setup: scans a bundled, deliberately vulnerable sample app
 secureagent scan /path/to/your/repo           # human-readable
 secureagent scan . --report report.html       # professional report (add --pdf for PDF)
+secureagent scan . --matrix                     # route x guard authorization matrix
+secureagent fix .                             # verified patches as diffs (add --apply to write them)
+secureagent benchmark backend/benchmark/corpus # measured precision/recall on the bundled corpus
 secureagent scan . --format sarif --output secureagent.sarif        # GitHub code scanning
 secureagent scan . --write-baseline .secureagent-baseline.json      # accept today's findings
 secureagent scan . --baseline .secureagent-baseline.json --fail-on high   # CI: fail on NEW high+

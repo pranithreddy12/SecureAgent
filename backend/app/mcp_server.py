@@ -69,6 +69,19 @@ TOOLS = [
         },
     },
     {
+        "name": "suggest_fixes",
+        "description": (
+            "Propose verified patches (unified diffs) for findings with a deterministic fix "
+            "(weak hash, TLS verification, yaml.load, debug flag, CSRF, JWT verification, "
+            "hardcoded secret). Never writes files."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+    },
+    {
         "name": "authorization_matrix",
         "description": "Route x guard grid for a source directory, grouped by resource.",
         "inputSchema": {
@@ -211,9 +224,43 @@ def tool_authorization_matrix(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def tool_suggest_fixes(args: dict[str, Any]) -> dict[str, Any]:
+    from app.analysis.fixes import propose_fixes
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.scanner import scan_repo
+
+    root = confine(str(args.get("path", "")))
+    if not root.is_dir():
+        raise ToolError(f"not a directory: {root}")
+    result = scan_repo(str(root), check_osv=False)
+    patches = propose_fixes(str(root), scan_to_report_context(result).findings)
+    return {
+        "patches": [
+            {
+                "file": p.path,
+                "verified": p.verified,
+                "verification": p.note,
+                "changes": [
+                    {
+                        "line": c.line,
+                        "type": c.finding_type,
+                        "what": c.description,
+                        "check": c.caveat,
+                    }
+                    for c in p.changes
+                ],
+                "diff": p.diff,
+            }
+            for p in patches
+        ],
+        "note": "Suggestions only; nothing was written. Review each caveat before applying.",
+    }
+
+
 HANDLERS = {
     "scan_snippet": tool_scan_snippet,
     "scan_path": tool_scan_path,
+    "suggest_fixes": tool_suggest_fixes,
     "authorization_matrix": tool_authorization_matrix,
 }
 

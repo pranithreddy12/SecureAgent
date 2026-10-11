@@ -312,6 +312,37 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
     return json.dumps(payload, indent=2)
 
 
+def _run_fix(args) -> int:
+    from app.analysis.fixes import apply_patches, propose_fixes
+    from app.analysis.reporting import scan_to_report_context
+
+    try:
+        result = scan_repo(args.path, check_osv=False, exclude=args.exclude)
+    except (IngestError, IntentError, FileNotFoundError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    findings = scan_to_report_context(result).findings
+    patches = propose_fixes(args.path, findings)
+    if not patches:
+        print("No automatic fixes available for the findings in this source tree.")
+        return 0
+    verified = [p for p in patches if p.verified]
+    for p in patches:
+        state = "VERIFIED" if p.verified else "NOT VERIFIED"
+        print(f"\n=== {p.path}  [{state}: {p.note}]")
+        for c in p.changes:
+            print(f"  line {c.line}: {c.description}")
+            print(f"      check: {c.caveat}")
+        print(p.diff.rstrip("\n"))
+    print(f"\n{len(verified)}/{len(patches)} file patch(es) verified.")
+    if args.apply:
+        written = apply_patches(args.path, patches)
+        print(f"Applied to {len(written)} file(s): {', '.join(written) or 'none'}")
+    else:
+        print("Dry run. Re-run with --apply to write the verified patches.")
+    return 0
+
+
 def _run_benchmark(args) -> int:
     from app.analysis.benchmark import format_result, run_benchmark
 
@@ -459,6 +490,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     scan.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
 
+    fix = sub.add_parser(
+        "fix",
+        help="Propose verified patches for deterministic findings (prints diffs; --apply writes).",
+    )
+    fix.add_argument("path", help="Directory to scan and patch.")
+    fix.add_argument("--exclude", action="append", default=[], metavar="PATTERN")
+    fix.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write the VERIFIED patches into the files (unverified ones are never written).",
+    )
+
     bench = sub.add_parser(
         "benchmark",
         help="Measure precision/recall against a corpus labelled with VULN:<type> markers.",
@@ -481,6 +524,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_demo(args)
     if args.command == "benchmark":
         return _run_benchmark(args)
+    if args.command == "fix":
+        return _run_fix(args)
 
     try:
         result = scan_repo(

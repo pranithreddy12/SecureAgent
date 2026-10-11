@@ -700,3 +700,16 @@ Append-only. Never rewrite past entries.
 ### Notes
 - Installing `vitest@3` introduced 2 critical + 5 high advisories (tinypool RCE gadget, mocker); `vitest@5`
   (with `@types/node@^22`) removes them. Remaining audit output is the already-accepted dev-only `braces` chain.
+
+## 2026-10-11 (Verified fix patches -- ADR-013)
+
+### Added
+- `app/analysis/fixes.py`, `secureagent fix PATH [--apply]`, MCP `suggest_fixes`: deterministic patches
+  for weak hash, TLS verification, yaml.load, debug flag, CSRF flag, JWT verification and hardcoded
+  Python secrets. Verified by parse + re-scan (fixed types decrease, no new types). `--apply` writes only
+  verified patches, atomically, only if the file is unchanged since analysis; symlinks skipped; CRLF kept.
+- `tests/test_fixes.py` (13 tests). On the bundled demo: 34 -> 26 findings, 2/2 patches verified.
+
+### Notes
+- Injection/IDOR/authorization findings are intentionally not auto-fixed (the correct fix is
+  application-specific).

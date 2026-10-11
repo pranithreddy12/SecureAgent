@@ -43,6 +43,10 @@ PPT arrives: fill PENDING sections only and log any conflicts in §16.
 JSON intent spec (ADR-010), authorization matrix (`scan --matrix`), accuracy benchmark
 (`secureagent benchmark`, `docs/benchmark.md`), MCP server (`secureagent-mcp`, `docs/mcp.md`).
 
+**Verified fix patches (2026-10-11, ADR-013)**: `secureagent fix PATH [--apply]`, MCP `suggest_fixes`;
+weak hash, TLS/JWT verification, yaml.load, debug/CSRF flags, hardcoded Python secrets. Verified = parses +
+re-scan shows finding gone and nothing new; never writes unverified or stale files. Demo: 34 -> 26 findings.
+
 **Attack chains (2026-10-11, ADR-012)**: `app/analysis/chains.py`; shown in CLI/JSON/MCP, report section 8
 and the audit page (`attack_chains` on `GET /api/audits/{id}`, stored in `stage_state`). Severity = worst
 member (never escalated); chains are not findings and are excluded from baselines/gating.
@@ -286,6 +290,8 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
   critical advisories (tinypool/mocker), which the project's own OSV scan would have flagged.
 - Login throttling is in-process (per worker); the interrupted-audit sweep assumes one API process.
 - Intraprocedural IDOR heuristic only (it also flags legitimate by-id lookups of shared catalogue data).
+- Fix patches are verified by re-scan and parse only (behaviour preservation is not proven); they cover seven
+  finding types and single files.
 - Workflow-order detection is a handler-local heuristic (Python): a state machine in the model/DB or a helper
   like `order.ship()` is invisible, so findings stay `suspicious` (confidence 0.4-0.5).
 - The MCP server (docs/mcp.md) implements tools over stdio only, by hand; no resources/prompts/HTTP.
