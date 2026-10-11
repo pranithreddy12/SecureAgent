@@ -38,6 +38,7 @@ Exit codes: `0` clean / gate passed, `1` findings (or new findings ≥ `--fail-o
 | `taint.py` | **Injection via data flow** (SQLi, command, code, SSRF, path traversal, open redirect) — interprocedural within a file (Python) + JS/TS heuristic | A03/A10/A01 |
 | `access_control.py` | IDOR / missing object-level authorization | CWE-639 / A01 |
 | `business_logic.py` | Mass assignment, client-trusted privilege/value (ADR-010) | CWE-915, 269, 602 / A01, A04 |
+| `workflow.py` | Terminal state set without checking the current state (pay -> ship skipped) | CWE-841 / A04 |
 | `authz_matrix.py` | Route x guard grid by resource; unguarded outliers among guarded siblings (`scan --matrix`) | CWE-862 / A01 |
 | `intent.py` | Developer intent spec (`secureagent-intent.json`) checked against routes + IDOR | CWE-862, 639 / A01 |
 | `misconfig.py` | Debug on, permissive CORS, disabled JWT verification, CSRF off, autoescape off, wildcard hosts, insecure cookies | A05/A07 |
@@ -69,7 +70,7 @@ secureagent scan . --exclude 'tests/' --exclude '*.min.js'   # glob patterns; 'd
 | A01 Broken Access Control | ✅ IDOR, missing-authz, path traversal, open redirect |
 | A02 Cryptographic Failures | ✅ weak hashing, disabled TLS |
 | A03 Injection | ✅ data-flow taint (SQLi/cmd/code) + dangerous sinks |
-| A04 Insecure Design | ◐ partial (client-trusted values, mass assignment, declared intent rules; no workflow-order yet) |
+| A04 Insecure Design | ◐ partial (client-trusted values, mass assignment, declared intent rules, workflow-order heuristic) |
 | A05 Security Misconfiguration | ✅ debug, CORS, CSRF, autoescape, hosts, XXE |
 | A06 Vulnerable Components | ✅ OSV |
 | A07 Identification & Auth Failures | ✅ JWT verification |

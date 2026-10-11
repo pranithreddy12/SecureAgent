@@ -63,6 +63,14 @@ def v_close_ticket(ticket_id):
     return "closed"
 
 
+@app.route("/v/orders/<order_id>/ship", methods=["POST"])
+@login_required
+def v_ship(order_id):
+    order = orders[order_id]
+    order.status = "shipped"  # VULN:workflow_order
+    return "shipped"
+
+
 # ----------------------------------------------------------------------------- safe
 
 
@@ -103,3 +111,13 @@ def s_health():
 @login_required
 def s_me():
     return str(current_user.profile)
+
+
+@app.route("/s/orders/<order_id>/ship", methods=["POST"])
+@login_required
+def s_ship(order_id):
+    order = orders[order_id]
+    if order.status != "paid":
+        return "order is not paid", 409
+    order.status = "shipped"
+    return "shipped"

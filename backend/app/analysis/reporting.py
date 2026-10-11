@@ -93,6 +93,7 @@ def _logging_finding(f) -> ReportFinding:
 def _logic_finding(f) -> ReportFinding:
     intent = f.category == "intent_violation"
     sibling = f.category == "inconsistent_authorization"
+    workflow = f.category == "workflow_order"
     return ReportFinding(
         title=f.title,
         type=f.category,
@@ -104,6 +105,9 @@ def _logic_finding(f) -> ReportFinding:
             if intent
             else "Sibling routes of the same resource are guarded; this one is not."
             if sibling
+            else "The handler changes state without checking where the entity currently is; "
+            "a state machine elsewhere (model, database) would not be visible here."
+            if workflow
             else "The handler uses a client-controlled value where the server should decide. "
             "Confirm no serializer/middleware outside the handler neutralises it."
         ),
@@ -113,6 +117,8 @@ def _logic_finding(f) -> ReportFinding:
         impact=(
             "Callers may reach an action its sibling routes protect."
             if sibling
+            else "Steps of a business process can be skipped, repeated or done out of order."
+            if workflow
             else "A client can tamper with values or privileges the server is meant to control."
         ),
         evidence=f.evidence,

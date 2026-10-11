@@ -114,8 +114,8 @@ consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages
   an independent corpus has not been run.
 - Parse OSV CVSS vectors into scores (so CVSS can be shown when reliably determined).
 - JS AST-based analysis (replace regex heuristics); sanitizer modelling in taint.
-- Workflow-order detector (ADR-008). Client-trusted-value, mass-assignment and the intent spec were built
-  on 2026-10-10 (ADR-010, Python only).
+- Client-trusted-value, mass-assignment, the intent spec and the workflow-order heuristic are built
+  (ADR-010, Python only); JS/TS logic detectors and model-layer state machines are not.
 
 ## 6. Two honest ways to close the project
 

@@ -51,3 +51,13 @@ def load_settings(text):
 def safe_checkout():
     # The price comes from the server-side catalogue; the client only names the product.
     return charge(amount=CATALOG[request.json["product_id"]].price)
+
+
+@app.route("/fulfilment/<order_id>/ship", methods=["POST"])
+@login_required
+def safe_ship_order(order_id):
+    # The transition is only allowed from the paid state.
+    if order.status != "paid":
+        return "order is not paid", 409
+    order.status = "shipped"
+    return "shipped"

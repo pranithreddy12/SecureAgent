@@ -284,6 +284,8 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - OSV matching uses pinned versions in lockfiles (no range resolution); needs network (skipped gracefully).
 - Login throttling is in-process (per worker); the interrupted-audit sweep assumes one API process.
 - Intraprocedural IDOR heuristic only (it also flags legitimate by-id lookups of shared catalogue data).
+- Workflow-order detection is a handler-local heuristic (Python): a state machine in the model/DB or a helper
+  like `order.ship()` is invisible, so findings stay `suspicious` (confidence 0.4-0.5).
 - The MCP server (docs/mcp.md) implements tools over stdio only, by hand; no resources/prompts/HTTP.
 - Accuracy is measured only on a small author-written corpus (`docs/benchmark.md`, 94%/94%); no
   independent real-world detection rate exists.

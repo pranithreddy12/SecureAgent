@@ -68,6 +68,14 @@ CATEGORY = {
         "high",
         0.55,
     ),
+    "workflow_order": (
+        "CWE-841",
+        "A04:2021 Insecure Design",
+        "Check the entity's current state before changing it (allowed transitions), ideally in "
+        "one place such as the model, and make the update conditional on that state.",
+        "medium",
+        0.45,
+    ),
     "inconsistent_authorization": (
         "CWE-862",
         "A01:2021 Broken Access Control",
@@ -120,6 +128,8 @@ class LogicFinding:
             return f"Declared rule violated: {self.rule}"
         if self.category == "inconsistent_authorization":
             return f"Inconsistent authorization: {self.rule}"
+        if self.category == "workflow_order":
+            return f"Workflow step not enforced in {self.handler}(): {self.rule}"
         return f"Business-logic flaw in {self.handler}(): {self.rule}"
 
 

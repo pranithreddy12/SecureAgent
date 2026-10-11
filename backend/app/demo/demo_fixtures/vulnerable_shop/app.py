@@ -93,6 +93,13 @@ def checkout():
     return charge(amount=request.json["amount"])  # price decided by the client
 
 
+@app.route("/orders/<order_id>/ship", methods=["POST"])
+@login_required
+def ship_order(order_id):
+    order.status = "shipped"  # workflow: never checks the order was paid first
+    return "shipped"
+
+
 # --- Cryptography, deserialization, TLS ---------------------------------------------------
 
 

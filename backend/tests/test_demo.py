@@ -38,6 +38,7 @@ EXPECTED_TYPES = {
     "client_trusted_privilege",
     "client_trusted_value",
     "intent_violation",
+    "workflow_order",
     "inconsistent_authorization",
     # logging and secrets
     "sensitive_data_in_log",

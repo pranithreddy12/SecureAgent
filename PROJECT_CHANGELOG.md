@@ -669,3 +669,17 @@ Append-only. Never rewrite past entries.
   the same route (an unguarded sibling, or a declared `require_auth` rule) instead of being reported twice.
   The count is shown (`superseded`). Baseline fingerprints of the merged generic findings disappear.
 - Demo: 33 findings (3 merged).
+
+## 2026-10-11 (Workflow-order detector)
+
+### Added
+- `app/analysis/workflow.py`: a handler that sets a terminal state (`status = "shipped"`, `is_paid = True`,
+  `OrderStatus.PAID`, `.update(status=...)`) without any state comparison/assert/guard-helper/conditional
+  filter reports `workflow_order` (CWE-841, `suspicious`, confidence 0.4-0.5; one per handler).
+- Demo fixture (`POST /orders/<id>/ship`) with a safe counterpart; benchmark corpus cases (34 TP, 94%/94%);
+  `tests/test_workflow.py` (7 tests).
+
+### Notes
+- Adding a guarded route group to the safe fixture made the authorization-matrix outlier rule flag two
+  deliberately public GETs in the same `/safe` resource -- a real limitation of grouping by first path
+  segment. The new safe route lives under its own resource instead; the heuristic is unchanged.

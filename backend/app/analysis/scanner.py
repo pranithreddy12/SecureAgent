@@ -32,6 +32,7 @@ from app.analysis.routes import Route, RouteFinding, extract_routes, route_findi
 from app.analysis.secrets import SecretFinding
 from app.analysis.sinks import SinkFinding, scan_sinks
 from app.analysis.taint import JS_EXTENSIONS, TaintFinding, analyze_taint_project
+from app.analysis.workflow import analyze_workflow
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4, "informational": 5}
 
@@ -226,6 +227,7 @@ def scan_repo(
         result.misconfig_findings.extend(scan_misconfig(file.relpath, text))
         result.logging_findings.extend(scan_logging(file.relpath, text))
         result.logic_findings.extend(analyze_business_logic(file.relpath, text, custom_fields))
+        result.logic_findings.extend(analyze_workflow(file.relpath, text))
         if file.relpath.endswith((".py", *JS_EXTENSIONS)):
             taint_sources.append((file.relpath, text))
         if is_lockfile(file.relpath):
