@@ -51,6 +51,11 @@ def _render_text(result: ScanResult, color: bool) -> str:
         lines.append("WARNING: scan was truncated by a limit; results are partial.")
     if result.osv_note:
         lines.append(result.osv_note)
+    if result.superseded:
+        lines.append(
+            f"{result.superseded} generic unguarded-endpoint finding(s) merged into a more "
+            "specific finding on the same route."
+        )
     if result.stats.excluded:
         lines.append(f"{result.stats.excluded} file(s) excluded by --exclude / .secureagentignore.")
     if result.inline_ignored:

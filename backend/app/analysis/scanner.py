@@ -72,6 +72,7 @@ class ScanResult:
     logging_findings: list[LoggingFinding] = field(default_factory=list)
     logic_findings: list[LogicFinding] = field(default_factory=list)
     intent_rules: int = 0  # developer intent rules evaluated (0 = no spec supplied)
+    superseded: int = 0  # generic unguarded-route findings replaced by a more specific one
     dependencies: list[Dependency] = field(default_factory=list)
     dependency_findings: list[DependencyFinding] = field(default_factory=list)
     osv_note: str | None = None
@@ -236,6 +237,7 @@ def scan_repo(
     result.logic_findings.extend(authz_outliers(result.routes))
     result.logic_findings.extend(evaluate_intent(rules, result.routes, result.idor_findings))
     _dedupe_sinks_superseded_by_taint(result)
+    _dedupe_route_findings(result)
     _apply_inline_ignores(result, ignored_lines)
 
     if check_osv and result.dependencies:
@@ -266,6 +268,20 @@ def _apply_inline_ignores(result: ScanResult, ignored: dict[str, set[int]]) -> N
         f for f in result.route_findings if kept(f.route.relpath, f.route.line)
     ]
     result.inline_ignored = before - result.total_findings
+
+
+def _dedupe_route_findings(result: ScanResult) -> None:
+    """The generic "endpoint without visible authorization" finding is superseded by a more
+    specific finding on the same route (an unguarded sibling, or a declared require_auth rule)."""
+    specific = {
+        (f.relpath, f.line)
+        for f in result.logic_findings
+        if f.category == "inconsistent_authorization"
+        or (f.category == "intent_violation" and "[require_auth]" in f.rule)
+    }
+    kept = [f for f in result.route_findings if (f.route.relpath, f.route.line) not in specific]
+    result.superseded = len(result.route_findings) - len(kept)
+    result.route_findings = kept
 
 
 def _dedupe_sinks_superseded_by_taint(result: ScanResult) -> None:

@@ -68,3 +68,32 @@ def test_cli_matrix_flag_prints_grid(tmp_path, capsys):
     assert "Authorization matrix" in out
     assert "guarded  GET     /a" in out
     assert "OPEN     POST    /b" in out
+
+
+def test_specific_finding_supersedes_generic_unguarded_route_finding(tmp_path):
+    from app.analysis.scanner import scan_repo
+
+    (tmp_path / "app.py").write_text(
+        "@app.route('/p')\n@login_required\ndef a():\n    return 1\n"
+        "@app.route('/p/1')\n@login_required\ndef b():\n    return 1\n"
+        "@app.route('/p', methods=['POST'])\n@login_required\ndef c():\n    return 1\n"
+        "@app.route('/p/2', methods=['DELETE'])\ndef d():\n    return 1\n",
+        encoding="utf-8",
+    )
+    r = scan_repo(str(tmp_path), check_osv=False)
+    assert [f.category for f in r.logic_findings] == ["inconsistent_authorization"]
+    assert r.route_findings == []  # the generic finding on the same route was merged
+    assert r.superseded == 1
+
+
+def test_report_context_carries_the_matrix(tmp_path):
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.scanner import scan_repo
+    from app.reports.renderer import render_html
+
+    (tmp_path / "app.py").write_text(
+        "@app.route('/a')\n@login_required\ndef a():\n    return 1\n", encoding="utf-8"
+    )
+    ctx = scan_to_report_context(scan_repo(str(tmp_path), check_osv=False))
+    assert ctx.authorization_matrix[0].resource == "a"
+    assert "Authorization matrix" in render_html(ctx)

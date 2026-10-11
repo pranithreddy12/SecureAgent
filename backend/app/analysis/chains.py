@@ -84,7 +84,10 @@ def find_chains(findings: list[ReportFinding], routes: list[Route]) -> list[Atta
     unguarded_by_route: dict[tuple[str, int], ReportFinding] = {}
     for f in findings:
         loc = _where(f)
-        if f.type in UNGUARDED_TYPES and loc:
+        if loc and (
+            f.type in UNGUARDED_TYPES
+            or (f.type == "intent_violation" and "[require_auth]" in f.title)
+        ):
             unguarded_by_route[loc] = f
 
     for f in findings:

@@ -36,7 +36,7 @@ python -m app.cli demo --online              # also look up the sample's pinned 
 Offline by default. The dependency check is the only part that needs the network, so it is
 reported honestly as skipped unless you pass `--online`.
 
-## What you will see (36 findings, offline)
+## What you will see (33 findings, offline)
 
 | Class | Planted flaw | Reported as |
 |---|---|---|

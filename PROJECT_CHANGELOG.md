@@ -658,3 +658,14 @@ Append-only. Never rewrite past entries.
 ### Fixed
 - `POST /login` self-scan finding reappeared because the `secureagent: ignore` comment moved to the
   closing line when the signature was wrapped; moved onto the `def` line.
+
+## 2026-10-11 (Authorization matrix in the report; unguarded-route de-duplication)
+
+### Added
+- Report section 6 shows the route x guard matrix (`authorization_matrix` on the report context).
+
+### Changed
+- A generic "endpoint without visible authorization" finding is merged into a more specific finding on
+  the same route (an unguarded sibling, or a declared `require_auth` rule) instead of being reported twice.
+  The count is shown (`superseded`). Baseline fingerprints of the merged generic findings disappear.
+- Demo: 33 findings (3 merged).

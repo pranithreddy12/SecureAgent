@@ -126,6 +126,22 @@ class AttackChain(BaseModel):
     assumptions: list[str] = []
 
 
+class MatrixRoute(BaseModel):
+    method: str
+    path: str
+    handler: str
+    guarded: bool
+    guard: str | None = None
+    location: str
+
+
+class MatrixGroupView(BaseModel):
+    resource: str
+    guarded: int
+    total: int
+    routes: list[MatrixRoute]
+
+
 class ReportContext(BaseModel):
     audit_id: str
     audit_status: str
@@ -153,6 +169,7 @@ class ReportContext(BaseModel):
     interesting_paths: list[str] = []
     findings: list[ReportFinding] = []
     attack_chains: list[AttackChain] = []
+    authorization_matrix: list[MatrixGroupView] = []
     limitations: list[str] = []
     timeline: list[TimelineEntry] = []
 

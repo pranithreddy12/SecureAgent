@@ -144,6 +144,20 @@
   <div class="stat"><b>{{ r.forms | length }}</b>Forms</div>
   <div class="stat"><b>{{ r.parameters | length }}</b>Parameters</div>
 </div>
+{% if r.authorization_matrix %}
+<h3>Authorization matrix</h3>
+<p class="muted small">Routes grouped by resource. &ldquo;open&rdquo; means no authorization guard was detected statically; global middleware cannot be seen.</p>
+<table class="small">
+  <tr><th>Resource</th><th>Method</th><th>Path</th><th>Handler</th><th>Guard</th></tr>
+  {% for g in r.authorization_matrix %}
+    {% for rt in g.routes %}
+    <tr>{% if loop.first %}<td rowspan="{{ g.routes | length }}"><b>/{{ g.resource }}</b><br><span class="muted">{{ g.guarded }}/{{ g.total }} guarded</span></td>{% endif %}
+      <td>{{ rt.method }}</td><td>{{ rt.path }}</td><td>{{ rt.handler or "—" }}</td>
+      <td>{% if rt.guarded %}{{ rt.guard or "guarded" }}{% else %}<b>open</b>{% endif %}</td></tr>
+    {% endfor %}
+  {% endfor %}
+</table>
+{% endif %}
 {% if r.interesting_paths %}<h3>Interesting paths</h3><ul>{% for p in r.interesting_paths %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
 
 <h2 id="s7">7. Technology Stack Detected</h2>

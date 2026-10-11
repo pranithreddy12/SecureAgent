@@ -7,10 +7,17 @@ import os
 import uuid
 from datetime import UTC, datetime
 
+from app.analysis.authz_matrix import build_matrix
 from app.analysis.chains import find_chains
 from app.analysis.scanner import ScanResult
 from app.core.enums import FindingStatus, Severity
-from app.schemas.report import ReportContext, ReportFinding, type_label
+from app.schemas.report import (
+    MatrixGroupView,
+    MatrixRoute,
+    ReportContext,
+    ReportFinding,
+    type_label,
+)
 
 AUTHORIZATION_STATEMENT = (
     "I confirm that I am authorized to analyse the source code scanned in this report."
@@ -240,6 +247,28 @@ def _route_finding(f) -> ReportFinding:
     )
 
 
+def _matrix_view(result: ScanResult) -> list[MatrixGroupView]:
+    return [
+        MatrixGroupView(
+            resource=g.resource,
+            guarded=g.guarded,
+            total=len(g.routes),
+            routes=[
+                MatrixRoute(
+                    method=r.method,
+                    path=r.path,
+                    handler=r.handler or "",
+                    guarded=r.protected,
+                    guard=r.guard,
+                    location=f"{r.relpath}:{r.line}",
+                )
+                for r in g.routes
+            ],
+        )
+        for g in build_matrix(result.routes)
+    ]
+
+
 def scan_to_report_context(
     result: ScanResult, *, repo_label: str | None = None, demo: bool = False
 ) -> ReportContext:
@@ -303,5 +332,6 @@ def scan_to_report_context(
         endpoints=endpoints,
         findings=findings,
         attack_chains=find_chains(findings, result.routes),
+        authorization_matrix=_matrix_view(result),
         limitations=limitations,
     )
