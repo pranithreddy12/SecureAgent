@@ -101,3 +101,16 @@ The web app analyses code that is **mounted into the backend container**, never 
 Outside Compose, set `SOURCE_ROOTS` to a comma-separated list of absolute directories; an empty value
 disables the feature (the API answers 503). Paths are resolved (symlinks and `..` included) and must be
 inside a root. The directory is only read.
+
+## First administrator
+
+Registration always creates an `auditor`. Create or promote an administrator from the server:
+
+```bash
+# in the backend container, or locally with the project virtualenv
+SECUREAGENT_ADMIN_PASSWORD='choose-a-strong-passphrase' \
+  python -m app.manage create-admin --email you@example.com --name "Your Name"
+```
+
+The password is read from `SECUREAGENT_ADMIN_PASSWORD` or prompted for; it is never a command-line
+argument. If the email already exists the account is promoted and its password is left unchanged.

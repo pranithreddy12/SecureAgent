@@ -119,3 +119,12 @@ def test_cli_clean_repo_exit_zero(tmp_path: Path, capsys: pytest.CaptureFixture)
 
 def test_cli_bad_path_exit_two(capsys: pytest.CaptureFixture) -> None:
     assert main(["scan", "/no/such/path/here"]) == 2
+
+
+def test_env_var_names_are_not_secrets():
+    from app.analysis.secrets import scan_text
+
+    assert scan_text("a.py", 'PASSWORD_ENV = "SECUREAGENT_ADMIN_PASSWORD"\n') == []
+    assert scan_text("a.py", 'API_KEY_VAR = "STRIPE_SECRET_KEY"\n') == []
+    # a real-looking value is still reported
+    assert scan_text("a.py", 'DB_PASSWORD = "Tr0ub4dor&3xK9vQ2mZ"\n')

@@ -1,4 +1,4 @@
-.PHONY: up down lab logs backend-dev frontend-dev testdb migrate test lint build
+.PHONY: up down lab logs backend-dev frontend-dev testdb migrate test lint build test-frontend create-admin
 
 up:            ## build and start the stack
 	docker compose up --build -d
@@ -33,6 +33,12 @@ lint:
 
 build:
 	cd frontend && npm run build
+
+test-frontend:
+	cd frontend && npm test
+
+create-admin:  ## make create-admin EMAIL=you@example.com NAME="Your Name"
+	cd backend && .venv/Scripts/python -m app.manage create-admin --email $(EMAIL) --name "$(NAME)"
 
 scan:          ## static secret scan of a repo: make scan DIR=/path/to/repo
 	cd backend && .venv/Scripts/python -m app.cli scan $(DIR)

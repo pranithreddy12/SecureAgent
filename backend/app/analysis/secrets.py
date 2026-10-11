@@ -120,10 +120,15 @@ def _fingerprint(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8", "replace")).hexdigest()[:16]
 
 
+_ENV_VAR_NAME = re.compile(r"^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$")  # SECUREAGENT_ADMIN_PASSWORD
+
+
 def _is_placeholder(value: str) -> bool:
     v = value.strip()
     if _PLACEHOLDER.match(v) or _ENV_REFERENCE.search(v) or v.lower() in _BENIGN_VALUES:
         return True
+    if _ENV_VAR_NAME.match(v):
+        return True  # the *name* of a variable (PASSWORD_ENV = "APP_PASSWORD"), not a value
     return len(set(v)) <= 2  # e.g. "aaaaaa", "------"
 
 

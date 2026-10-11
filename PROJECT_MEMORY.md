@@ -282,6 +282,8 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Python taint resolves cross-file calls heuristically (import hint / unique name), does not model
   sanitizers, and does not follow class attributes; JS/TS analysis is regex-based (no AST).
 - OSV matching uses pinned versions in lockfiles (no range resolution); needs network (skipped gracefully).
+- Frontend has 24 Vitest tests (CI) but no browser e2e. `vitest@5` required `@types/node@^22`; vitest 3 pulled
+  critical advisories (tinypool/mocker), which the project's own OSV scan would have flagged.
 - Login throttling is in-process (per worker); the interrupted-audit sweep assumes one API process.
 - Intraprocedural IDOR heuristic only (it also flags legitimate by-id lookups of shared catalogue data).
 - Workflow-order detection is a handler-local heuristic (Python): a state machine in the model/DB or a helper

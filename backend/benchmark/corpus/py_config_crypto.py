@@ -76,3 +76,5 @@ def s_handled():
     except Exception:
         logger.exception("risky failed")
         raise
+
+PASSWORD_ENV_NAME = "APP_ADMIN_PASSWORD"  # the name of an environment variable, not a secret

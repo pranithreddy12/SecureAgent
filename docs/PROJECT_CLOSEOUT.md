@@ -107,8 +107,8 @@ consolidated findings, compact CVE/CVSS, denser layout (demo PDF 33 → 25 pages
 6. Optional LLM reasoning with deterministic fallback; fixture-driven demo of the pipeline.
 
 ### C. Independent of the blocker (can be done any time)
-- Frontend tests (component + one Playwright e2e of register→login→dashboard).
-- Admin bootstrap command; production cookie/CORS checklist. (Login throttling built 2026-10-11, in-process.)
+- Playwright browser e2e (24 component/unit tests exist since 2026-10-11).
+- Production cookie/CORS checklist. (Login throttling and the admin bootstrap command were built 2026-10-11.)
 - Detector accuracy on **public** vulnerable corpora. A benchmark harness and a small author-written
   corpus exist (`secureagent benchmark`, `docs/benchmark.md`: 94% precision / 94% recall on that corpus);
   an independent corpus has not been run.

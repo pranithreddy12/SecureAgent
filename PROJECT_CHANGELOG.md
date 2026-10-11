@@ -683,3 +683,20 @@ Append-only. Never rewrite past entries.
 - Adding a guarded route group to the safe fixture made the authorization-matrix outlier rule flag two
   deliberately public GETs in the same `/safe` resource -- a real limitation of grouping by first path
   segment. The new safe route lives under its own resource instead; the heuristic is unchanged.
+
+## 2026-10-11 (Frontend tests, admin bootstrap, secret false positive)
+
+### Added
+- Frontend: Vitest 5 + Testing Library; 24 tests (api client, badges, audit list/detail pages: polling stops at a
+  terminal state, authorization checkbox gates submit, server errors surfaced, chains rendered). `npm test`; CI
+  step; Makefile target.
+- `python -m app.manage create-admin`: creates or promotes an administrator; password from
+  `SECUREAGENT_ADMIN_PASSWORD` or a prompt, never argv. `tests/test_manage.py`.
+
+### Fixed
+- `PASSWORD_ENV = "SECUREAGENT_ADMIN_PASSWORD"` was reported as a hardcoded secret (found by the self-scan):
+  UPPER_SNAKE values are variable names, not credentials.
+
+### Notes
+- Installing `vitest@3` introduced 2 critical + 5 high advisories (tinypool RCE gadget, mocker); `vitest@5`
+  (with `@types/node@^22`) removes them. Remaining audit output is the already-accepted dev-only `braces` chain.

@@ -61,6 +61,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck   # generates Next's route types first, then tsc
+      - run: npm test            # Vitest + Testing Library
       - run: npm run build
 
   self-scan:

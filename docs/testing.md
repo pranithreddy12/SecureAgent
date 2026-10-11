@@ -1,6 +1,10 @@
 # SecureAgent – Testing
 
-Status as of 2026-10-09: **253 backend tests: 252 pass, 1 skipped, 0 fail** (the skipped PDF test needs
+Frontend (added 2026-10-11): `cd frontend && npm test` runs 24 Vitest + Testing Library tests (API client,
+badges, audit list/detail pages incl. polling and the authorization gate); CI runs them. No Playwright
+browser e2e yet -- the end-to-end path was verified manually through Docker.
+
+Backend status as of 2026-10-09: **253 backend tests: 252 pass, 1 skipped, 0 fail** (the skipped PDF test needs
 the Pango libraries and passes in the Docker image), **93% line coverage** of `backend/app`.
 The frontend has **no automated tests yet** (see *Gaps*).
 
