@@ -10,7 +10,7 @@ this file may be cited as evidence until the evaluation in §4 has been run and 
 | A grey-box static auditor that combines taint analysis, authorization-matrix analysis, a developer *intent spec*, and attack-chain correlation, with an explicit **honesty model** (static findings are never "confirmed"; CVE/CVSS only from real advisories) | Working, tested implementation (ADR-008/010/012/013/015) | Engineering contribution; fine for a tool paper |
 | **Verified fix patches**: a patch is "verified" only if it parses and a re-scan shows the finding gone with nothing new | Implemented + unit-tested (ADR-013) | Novel-ish and cheap to evaluate properly |
 | **Benchmarks written by the tool's author overstate real-world precision** | Author corpus: 97% precision / 95% recall. First independent scan of a real multi-project directory: 204 findings, a large majority false positives (root causes enumerated in `PROJECT_CHANGELOG.md`, 2026-10-12) | A useful, honest *negative result*; currently anecdotal (n = 1 project, triage by an LLM assistant) |
-| Deterministic scanner as the exhaustive layer under an LLM reviewer (MCP) | MCP server exists; protocol-level tests only | Position/vision; not yet evaluated |
+| Deterministic scanner as the exhaustive layer under an LLM reviewer (MCP, and the built-in `review` command) | MCP server and an opt-in LLM review layer exist (ADR-017); fake-transport tests only, no live run, no accuracy data | Position/vision; **RQ5 not evaluated** |
 
 What can **not** be claimed: that it outperforms CodeQL/Semgrep/Bandit/Snyk, that it finds business-logic
 flaws a human would miss, any detection rate on real software, or that the LLM-assisted workflow works

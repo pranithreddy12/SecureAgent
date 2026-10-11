@@ -72,6 +72,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R65 | Taint path explanation (source -> hops -> sink) on injection findings | project (explainability) | backend/app/analysis/taint.py (`_TaintSet`, `_trace_expr`), tests/test_taint.py | Implemented + Tested (Python; JS findings have no path) |
 | R66 | Justified, expiring finding suppressions (`suppress`, `secureagent-suppressions.json`) | project (feedback loop) | backend/app/analysis/suppressions.py, cli.py, tests/test_suppressions.py | Implemented + Tested (CLI/file based; no web UI yet) |
 | R67 | Diff mode: findings new since a git ref (`--since`, MCP `scan_diff`) | project (PR review) | backend/app/analysis/gitdiff.py, cli.py, mcp_server.py, tests/test_gitdiff.py | Implemented + Tested |
+| R68 | Opt-in LLM review of findings (consent, redaction, evidence-quote verification, never affects gating) | ADR-017, SPEC §6 (optional LLM with deterministic fallback) | backend/app/analysis/llm_review.py, cli.py `review`, tests/test_llm_review.py | Implemented + Tested with a fake transport; **live model call and accuracy not evaluated** |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.

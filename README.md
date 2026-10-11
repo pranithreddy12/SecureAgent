@@ -77,6 +77,8 @@ secureagent scan . --matrix                     # route x guard authorization ma
 secureagent fix .                             # verified patches as diffs (add --apply to write them)
 secureagent scan . --since origin/main         # only findings NEW compared with a git ref (PR review)
 secureagent suppress . --list                  # every finding with a short id
+secureagent review . --dry-run                 # LLM second opinion: show exactly what would be sent
+ANTHROPIC_API_KEY=... secureagent review . --report ai.html   # opt-in; asks before sending code
 secureagent suppress . --id 3f9a1c0b --reason "cache key only, never a password" --expires 2027-01-01
 secureagent benchmark backend/benchmark/corpus # measured precision/recall on the bundled corpus
 secureagent scan . --format sarif --output secureagent.sarif        # GitHub code scanning
@@ -141,7 +143,7 @@ redaction everywhere, read-only scanning, escaped reports.
 
 ```bash
 make testdb                      # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q    # 449 tests; ~93% coverage
+cd backend && python -m pytest -q    # 465 tests; ~93% coverage
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 cd frontend && npm run e2e           # Playwright against the Docker stack (frontend/e2e/README.md)
 ```

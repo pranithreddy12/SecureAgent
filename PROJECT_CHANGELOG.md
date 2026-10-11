@@ -887,3 +887,20 @@ Every false-positive class was traced to a detector defect and fixed, with regre
 - JS/TS taint findings have no path (they are regex-based).
 - A suppression keyed by fingerprint covers the *same* type/file/title; changing the finding's title
   (a detector wording change) invalidates it by design -- re-review.
+
+## 2026-10-12 (Opt-in LLM review layer -- ADR-017)
+
+### Added
+- `secureagent review PATH [--limit N] [--model M] [--dry-run] [--yes] [--report FILE]`: a model's second
+  opinion (true / false positive / unclear + one quoted evidence line) on reviewable findings.
+- Safeguards: explicit consent (or `--yes`), `--dry-run` payload preview, key from `ANTHROPIC_API_KEY` only,
+  secret redaction, secret findings and git-ignored files never sent, strict-JSON parsing, **evidence
+  quote must exist in the code sent or the verdict becomes `unclear`**, local (model, prompt) cache.
+- `AIReview` on report findings, rendered as "an unverified second opinion that does not change this
+  finding's status".
+- 16 tests (463 backend tests total), all with a fake transport.
+
+### Notes
+- The verdict never changes status, severity, fingerprint, suppression or the CI gate.
+- Not evaluated: a live model call has not been run by the project, and accuracy is unmeasured (RQ5).
+- Stdlib HTTP only; no SDK dependency.

@@ -393,6 +393,129 @@ def _run_fix(args) -> int:
     return 0
 
 
+def _run_review(args) -> int:
+    from app.analysis import llm_review as lr
+    from app.analysis.baseline import fingerprint
+    from app.analysis.gitignore import GitIgnore
+    from app.analysis.reporting import scan_to_report_context
+
+    try:
+        result = scan_repo(args.path, check_osv=False, exclude=args.exclude)
+    except (IngestError, IntentError, SuppressionError, FileNotFoundError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    ctx = scan_to_report_context(result)
+    ignore = GitIgnore.from_root(args.path)
+    order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
+    candidates = [
+        f
+        for f in ctx.findings
+        if f.type in lr.REVIEWABLE
+        and f.status not in (FindingStatus.INFORMATIONAL, FindingStatus.FALSE_POSITIVE)
+        and not (ignore and ignore.is_ignored(f.endpoint.rsplit(":", 1)[0]))
+    ]
+    candidates.sort(key=lambda f: (order.get(f.severity.value, 9), -f.confidence, f.endpoint))
+    prepared = []
+    for f in candidates[: max(args.limit, 0)]:
+        path = _evidence_path(f.evidence)
+        context = lr.build_context(args.path, f, path)
+        if context is not None:
+            prepared.append((f, path, context))
+    if not prepared:
+        print("Nothing to review (no reviewable findings with readable code).")
+        return 0
+
+    chars = sum(len(c.text) for _, _, c in prepared)
+    files = sorted({name for _, _, c in prepared for name in c.files})
+    model = args.model or os.environ.get("SECUREAGENT_REVIEW_MODEL") or lr.DEFAULT_MODEL
+    print(
+        f"LLM review: {len(prepared)} finding(s), about {chars // 1024 + 1} KiB of code from "
+        f"{len(files)} file(s), model {model}.\n"
+        "Secret-looking values are redacted; secret findings and git-ignored files are never "
+        "sent. The verdict is shown beside each finding and never changes status or gating.",
+        file=sys.stderr,
+    )
+    if args.dry_run:
+        for f, path, context in prepared:
+            print(f"\n===== {f.endpoint}  {f.title}\n{lr.build_prompt(f, context, path)}")
+        print("\n(dry run: nothing was sent)", file=sys.stderr)
+        return 0
+    try:
+        key = lr.api_key_from_env()
+    except lr.ReviewError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if not args.yes:
+        if not sys.stdin.isatty():
+            print("error: refusing to send code without --yes in a non-interactive session",
+                  file=sys.stderr)  # fmt: skip
+            return 2
+        if input(f"Send these excerpts to {lr.API_URL}? [y/N] ").strip().lower() not in {
+            "y",
+            "yes",
+        }:
+            print("Cancelled; nothing was sent.", file=sys.stderr)
+            return 1
+
+    reviewer = lr.Reviewer(
+        api_key=key,
+        model=model,
+        transport=lr.http_transport,  # looked up now so tests/embedders can replace it
+        cache_path=lr.default_cache_path(),
+    )
+    reviewed = {}
+    try:
+        for f, path, context in prepared:
+            review = reviewer.review(f, context, path)
+            reviewed[f.endpoint + "|" + f.title] = review
+            tag = review.verdict.upper().replace("_", " ")
+            print(f"[{tag} {review.confidence:.0%}] {f.type}  {f.endpoint}")
+            print(f"    {review.reason}")
+            if review.quote:
+                print(
+                    f"    line: {review.quote}"
+                    + ("" if review.quote_verified else "  (NOT in code)")
+                )
+            if review.note:
+                print(f"    note: {review.note}")
+            if review.verdict == "false_positive" and review.confidence >= 0.8:
+                print(
+                    f"    suppress: secureagent suppress {args.path} --id {fingerprint(f)[:8]} "
+                    '--reason "<your justification>"'
+                )
+    except lr.ReviewError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        reviewer.save_cache()
+        return 2
+    reviewer.save_cache()
+
+    if args.report:
+        from app.reports.renderer import render_html
+        from app.schemas.report import AIReview
+
+        attached = []
+        for f in ctx.findings:
+            r = reviewed.get(f.endpoint + "|" + f.title)
+            attached.append(f.model_copy(update={"ai_review": AIReview(**r.__dict__)}) if r else f)
+        html = render_html(ctx.model_copy(update={"findings": attached}))
+        with open(args.report, "w", encoding="utf-8") as fh:
+            fh.write(html)
+        print(f"Wrote report with AI verdicts to {args.report}", file=sys.stderr)
+    print(
+        f"Reviewed {len(reviewed)} finding(s). Reminder: verdicts are unverified second opinions."
+    )
+    return 0
+
+
+def _evidence_path(evidence: str | None) -> tuple[str, ...]:
+    """The taint path steps embedded in a finding's evidence text."""
+    marker = "How the input gets here:"
+    if not evidence or marker not in evidence:
+        return ()
+    steps = evidence.split(marker, 1)[1].strip().splitlines()
+    return tuple(s.strip().split(". ", 1)[-1] for s in steps if s.strip())
+
+
 def _run_suppress(args) -> int:
     import getpass
     from datetime import date
@@ -593,7 +716,7 @@ def _open_report(result: ScanResult, scanned: str, written: str | None) -> bool:
     return True
 
 
-_COMMANDS = {"scan", "demo", "benchmark", "fix", "suppress", "-h", "--help"}
+_COMMANDS = {"scan", "demo", "benchmark", "fix", "suppress", "review", "-h", "--help"}
 
 
 def _expand_shorthand(argv: list[str]) -> list[str]:
@@ -711,6 +834,22 @@ def main(argv: list[str] | None = None) -> int:
     supp.add_argument("--expires", help="Re-review date, YYYY-MM-DD (recommended).")
     supp.add_argument("--exclude", action="append", default=[], metavar="PATTERN")
 
+    review = sub.add_parser(
+        "review",
+        help="Opt-in LLM second opinion on findings (sends code excerpts to the Anthropic API).",
+    )
+    review.add_argument("path", nargs="?", default=".", help="Project directory (default: .)")
+    review.add_argument(
+        "--limit", type=int, default=15, help="Max findings to review (default 15)."
+    )
+    review.add_argument(
+        "--model", default=None, help="Model id (default: SECUREAGENT_REVIEW_MODEL)."
+    )
+    review.add_argument("--dry-run", action="store_true", help="Show exactly what would be sent.")
+    review.add_argument("--yes", action="store_true", help="Do not ask for confirmation.")
+    review.add_argument("--report", help="Write an HTML report that includes the AI verdicts.")
+    review.add_argument("--exclude", action="append", default=[], metavar="PATTERN")
+
     bench = sub.add_parser(
         "benchmark",
         help="Measure precision/recall against a corpus labelled with VULN:<type> markers.",
@@ -737,6 +876,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_fix(args)
     if args.command == "suppress":
         return _run_suppress(args)
+    if args.command == "review":
+        return _run_review(args)
 
     try:
         result = scan_repo(

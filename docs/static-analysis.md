@@ -119,6 +119,16 @@ WeasyPrint native libraries available in the Docker image).
   moved code is not new, a second identical issue is). `--fail-on` gates on the new findings only.
   MCP: `scan_diff`.
 
+## LLM review (opt-in second opinion)
+
+`secureagent review PATH` asks a model whether each reviewable finding is a true positive, a false
+positive or unclear, with one quoted line of evidence (ADR-017). It needs `ANTHROPIC_API_KEY`, shows what
+will be sent and asks first (`--yes` to skip, `--dry-run` to only print). It sends the finding's function,
+up to three helpers it calls and the taint path; secret-looking values are redacted and secret findings are
+never sent. A verdict whose quote is not in the code that was sent is discarded. The verdict is shown beside
+the finding (`--report` writes an HTML report with it) and **never** changes status, baseline or gating.
+Unevaluated: use verdicts as hints.
+
 ## Real-world calibration
 
 The first independent scan (a developer's own multi-project directory) drove a round of precision fixes

@@ -214,6 +214,13 @@
   {% if f.impact %}<p><b>Impact.</b> {{ f.impact }}</p>{% endif %}
   <p><b>Evidence.</b>{% if f.validation_method %} <span class="muted">(validation: {{ f.validation_method }})</span>{% endif %}</p>
   {% if f.evidence %}<pre>{{ f.evidence }}</pre>{% else %}<p class="muted">No evidence recorded.</p>{% endif %}
+  {% if f.ai_review %}
+  <p class="small"><b>AI review</b> <span class="muted">({{ f.ai_review.model }}; an unverified second opinion that does not change this finding's status)</span>:
+    <b>{{ f.ai_review.verdict | replace("_", " ") }}</b> ({{ f.ai_review.confidence | pct }}).
+    {{ f.ai_review.reason }}
+    {% if f.ai_review.quote %}<br>Supporting line{% if not f.ai_review.quote_verified %} (not found in the code sent){% endif %}: <code>{{ f.ai_review.quote }}</code>{% endif %}
+    {% if f.ai_review.note %}<br><span class="muted">{{ f.ai_review.note }}</span>{% endif %}</p>
+  {% endif %}
   <p><b>Remediation.</b> {{ f.remediation or "No remediation guidance recorded." }}</p>
 </div>
 {% else %}<p class="muted">No reportable findings.</p>{% endfor %}

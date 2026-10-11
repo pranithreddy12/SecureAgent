@@ -45,6 +45,18 @@ class CvssScore(BaseModel):
     version: str | None = None
 
 
+class AIReview(BaseModel):
+    """An LLM's second opinion on a finding. Informational only: it never changes ``status``."""
+
+    verdict: str  # true_positive | false_positive | unclear
+    confidence: float = Field(ge=0, le=1)
+    reason: str = ""
+    quote: str = ""
+    quote_verified: bool = False
+    model: str = ""
+    note: str = ""
+
+
 class ReportFinding(BaseModel):
     title: str
     type: str
@@ -64,6 +76,7 @@ class ReportFinding(BaseModel):
     cvss: CvssScore | None = None
     remediation: str | None = None
     sources: list[str] = []
+    ai_review: AIReview | None = None
 
     @property
     def cve_display(self) -> str:
