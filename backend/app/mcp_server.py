@@ -82,6 +82,21 @@ TOOLS = [
         },
     },
     {
+        "name": "scan_diff",
+        "description": (
+            "Findings that are NEW compared with a git ref (branch, tag or commit), by "
+            "line-independent fingerprint. Use it to review a change instead of a whole repo."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "since": {"type": "string", "description": "git ref, e.g. origin/main or HEAD~1"},
+            },
+            "required": ["path", "since"],
+        },
+    },
+    {
         "name": "application_model",
         "description": (
             "Static reconnaissance of a source directory: technologies, inputs read (query/body/"
@@ -270,6 +285,42 @@ def tool_suggest_fixes(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def tool_scan_diff(args: dict[str, Any]) -> dict[str, Any]:
+    from app.analysis.baseline import fingerprint
+    from app.analysis.gitdiff import GitDiffError, base_fingerprints, split_new
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.scanner import scan_repo
+
+    root = confine(str(args.get("path", "")))
+    if not root.is_dir():
+        raise ToolError(f"not a directory: {root}")
+    ref = str(args.get("since", "")).strip()
+    if not ref:
+        raise ToolError("'since' must be a git ref")
+
+    def scan(p: str):
+        return scan_repo(p, check_osv=False)
+
+    def findings(r):
+        return scan_to_report_context(r).findings
+
+    try:
+        base = base_fingerprints(str(root), ref, scan, fingerprint, findings)
+    except GitDiffError as exc:
+        raise ToolError(str(exc)) from exc
+    current = scan(str(root))
+    items = [(fingerprint(f), f) for f in findings(current)]
+    new, unchanged = split_new(items, base)
+    payload = _findings_payload(current)
+    wanted = {(f.endpoint, f.title) for _, f in new}
+    payload["findings"] = [x for x in payload["findings"] if (x["location"], x["title"]) in wanted]
+    payload["total_findings"] = len(new)
+    payload["returned"] = len(payload["findings"])
+    payload["since"] = ref
+    payload["unchanged_hidden"] = len(unchanged)
+    return payload
+
+
 def tool_application_model(args: dict[str, Any]) -> dict[str, Any]:
     from app.analysis.scanner import scan_repo
 
@@ -289,6 +340,7 @@ HANDLERS = {
     "scan_snippet": tool_scan_snippet,
     "scan_path": tool_scan_path,
     "suggest_fixes": tool_suggest_fixes,
+    "scan_diff": tool_scan_diff,
     "application_model": tool_application_model,
     "authorization_matrix": tool_authorization_matrix,
 }

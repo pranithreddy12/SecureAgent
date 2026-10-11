@@ -81,6 +81,7 @@ class TaintFinding:
     line: int
     sink: str
     evidence: str
+    path: tuple[str, ...] = ()  # source -> ... -> sink, one human-readable step each
 
     @property
     def cwe(self) -> str:
@@ -199,7 +200,9 @@ def _propagate_cross(func, relpath, tainted, gfuncs, imports_by_file, depth, vis
         if key in visited:
             continue
         visited.add(key)
-        ctaint = _function_tainted(callee, passed)
+        ctaint = _function_tainted(
+            callee, passed, None, _call_origins(call, callee, tainted, relpath, passed)
+        )
         out += _sinks_in_function(callee, ctaint, crel, clines)
         out += _propagate_cross(callee, crel, ctaint, gfuncs, imports_by_file, depth + 1, visited)
     return out
@@ -274,7 +277,9 @@ def _propagate(
         if key in visited:
             continue
         visited.add(key)
-        callee_tainted = _function_tainted(callee, passed, ctx)
+        callee_tainted = _function_tainted(
+            callee, passed, ctx, _call_origins(call, callee, tainted, relpath, passed)
+        )
         findings += _sinks_in_function(callee, callee_tainted, relpath, lines, ctx)
         findings += _propagate(
             callee, callee_tainted, functions, relpath, lines, depth + 1, visited, ctx
@@ -345,20 +350,124 @@ def _exits(body: list[ast.stmt]) -> bool:
     return False
 
 
-def _function_tainted(func, initial: set[str], ctx: _Ctx | None = None) -> set[str]:
+class _TaintSet(set):
+    """A set of tainted names that also remembers *why* each became tainted (for explanations).
+
+    ``origins`` maps an initially-tainted name (a parameter) to the steps that led to it;
+    ``parents`` maps a derived name to the (line, value expression) that tainted it."""
+
+    origins: dict[str, list[str]]
+    parents: dict[str, tuple[int, ast.expr]]
+
+
+def _function_tainted(
+    func,
+    initial: set[str],
+    ctx: _Ctx | None = None,
+    origins: dict[str, list[str]] | None = None,
+) -> _TaintSet:
     guarded = _allowlist_guarded(func)
-    tainted = set(initial) - guarded
-    assigns = _collect_assignments(func)
+    tainted = _TaintSet(set(initial) - guarded)
+    tainted.parents = {}
+    if origins is None:  # entry point: its parameters are the request input
+        origins = {n: [f"handler parameter `{n}` (request input)"] for n in initial}
+    tainted.origins = origins
+    assigns = _collect_assignments_lined(func)
     changed = True
     while changed:
         changed = False
-        for targets, value in assigns:
+        for targets, value, lineno in assigns:
             if _expr_tainted(value, tainted, ctx):
                 for t in targets:
                     if t not in tainted and t not in guarded:
                         tainted.add(t)
+                        tainted.parents[t] = (lineno, value)
                         changed = True
     return tainted
+
+
+def _collect_assignments_lined(func) -> list[tuple[list[str], ast.expr, int]]:
+    out: list[tuple[list[str], ast.expr, int]] = []
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign):
+            out.append((_target_names(node.targets), node.value, node.lineno))
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            out.append((_target_names([node.target]), node.value, node.lineno))
+        elif isinstance(node, (ast.AugAssign, ast.NamedExpr)):
+            out.append((_target_names([node.target]), node.value, node.lineno))
+    return out
+
+
+def _short(node: ast.AST, limit: int = 90) -> str:
+    try:
+        text = " ".join(ast.unparse(node).split())
+    except Exception:  # noqa: BLE001 - explanation text must never break analysis
+        return "<expression>"
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _trace_expr(expr, tainted, relpath: str, ctx: _Ctx | None = None) -> list[str]:
+    """Steps (source first) explaining why ``expr`` is attacker-influenced."""
+    steps: list[str] = []
+    seen: set[str] = set()
+
+    def from_expr(e) -> None:
+        for sub in _iter_unsanitized(e):
+            if isinstance(sub, ast.Name) and sub.id in tainted:
+                from_name(sub.id)
+                return
+            if (
+                ctx is not None
+                and isinstance(sub, ast.Call)
+                and not _is_source(sub)
+                and _call_returns_tainted(sub, tainted, ctx)
+            ):
+                steps.append(
+                    f"{relpath}:{sub.lineno}  {_short(sub)}  (returns request-controlled data)"
+                )
+                return
+            if _is_source(sub):
+                steps.append(
+                    f"{relpath}:{getattr(sub, 'lineno', '?')}  {_short(sub)}  (request input)"
+                )
+                return
+
+    def from_name(name: str) -> None:
+        if name in seen:
+            return
+        seen.add(name)
+        parents = getattr(tainted, "parents", {})
+        origins = getattr(tainted, "origins", {})
+        if name in parents:
+            lineno, value = parents[name]
+            if _is_source(value):  # `q = request.args.get("q")`: one step, not two
+                steps.append(f"{relpath}:{lineno}  {name} = {_short(value)}  (request input)")
+                return
+            from_expr(value)
+            steps.append(f"{relpath}:{lineno}  {name} = {_short(value)}")
+        elif name in origins:
+            steps.extend(origins[name])
+        else:
+            steps.append(f"{relpath}  `{name}` (tainted parameter)")
+
+    from_expr(expr)
+    return steps
+
+
+def _call_origins(call: ast.Call, callee, caller_tainted, relpath: str, passed) -> dict:
+    """For each tainted parameter of ``callee``: the caller-side steps plus the hop itself."""
+    positional = [a.arg for a in [*getattr(callee.args, "posonlyargs", []), *callee.args.args]]
+    pairs = list(zip(positional, call.args, strict=False))
+    pairs += [(kw.arg, kw.value) for kw in call.keywords if kw.arg]
+    out: dict[str, list[str]] = {}
+    for pname, arg in pairs:
+        if pname in passed:
+            steps = _trace_expr(arg, caller_tainted, relpath)
+            steps.append(
+                f"{relpath}:{call.lineno}  passed to {getattr(callee, 'name', '?')}() as `{pname}`"
+            )
+            out[pname] = steps
+    return out
 
 
 def _sinks_in_function(
@@ -381,9 +490,30 @@ def _sinks_in_function(
                 severity, confidence = "medium", 0.35
                 snippet = f"{snippet}  [query text arrives from callers via a parameter]"
             out.append(
-                TaintFinding(vuln_type, severity, confidence, relpath, call.lineno, sink, snippet)
+                TaintFinding(
+                    vuln_type,
+                    severity,
+                    confidence,
+                    relpath,
+                    call.lineno,
+                    sink,
+                    snippet,
+                    _sink_path(call, tainted, relpath, sink, ctx),
+                )
             )
     return out
+
+
+def _sink_path(
+    call: ast.Call, tainted, relpath: str, sink: str, ctx: _Ctx | None = None
+) -> tuple[str, ...]:
+    steps: list[str] = []
+    for arg in [*call.args, *(k.value for k in call.keywords)]:
+        if _expr_tainted(arg, tainted, ctx):
+            steps = _trace_expr(arg, tainted, relpath, ctx)
+            break
+    steps.append(f"{relpath}:{call.lineno}  {sink}(…)  (sink)")
+    return tuple(steps[-8:])  # long chains: keep the part nearest the sink
 
 
 def _check_sink(

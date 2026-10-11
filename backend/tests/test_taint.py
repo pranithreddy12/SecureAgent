@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from pathlib import Path
 
 from app.analysis.reporting import scan_to_report_context
@@ -136,3 +137,57 @@ def test_ssrf_status_is_suspicious(tmp_path: Path) -> None:
     ctx = scan_to_report_context(scan_repo(str(tmp_path), check_osv=False))
     ssrf = next(f for f in ctx.findings if f.type == "ssrf")
     assert ssrf.status is FindingStatus.SUSPICIOUS
+
+
+def _paths(src: str, vuln: str) -> list[tuple[str, ...]]:
+    return [f.path for f in analyze_taint("app.py", textwrap.dedent(src)) if f.vuln_type == vuln]
+
+
+def test_path_explains_assignment_chain_to_the_sink():
+    (path,) = _paths(
+        """
+        @app.get("/s")
+        def s():
+            term = request.args.get("q")
+            sql = "SELECT * FROM t WHERE n = '" + term + "'"
+            cur.execute(sql)
+        """,
+        "sql_injection",
+    )
+    assert [p.split("  ", 1)[0] for p in path] == ["app.py:4", "app.py:5", "app.py:6"]
+    assert "(request input)" in path[0] and "term" in path[0]
+    assert "sql = " in path[1] and path[-1].endswith("(sink)")
+
+
+def test_path_crosses_a_function_call():
+    (path,) = _paths(
+        """
+        def run(query):
+            cur.execute(query)
+
+        @app.get("/s")
+        def s():
+            q = request.args.get("q")
+            return run("SELECT " + q)
+        """,
+        "sql_injection",
+    )
+    text = "\n".join(path)
+    assert "request input" in text
+    assert "passed to run() as `query`" in text
+    assert path[-1].startswith("app.py:3") and path[-1].endswith("(sink)")
+
+
+def test_path_names_a_helper_that_returns_request_data():
+    (path,) = _paths(
+        """
+        def current_theme():
+            return request.cookies.get("theme")
+
+        @app.get("/t")
+        def theme():
+            return eval("themes." + current_theme())
+        """,
+        "code_injection",
+    )
+    assert any("returns request-controlled data" in step for step in path)

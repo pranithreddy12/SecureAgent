@@ -71,7 +71,11 @@ class _RouteIndex:
 
 
 def find_chains(findings: list[ReportFinding], routes: list[Route]) -> list[AttackChain]:
-    findings = [f for f in findings if f.status is not FindingStatus.INFORMATIONAL]
+    findings = [
+        f
+        for f in findings
+        if f.status not in (FindingStatus.INFORMATIONAL, FindingStatus.FALSE_POSITIVE)
+    ]
     index = _RouteIndex(routes)
     chains: list[AttackChain] = []
     seen: set[tuple[str, ...]] = set()

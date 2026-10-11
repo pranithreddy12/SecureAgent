@@ -866,3 +866,24 @@ Every false-positive class was traced to a detector defect and fixed, with regre
   `verify_*`, `*_owner*`), compares an owner attribute (`.owner_id`, `.user_id`, `.created_by`), or raises
   an explicit 401/403 is treated as guarded (the matrix shows "in-handler check: ..."). `check_output` /
   `check_call` are deliberately *not* access checks. `Depends(get_owned_cat)` is recognised.
+
+## 2026-10-12 (Taint paths, justified suppressions, diff mode)
+
+### Added
+- **Taint path ("why was this flagged?")**: injection findings carry `path`, the ordered steps from the
+  request input through assignments, helper return values and calls to the sink (`_TaintSet` remembers why
+  each name became tainted; `_trace_expr` renders it). Terminal, JSON `path`, report evidence.
+- **Feedback loop**: `secureagent suppress --list|--id ... --reason ...` writes
+  `secureagent-suppressions.json` (reason >= 10 chars, optional expiry, occurrence `count`). Matching
+  findings become `false_positive` with the justification; expired suppressions are reported and stop
+  applying; suppressed findings do not fail gates, appear in the terminal list or form attack chains.
+- **Diff mode**: `scan --since <ref>` (`git archive` into a temp dir; multiset fingerprint comparison),
+  gating on new findings only; MCP tool `scan_diff`.
+- 26 new tests (447 backend tests total).
+
+### Notes
+- Suppressions are file-based; the web app honours the file if it is in the audited directory but has
+  no "mark as false positive" button yet.
+- JS/TS taint findings have no path (they are regex-based).
+- A suppression keyed by fingerprint covers the *same* type/file/title; changing the finding's title
+  (a detector wording change) invalidates it by design -- re-review.

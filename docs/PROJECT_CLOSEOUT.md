@@ -2,7 +2,7 @@
 
 Date: 2026-10-11 · Repository: `main` (CI green on all four jobs: backend, frontend, self-scan, end-to-end)
 
-Evidence at close-out: **402 backend tests pass (2 skipped: PDF, which CI runs, and a Windows-only symlink case), 93% line coverage ·
+Evidence at close-out: **447 backend tests pass (2 skipped: PDF, which CI runs, and a Windows-only symlink case), 93% line coverage ·
 33 frontend unit tests · 7 Playwright browser tests · 16 ADRs · detector benchmark 97% precision / 95%
 recall on the bundled corpus · self-scan clean (0 new findings; 1 accepted advisory)**.
 

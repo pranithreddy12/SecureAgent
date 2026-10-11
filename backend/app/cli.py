@@ -22,6 +22,7 @@ from dataclasses import asdict
 from app.analysis.ingest import IngestError
 from app.analysis.intent import IntentError
 from app.analysis.scanner import ScanResult, scan_repo
+from app.analysis.suppressions import SuppressionError
 from app.core.enums import FindingStatus
 
 _COLORS = {
@@ -39,7 +40,12 @@ def _tag(severity: str, color: bool) -> str:
     return f"{_COLORS.get(severity, '')}{t}{_RESET}" if color else t
 
 
-def _render_text(result: ScanResult, color: bool) -> str:
+def _render_text(
+    result: ScanResult,
+    color: bool,
+    unchanged: set[str] | None = None,
+    since: str | None = None,
+) -> str:
     lines: list[str] = [f"SecureAgent static scan — {result.root}"]
     lines.append(
         f"Scanned {result.stats.files_scanned} files "
@@ -77,14 +83,20 @@ def _render_text(result: ScanResult, color: bool) -> str:
     context = scan_to_report_context(result)
     # Findings the validator reclassified (test/example/dev-only code, gitignored local files) are
     # not listed here; the HTML report keeps them with the reason.
-    hidden = {f.endpoint for f in context.findings if f.status is _Status.INFORMATIONAL}
+    hidden = {
+        f.endpoint
+        for f in context.findings
+        if f.status in (_Status.INFORMATIONAL, _Status.FALSE_POSITIVE)
+    }
+
+    diff_hidden = unchanged or set()
 
     def _visible(items):
         def key(f):
             r = getattr(f, "route", f)
             return f"{r.relpath}:{r.line}"
 
-        return [f for f in items if key(f) not in hidden]
+        return [f for f in items if key(f) not in hidden and key(f) not in diff_hidden]
 
     shown_ordered_secrets = _visible(result.ordered_secrets)
     shown_ordered_misconfig_findings = _visible(result.ordered_misconfig_findings)
@@ -99,10 +111,16 @@ def _render_text(result: ScanResult, color: bool) -> str:
     lines.append(
         f"{result.total_findings} finding(s): " + ", ".join(f"{v} {k}" for k, v in counts.items())
     )
+    if since:
+        lines.append(
+            f"Diff mode: showing findings new since {since}; "
+            f"{len(diff_hidden)} unchanged finding(s) hidden."
+        )
     if hidden:
         lines.append(
-            f"{len(hidden)} of them are informational (test/example/dev-only code or files ignored "
-            "by git) and are hidden here; the HTML report lists them with the reason."
+            f"{len(hidden)} of them are informational (test/example/dev-only code, git-ignored "
+            "files) or suppressed with a justification, and are hidden here; the HTML report "
+            "lists them with the reason."
         )
 
     if shown_ordered_secrets:
@@ -149,6 +167,8 @@ def _render_text(result: ScanResult, color: bool) -> str:
         for f in shown_ordered_taint_findings:
             lines.append(f"  {_tag(f.severity, color)} {f.vuln_type.replace('_', ' ')} → {f.sink}")
             lines.append(f"      {f.relpath}:{f.line}  ({f.cwe})")
+            for i, step in enumerate(f.path, 1):
+                lines.append(f"        {i}. {step}")
 
     if shown_ordered_sink_findings:
         lines.append("\nDangerous code patterns:")
@@ -270,6 +290,7 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
                 "cwe": f.cwe,
                 "owasp": f.owasp,
                 "evidence": f.evidence,
+                "path": list(f.path),
             }
             for f in result.ordered_taint_findings
         ],
@@ -369,6 +390,77 @@ def _run_fix(args) -> int:
         print(f"Applied to {len(written)} file(s): {', '.join(written) or 'none'}")
     else:
         print("Dry run. Re-run with --apply to write the verified patches.")
+    return 0
+
+
+def _run_suppress(args) -> int:
+    import getpass
+    from datetime import date
+
+    from app.analysis.baseline import fingerprint
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.suppressions import FILENAME, MIN_REASON, Suppression, add
+
+    try:
+        # Scan without applying existing suppressions so every finding keeps its identity.
+        result = scan_repo(args.path, check_osv=False, exclude=args.exclude)
+    except (IngestError, IntentError, SuppressionError, FileNotFoundError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    result.suppressions = []
+    findings = [
+        f
+        for f in scan_to_report_context(result).findings
+        if f.type != "vulnerable_dependency" or f.endpoint
+    ]
+    rows = [(fingerprint(f), f) for f in findings]
+    if args.list or not args.id:
+        for fp, f in rows:
+            print(f"{fp[:8]}  {f.severity.value:<8} {f.status.value:<13} {f.endpoint}  {f.title}")
+        print(
+            f"\n{len(rows)} finding(s). Suppress one: secureagent suppress --id <id> --reason ..."
+        )
+        return 0
+
+    matches = [(fp, f) for fp, f in rows if fp.startswith(args.id.lower())]
+    fps = {fp for fp, _ in matches}
+    if len(fps) != 1:
+        msg = "no finding has that id" if not fps else "that id is ambiguous; use more characters"
+        print(f"error: {msg}", file=sys.stderr)
+        return 2
+    reason = (args.reason or "").strip()
+    if len(reason) < MIN_REASON:
+        print(f"error: --reason of at least {MIN_REASON} characters is required", file=sys.stderr)
+        return 2
+    fp = next(iter(fps))
+    f = matches[0][1]
+    try:
+        by = args.by or getpass.getuser()
+    except Exception:  # noqa: BLE001
+        by = "unknown"
+    entry = Suppression(
+        fingerprint=fp,
+        type=f.type,
+        location=f.endpoint.rsplit(":", 1)[0],
+        title=f.title,
+        reason=reason,
+        by=by,
+        created=date.today().isoformat(),
+        expires=args.expires,
+        count=len(matches),
+    )
+    target = os.path.join(args.path, FILENAME)
+    try:
+        add(target, entry)
+    except (SuppressionError, OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(
+        f"Suppressed {entry.type} in {entry.location} "
+        f"({len(matches)} occurrence(s)); wrote {target}"
+    )
+    if not entry.expires:
+        print("Tip: set --expires so the decision is revisited.")
     return 0
 
 
@@ -501,7 +593,7 @@ def _open_report(result: ScanResult, scanned: str, written: str | None) -> bool:
     return True
 
 
-_COMMANDS = {"scan", "demo", "benchmark", "fix", "-h", "--help"}
+_COMMANDS = {"scan", "demo", "benchmark", "fix", "suppress", "-h", "--help"}
 
 
 def _expand_shorthand(argv: list[str]) -> list[str]:
@@ -533,6 +625,12 @@ def main(argv: list[str] | None = None) -> int:
         default=".",
         help="Directory to scan (default: the current directory). You must be authorized to "
         "analyse it.",
+    )
+    scan.add_argument(
+        "--since",
+        metavar="REF",
+        help="Diff mode: report only findings that are new compared with this git ref "
+        "(branch, tag or commit, e.g. origin/main). Gating applies to the new findings only.",
     )
     scan.add_argument(
         "--exit-zero",
@@ -601,6 +699,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Write the VERIFIED patches into the files (unverified ones are never written).",
     )
 
+    supp = sub.add_parser(
+        "suppress",
+        help="List findings with short ids, or suppress one with a recorded justification.",
+    )
+    supp.add_argument("path", nargs="?", default=".", help="Project directory (default: .)")
+    supp.add_argument("--list", action="store_true", help="Print every finding with its id.")
+    supp.add_argument("--id", help="Finding id (prefix from --list) to suppress.")
+    supp.add_argument("--reason", help="Why this is not a real issue (min 10 characters).")
+    supp.add_argument("--by", help="Who is making the call (default: your user name).")
+    supp.add_argument("--expires", help="Re-review date, YYYY-MM-DD (recommended).")
+    supp.add_argument("--exclude", action="append", default=[], metavar="PATTERN")
+
     bench = sub.add_parser(
         "benchmark",
         help="Measure precision/recall against a corpus labelled with VULN:<type> markers.",
@@ -625,6 +735,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_benchmark(args)
     if args.command == "fix":
         return _run_fix(args)
+    if args.command == "suppress":
+        return _run_suppress(args)
 
     try:
         result = scan_repo(
@@ -634,7 +746,7 @@ def main(argv: list[str] | None = None) -> int:
             exclude=args.exclude,
             intent=args.intent,
         )
-    except (IngestError, IntentError, FileNotFoundError) as exc:
+    except (IngestError, IntentError, SuppressionError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -653,16 +765,35 @@ def main(argv: list[str] | None = None) -> int:
     baseline = load_baseline(args.baseline) if args.baseline else set()
     new_items = [(fp, f) for fp, f in items if fp not in baseline]
     suppressed = len(items) - len(new_items)
+    unchanged_endpoints: set[str] | None = None
+    if args.since:
+        from app.analysis.gitdiff import GitDiffError, base_fingerprints, split_new
+
+        try:
+            base = base_fingerprints(
+                args.path,
+                args.since,
+                lambda p: scan_repo(p, check_osv=not args.no_osv, exclude=args.exclude),
+                fingerprint,
+                lambda r: scan_to_report_context(r).findings,
+            )
+        except GitDiffError as exc:
+            print(f"error: --since {args.since}: {exc}", file=sys.stderr)
+            return 2
+        new_items, unchanged = split_new(items, base)
+        suppressed = len(unchanged)
+        unchanged_endpoints = {f.endpoint for _, f in unchanged}
+    shown = new_items if args.since else items
 
     color = (not args.no_color) and sys.stdout.isatty() and args.format == "text"
     if args.format == "sarif":
         from app.analysis.sarif import to_sarif
 
-        report = json.dumps(to_sarif([f for _, f in items]), indent=2)
+        report = json.dumps(to_sarif([f for _, f in shown]), indent=2)
     elif args.format == "json":
-        report = _render_json(result, items, baseline)
+        report = _render_json(result, shown, baseline)
     else:
-        report = _render_text(result, color)
+        report = _render_text(result, color, unchanged_endpoints, args.since)
         if args.baseline:
             report += f"\nBaseline: {suppressed} suppressed, {len(new_items)} new."
         if args.matrix:
@@ -690,8 +821,8 @@ def main(argv: list[str] | None = None) -> int:
     # Findings reclassified as informational (test/example/dev-only code) never fail a gate.
     gating = [
         (fp, f)
-        for fp, f in (new_items if args.baseline else items)
-        if f.status is not FindingStatus.INFORMATIONAL
+        for fp, f in (new_items if (args.baseline or args.since) else items)
+        if f.status not in (FindingStatus.INFORMATIONAL, FindingStatus.FALSE_POSITIVE)
     ]
     if args.exit_zero:
         return 0

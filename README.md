@@ -75,6 +75,9 @@ secureagent scan /path/to/your/repo           # human-readable
 secureagent scan . --report report.html       # professional report (add --pdf for PDF)
 secureagent scan . --matrix                     # route x guard authorization matrix
 secureagent fix .                             # verified patches as diffs (add --apply to write them)
+secureagent scan . --since origin/main         # only findings NEW compared with a git ref (PR review)
+secureagent suppress . --list                  # every finding with a short id
+secureagent suppress . --id 3f9a1c0b --reason "cache key only, never a password" --expires 2027-01-01
 secureagent benchmark backend/benchmark/corpus # measured precision/recall on the bundled corpus
 secureagent scan . --format sarif --output secureagent.sarif        # GitHub code scanning
 secureagent scan . --write-baseline .secureagent-baseline.json      # accept today's findings
@@ -138,7 +141,7 @@ redaction everywhere, read-only scanning, escaped reports.
 
 ```bash
 make testdb                      # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q    # 404 tests; ~93% coverage
+cd backend && python -m pytest -q    # 449 tests; ~93% coverage
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 cd frontend && npm run e2e           # Playwright against the Docker stack (frontend/e2e/README.md)
 ```

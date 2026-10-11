@@ -190,7 +190,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 14 Frontend | Auth, dashboard (real data), audits list/detail; targets/global pages pending their APIs |
 | 15 Audit progress | Done for source audits (stages, polling, activity log) |
 | 16 Demo mode | CLI demo done; fixture demo of the agent pipeline pending |
-| 17 Testing | 404 backend (93% cov.) + 33 Vitest + 7 Playwright, all in CI |
+| 17 Testing | 449 backend (93% cov.) + 33 Vitest + 7 Playwright, all in CI |
 | 18 Docker integration | Compose runs and is e2e-tested; ZAP/Nuclei unused |
 | 19 End-to-end | Done for the source-audit journey (Playwright, CI job `e2e`) |
 | 20 Documentation | Done (13 ADRs, UML, guides, traceability R1-R58, close-out) |
@@ -371,6 +371,9 @@ reconnaissance -> scanner -> safe_validation -> validator -> correlation -> repo
 (`/api/projects`, authorization trail, revocation, per-user limits), resume from failed stage
 (`POST /api/audits/{id}/retry?resume=true`), migration `c8d2e4f6a1b3`, frontend `/projects`. ZAP/Nuclei are
 not applicable to source files. LangGraph tracing is disabled by default.
+
+**Explain / suppress / diff (2026-10-12):** taint `path` on injection findings; `secureagent suppress` +
+`secureagent-suppressions.json` (justified, expiring, count-capped); `scan --since REF` and MCP `scan_diff`.
 
 **Static reconnaissance + rule-based validation (2026-10-11, ADR-015):** `analysis/recon.py` (application
 model) and `analysis/validation.py` (test/example/dev-only findings -> informational). They are the in-scope

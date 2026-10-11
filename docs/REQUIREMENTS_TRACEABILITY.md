@@ -69,6 +69,9 @@ Status: Planned → In Progress → Implemented → Tested.
 | R62 | Accessible form fields (hint described-by, not in the label) | WCAG 1.3.1 / 4.1.2 | frontend/components/ui.tsx, e2e exact-label locators | Implemented + Tested |
 | R63 | Source reconnaissance (application model): technologies, inputs, outbound hosts, env vars | ADR-015 (static counterpart of SPEC reconnaissance) | backend/app/analysis/recon.py, tests/test_recon_validation.py, report sections 6-7, audit page | Implemented + Tested. **Does not satisfy live reconnaissance (R7), which stays Deferred** |
 | R64 | Rule-based finding validation (test/example/dev-only code reclassified as informational) | ADR-015 | backend/app/analysis/validation.py, tests/test_recon_validation.py | Implemented + Tested. **Does not satisfy Safe Validation (R11), which stays Deferred** |
+| R65 | Taint path explanation (source -> hops -> sink) on injection findings | project (explainability) | backend/app/analysis/taint.py (`_TaintSet`, `_trace_expr`), tests/test_taint.py | Implemented + Tested (Python; JS findings have no path) |
+| R66 | Justified, expiring finding suppressions (`suppress`, `secureagent-suppressions.json`) | project (feedback loop) | backend/app/analysis/suppressions.py, cli.py, tests/test_suppressions.py | Implemented + Tested (CLI/file based; no web UI yet) |
+| R67 | Diff mode: findings new since a git ref (`--since`, MCP `scan_diff`) | project (PR review) | backend/app/analysis/gitdiff.py, cli.py, mcp_server.py, tests/test_gitdiff.py | Implemented + Tested |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.

@@ -8,9 +8,11 @@ import uuid
 from datetime import UTC, datetime
 
 from app.analysis.authz_matrix import build_matrix
+from app.analysis.baseline import fingerprint
 from app.analysis.chains import find_chains
 from app.analysis.routes import PRIVILEGED_PATH
 from app.analysis.scanner import ScanResult
+from app.analysis.suppressions import apply as apply_suppressions
 from app.analysis.validation import validate_findings
 from app.core.enums import FindingStatus, Severity
 from app.schemas.report import (
@@ -190,6 +192,13 @@ def _idor_finding(f) -> ReportFinding:
     )
 
 
+def _path_text(f) -> str:
+    path = getattr(f, "path", ())
+    if not path:
+        return ""
+    return "\nHow the input gets here:\n" + "\n".join(f"  {i}. {s}" for i, s in enumerate(path, 1))
+
+
 def _taint_finding(f) -> ReportFinding:
     status = FindingStatus.LIKELY if f.strong else FindingStatus.SUSPICIOUS
     return ReportFinding(
@@ -206,7 +215,7 @@ def _taint_finding(f) -> ReportFinding:
         description=f"User-controlled input flows into {f.sink}.",
         impact="An attacker-controlled value reaching this sink can lead to "
         f"{f.vuln_type.replace('_', ' ')}.",
-        evidence=f"{f.sink} — {f.evidence}",
+        evidence=f"{f.sink} — {f.evidence}" + _path_text(f),
         validation_method="static taint analysis (source → sink)",
         owasp_category=f.owasp,
         cwe=f.cwe,
@@ -318,6 +327,7 @@ def scan_to_report_context(
     findings += [_route_finding(f) for f in result.ordered_route_findings]
 
     findings, validation = validate_findings(findings) if validate else (findings, {})
+    findings, suppressed, expired = apply_suppressions(findings, result.suppressions, fingerprint)
     endpoints = sorted({f"{r.method} {r.path}" for r in result.routes})
     model = result.app_model
     interesting = sorted(
@@ -328,6 +338,16 @@ def scan_to_report_context(
         "(see each finding's reason)."
         for rule, n in sorted(validation.items())
     ]
+    if suppressed:
+        validation_notes.append(
+            f"{suppressed} finding(s) suppressed with a recorded justification "
+            "(secureagent-suppressions.json); they are listed as false positives with the reason."
+        )
+    for s in expired:
+        validation_notes.append(
+            f"Suppression for {s.type or 'a finding'} in {s.location or 'the repository'} "
+            f"expired on {s.expires}; the finding is reported again. Re-review it or renew it."
+        )
     limitations = [
         "Static source analysis only; no live target was tested in this report.",
         "Authorization may be enforced by global middleware this analyser cannot observe, "

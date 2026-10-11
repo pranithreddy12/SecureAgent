@@ -103,6 +103,22 @@ confidence score. CVE/CVSS are shown only from real advisory metadata — never 
 `misconfig,route_scan,baseline,sarif,reports}.py` — 114 passing, 1 skipped (PDF, needs
 WeasyPrint native libraries available in the Docker image).
 
+## Explaining, suppressing and diffing findings
+
+- **Taint path.** Every injection finding carries `path`: the numbered steps from the request input,
+  through assignments, helper-return values and function calls (`passed to run() as query`), to the
+  sink. Shown under the finding in the terminal, in JSON (`path`) and in the report evidence.
+- **Justified suppressions.** `secureagent suppress --list` prints findings with 8-character ids;
+  `suppress --id ... --reason ... [--by NAME] [--expires YYYY-MM-DD]` appends to
+  `secureagent-suppressions.json` (commit it). A reason of at least 10 characters is required; an
+  expired suppression stops applying and is reported; `count` stops a *new* identical finding from
+  being hidden. Suppressed findings become `false_positive` with the reason, do not fail gates and do
+  not form attack chains.
+- **Diff mode.** `scan --since <git-ref>` exports the ref with `git archive` into a temporary
+  directory, scans it, and reports only findings whose line-independent fingerprint is new (multiset:
+  moved code is not new, a second identical issue is). `--fail-on` gates on the new findings only.
+  MCP: `scan_diff`.
+
 ## Real-world calibration
 
 The first independent scan (a developer's own multi-project directory) drove a round of precision fixes

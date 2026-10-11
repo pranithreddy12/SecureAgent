@@ -39,6 +39,9 @@ from app.analysis.routes import (
 )
 from app.analysis.secrets import SecretFinding
 from app.analysis.sinks import SinkFinding, scan_sinks
+from app.analysis.suppressions import FILENAME as SUPPRESSIONS_FILENAME
+from app.analysis.suppressions import Suppression
+from app.analysis.suppressions import load as load_suppressions
 from app.analysis.taint import JS_EXTENSIONS, TaintFinding, analyze_taint_project
 from app.analysis.workflow import analyze_workflow
 
@@ -89,6 +92,7 @@ class ScanResult:
     intent_rules: int = 0  # developer intent rules evaluated (0 = no spec supplied)
     superseded: int = 0  # generic unguarded-route findings replaced by a more specific one
     app_model: ApplicationModel = field(default_factory=ApplicationModel)
+    suppressions: list[Suppression] = field(default_factory=list)
     dependencies: list[Dependency] = field(default_factory=list)
     dependency_findings: list[DependencyFinding] = field(default_factory=list)
     osv_note: str | None = None
@@ -203,6 +207,7 @@ def scan_repo(
     osv_client: OsvClient | None = None,
     exclude: Sequence[str] = (),
     intent: str | None = None,
+    suppressions: str | None = None,
 ) -> ScanResult:
     """Ingest ``root`` (read-only) and run all static analysers.
 
@@ -223,6 +228,9 @@ def scan_repo(
     rules = load_intent(intent_path) if (intent or os.path.isfile(intent_path)) else []
     result.intent_rules = len(rules)
     custom_fields = extra_fields(rules)
+    supp_path = suppressions or os.path.join(str(root), SUPPRESSIONS_FILENAME)
+    if suppressions or os.path.isfile(supp_path):
+        result.suppressions = load_suppressions(supp_path)
 
     gitignore = GitIgnore.from_root(root)
     taint_sources: list[tuple[str, str]] = []
