@@ -146,3 +146,23 @@ def test_stdio_subprocess_roundtrip():
         check=True,
     )
     assert "scan_snippet" in proc.stdout
+
+
+def test_explain_finding_returns_code_path_and_validates_id(tmp_path, monkeypatch):
+    monkeypatch.setenv("SECUREAGENT_MCP_ROOTS", str(tmp_path))
+    (tmp_path / "app.py").write_text(
+        "from flask import request\n"
+        "@app.route('/s')\n"
+        "def s():\n"
+        "    name = request.args['n']\n"
+        "    cur.execute('SELECT * FROM t WHERE n = ' + name)\n",
+        encoding="utf-8",
+    )
+    scan = payload(call("scan_path", {"path": str(tmp_path)}))
+    sqli = next(f for f in scan["findings"] if f["type"] == "sql_injection")
+    assert len(sqli["id"]) == 8
+    out = payload(call("explain_finding", {"path": str(tmp_path), "id": sqli["id"]}))
+    assert out["type"] == "sql_injection" and out["status"] != "confirmed"
+    assert "def s():" in out["code"] and out["files"] == ["app.py"]
+    assert call("explain_finding", {"path": str(tmp_path), "id": "ffffffff"})["result"]["isError"]
+    assert call("explain_finding", {"path": str(tmp_path), "id": "ab"})["result"]["isError"]

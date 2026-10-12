@@ -102,6 +102,14 @@ Outside Compose, set `SOURCE_ROOTS` to a comma-separated list of absolute direct
 disables the feature (the API answers 503). Paths are resolved (symlinks and `..` included) and must be
 inside a root. The directory is only read.
 
+## Uploading a zip instead
+
+Set `UPLOAD_DIR` (Compose does: a named volume at `/app/uploads`). **Projects -> Upload a zip** then
+unpacks the archive into a private per-user folder, audits it like any other project and deletes it when the
+project is deleted. Limits: `MAX_UPLOAD_MB` (25), `MAX_UPLOAD_FILES` (5000), `MAX_UPLOAD_UNPACKED_MB`
+(150). Hostile archives (path traversal, symlinks, bombs, encryption) are refused. `SOURCE_ROOTS` may be
+empty when only uploads are wanted. Keep `UPLOAD_DIR` outside `SOURCE_ROOTS`. See ADR-019.
+
 ## First administrator
 
 Registration always creates an `auditor`. Create or promote an administrator from the server:

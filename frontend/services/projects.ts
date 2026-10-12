@@ -6,6 +6,13 @@ export const projectService = {
   get: (id: string) => api<ProjectDetail>(`/projects/${id}`),
   create: (body: { name: string; path: string; description?: string }) =>
     api<Project>("/projects", { method: "POST", body: JSON.stringify(body) }),
+  /** Upload a zip archive; the body is the raw file (ADR-019). */
+  upload: (name: string, file: File) =>
+    api<Project>(`/projects/upload?name=${encodeURIComponent(name)}`, {
+      method: "POST",
+      body: file,
+      headers: { "Content-Type": "application/zip" },
+    }),
   authorize: (id: string) =>
     api<AuthorizationEntry>(`/projects/${id}/authorize`, {
       method: "POST",

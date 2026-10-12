@@ -71,8 +71,8 @@ justified suppressions live in a reviewable `secureagent-suppressions.json`.
 claude mcp add secureagent -- secureagent-mcp
 ```
 
-Tools: `scan_snippet` (check code you just wrote), `scan_path`, `scan_diff`, `suggest_fixes`,
-`application_model`, `authorization_matrix`. Read-only, confined to the working directory, offline by default.
+Tools: `scan_snippet` (check code you just wrote), `scan_path`, `scan_diff`, `explain_finding` (judge one
+finding with its code and taint path), `suggest_fixes`, `application_model`, `authorization_matrix`. Read-only, confined to the working directory, offline by default.
 See [docs/mcp.md](docs/mcp.md).
 
 ## The web application
@@ -83,10 +83,12 @@ mkdir -p workspace && cp -r /path/to/project workspace/myapp     # mounted read-
 docker compose up --build -d backend frontend                    # http://localhost:3000
 ```
 
-Register a project, confirm authorization (append-only, revocable), start an audit, watch the staged
+Register a project (a mounted directory, or **upload a zip** -- unpacked safely into a private folder and
+deleted with the project), confirm authorization (append-only, revocable), start an audit, watch the staged
 pipeline (LangGraph; authorization gate → reconnaissance → scanner → fix verification → validator →
 correlation → report, plus two **opt-in** AI stages), and download the HTML/PDF report. Failed audits can be
-retried or resumed from the failed stage. Set `LLM_API_KEY` to offer the optional AI review/summary.
+retried or resumed from the failed stage, and any finding can be marked a false positive with a recorded
+reason (reversible). Set `LLM_API_KEY` to offer the optional AI review/summary.
 Details: [docs/deployment.md](docs/deployment.md).
 
 ## Honesty and safety model
@@ -105,15 +107,16 @@ Details: [docs/deployment.md](docs/deployment.md).
 - Detector accuracy is measured on an **author-written** corpus (97% / 95%); the first real-project scan had
   far lower precision, which is why a round of fixes followed (`tests/test_realworld_fp.py`). No independent
   detection rate or LLM accuracy has been measured yet (`docs/paper/PAPER_PLAN.md`).
-- Web audits read a directory mounted under `SOURCE_ROOTS`; there is no zip upload yet.
+- Zip upload accepts `.zip` only, with size/file-count limits; triage is per audit (use
+  `secureagent suppress` for a rule that applies to future audits).
 - Login throttling and the interrupted-audit sweep assume a single API replica.
 
 ## Tests
 
 ```bash
 make testdb                              # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q        # 470 passed, 2 skipped; ~94% coverage of tracked code
-cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 36 unit tests
+cd backend && python -m pytest -q        # 480 passed, 2 skipped
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 39 unit tests
 cd frontend && npm run e2e               # 7 Playwright tests against the Docker stack
 ```
 
@@ -125,7 +128,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 |---|---|
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (18 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (19 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

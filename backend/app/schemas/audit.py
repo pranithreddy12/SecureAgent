@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.enums import AuditStatus, FindingStatus, LogStatus, Severity
 from app.schemas.report import AttackChain
@@ -80,6 +80,19 @@ class FindingOut(BaseModel):
     remediation: str | None
     sources: list[str]
     ai_review: dict[str, Any] | None = None
+
+
+class TriageRequest(BaseModel):
+    """Owner's verdict on one finding: mark it a false positive (with a reason) or undo that."""
+
+    false_positive: bool
+    reason: str = Field(default="", max_length=500)
+
+    @model_validator(mode="after")
+    def _reason_required(self) -> "TriageRequest":
+        if self.false_positive and len(self.reason.strip()) < 10:
+            raise ValueError("a reason of at least 10 characters is required")
+        return self
 
 
 class LogOut(BaseModel):

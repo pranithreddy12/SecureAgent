@@ -248,3 +248,32 @@ async def test_retry_is_owner_only(
     client.cookies.clear()
     await register_login(client, "b@example.com")
     assert (await client.post(f"/api/audits/{audit_id}/retry")).status_code == 404
+
+
+async def test_triage_marks_and_restores_a_finding(
+    client: AsyncClient, workspace: Path, inline_runner: None
+) -> None:
+    await register_login(client, "a@example.com")
+    res = await client.post("/api/audits/source", json=create_body(workspace / "shop"))
+    audit_id = res.json()["id"]
+    findings = (await client.get(f"/api/audits/{audit_id}/findings")).json()
+    before = (await client.get(f"/api/audits/{audit_id}")).json()["total_findings"]
+    target = next(f for f in findings if f["status"] not in ("false_positive", "informational"))
+    url = f"/api/audits/{audit_id}/findings/{target['id']}/triage"
+    short = await client.patch(url, json={"false_positive": True, "reason": "short"})
+    assert short.status_code == 422
+    res = await client.patch(
+        url, json={"false_positive": True, "reason": "cache key only, not a secret"}
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "false_positive"
+    assert "cache key only" in res.json()["status_reason"]
+    assert (await client.get(f"/api/audits/{audit_id}")).json()["total_findings"] == before
+    undone = await client.patch(url, json={"false_positive": False})
+    assert undone.json()["status"] == target["status"]
+    assert undone.json()["status_reason"] == target["status_reason"]
+    # another user cannot triage it
+    other = await client.patch(
+        f"/api/audits/{audit_id}/findings/{uuid.uuid4()}/triage", json={"false_positive": False}
+    )
+    assert other.status_code == 404

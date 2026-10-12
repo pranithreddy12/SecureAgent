@@ -15,7 +15,7 @@ COPY backend/requirements.txt backend/requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock
 
 COPY backend/ .
-RUN useradd --create-home appuser && mkdir -p /app/reports && chown appuser /app/reports
+RUN useradd --create-home appuser && mkdir -p /app/reports /app/uploads && chown appuser /app/reports /app/uploads
 USER appuser
 
 EXPOSE 8000

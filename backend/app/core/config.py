@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # Directories the server may analyse as source audits (ADR-011). Empty = feature disabled.
     source_roots: Annotated[list[str], NoDecode] = []
 
+    # Where uploaded zip archives are unpacked (ADR-019). Empty = upload disabled.
+    upload_dir: str = ""
+    max_upload_mb: int = Field(25, gt=0)
+    max_upload_files: int = Field(5000, gt=0)
+    max_upload_unpacked_mb: int = Field(150, gt=0)
+
     allow_private_targets: bool = False
     target_allowlist: Annotated[list[str], NoDecode] = []
 
@@ -54,6 +60,11 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [h.strip().lower() for h in v.split(",") if h.strip()]
         return v
+
+    @property
+    def audit_roots(self) -> list[str]:
+        """Directories an audit may read: mounted source roots plus the upload directory."""
+        return [*self.source_roots, *([self.upload_dir] if self.upload_dir else [])]
 
 
 @lru_cache

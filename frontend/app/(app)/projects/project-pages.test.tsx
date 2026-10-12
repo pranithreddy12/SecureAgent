@@ -24,6 +24,7 @@ const service = vi.hoisted(() => ({
   list: vi.fn(),
   get: vi.fn(),
   create: vi.fn(),
+  upload: vi.fn(),
   authorize: vi.fn(),
   revoke: vi.fn(),
   remove: vi.fn(),
@@ -57,6 +58,29 @@ beforeEach(() => {
 });
 
 describe("ProjectsPage", () => {
+  it("uploads a zip and opens the new project", async () => {
+    service.upload.mockResolvedValue({ ...base, id: "up-1" });
+    render(<ProjectsPage />);
+    await userEvent.type(await screen.findByLabelText("Project name"), "Zipped shop");
+    const file = new File(["PK"], "shop.zip", { type: "application/zip" });
+    await userEvent.upload(screen.getByLabelText("Zip archive"), file);
+    await userEvent.click(screen.getByRole("button", { name: "Upload and create project" }));
+    await waitFor(() => expect(service.upload).toHaveBeenCalledWith("Zipped shop", file));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/projects/up-1"));
+  });
+
+  it("shows the server's refusal when an upload is rejected", async () => {
+    service.upload.mockRejectedValue(new Error("The archive contains an unsafe path."));
+    render(<ProjectsPage />);
+    await userEvent.type(await screen.findByLabelText("Project name"), "Bad");
+    await userEvent.upload(
+      screen.getByLabelText("Zip archive"),
+      new File(["PK"], "bad.zip", { type: "application/zip" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Upload and create project" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The archive contains an unsafe path.");
+  });
+
   it("lists projects with their authorization state", async () => {
     service.list.mockResolvedValue([
       { ...base, id: "a", name: "Authorized one", authorization_confirmed: true },

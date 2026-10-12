@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.database import get_sessionmaker
+from app.core.enums import AuditStatus, FindingStatus
 from app.models import AuditLog, SecurityAudit, SecurityReport, Vulnerability
 from app.schemas.audit import (
     AuditDetail,
@@ -19,6 +20,7 @@ from app.schemas.audit import (
     FindingOut,
     LogOut,
     SourceAuditCreate,
+    TriageRequest,
 )
 from app.schemas.report import AttackChain
 from app.services import audit_service
@@ -164,6 +166,53 @@ async def list_findings(audit_id: uuid.UUID, db: DbSession, user: CurrentUser):
         item.ai_review = (row.validation_result or {}).get("ai_review")
         out.append(item)
     return out
+
+
+@router.patch("/{audit_id}/findings/{finding_id}/triage", response_model=FindingOut)
+async def triage_finding(
+    audit_id: uuid.UUID,
+    finding_id: uuid.UUID,
+    data: TriageRequest,
+    db: DbSession,
+    user: CurrentUser,
+):
+    """Record the owner's false-positive verdict. Reversible; the original status is kept."""
+    audit = await _owned_audit(db, user, audit_id)
+    if audit.status is not AuditStatus.COMPLETED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Findings can be triaged once the audit is done."
+        )
+    row = await db.scalar(
+        select(Vulnerability)
+        .join(SecurityAudit, SecurityAudit.id == Vulnerability.audit_id)
+        .where(
+            Vulnerability.id == finding_id,
+            Vulnerability.audit_id == audit.id,
+            SecurityAudit.user_id == user.id,
+        )
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Finding not found")
+    vr = dict(row.validation_result or {})
+    if data.false_positive:
+        if "triage" not in vr:  # keep the first original status across repeated edits
+            vr["triage"] = {
+                "previous_status": row.status.value,
+                "previous_reason": row.status_reason,
+            }
+        vr["triage"]["by"] = user.email
+        vr["triage"]["reason"] = data.reason.strip()
+        row.status = FindingStatus.FALSE_POSITIVE
+        row.status_reason = f"Marked false positive by {user.email}: {data.reason.strip()}"
+    elif "triage" in vr:
+        previous = vr.pop("triage")
+        row.status = FindingStatus(previous["previous_status"])
+        row.status_reason = previous.get("previous_reason")
+    row.validation_result = vr
+    await db.commit()
+    item = FindingOut.model_validate(row)
+    item.ai_review = vr.get("ai_review")
+    return item
 
 
 @router.get("/{audit_id}/logs", response_model=list[LogOut])

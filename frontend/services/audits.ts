@@ -14,6 +14,11 @@ export const auditService = {
   logs: (id: string) => api<AuditLogEntry[]>(`/audits/${id}/logs`),
   retry: (id: string, opts: { resume?: boolean } = {}) =>
     api<Audit>(`/audits/${id}/retry${opts.resume ? "?resume=true" : ""}`, { method: "POST" }),
+  triage: (auditId: string, findingId: string, body: { false_positive: boolean; reason?: string }) =>
+    api<Finding>(`/audits/${auditId}/findings/${findingId}/triage`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   createSource: (body: SourceAuditRequest) =>
     api<Audit>("/audits/source", { method: "POST", body: JSON.stringify(body) }),
   reportUrl: (id: string, opts: { format?: "html" | "pdf"; download?: boolean } = {}) => {

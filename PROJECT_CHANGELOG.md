@@ -944,3 +944,18 @@ Every false-positive class was traced to a detector defect and fixed, with regre
   limitations, current test counts). `PROJECT_MEMORY.md`: ADR-010..018 table, future improvements, lessons
   (shell escaping, concurrent sessions, benchmark optimism, deterministic-first), session summary.
 
+## 2026-10-12 (zip upload, owner triage, MCP explain_finding -- ADR-019)
+
+### Added
+- `POST /api/projects/upload`: zip as the raw body; rejects zip-slip, absolute/drive paths, symlinks,
+  encrypted members, too many files and bombs (measured on bytes written); flattens one wrapper folder;
+  workspace deleted with the project; disabled unless `UPLOAD_DIR`. New settings `UPLOAD_DIR`,
+  `MAX_UPLOAD_MB`, `MAX_UPLOAD_FILES`, `MAX_UPLOAD_UNPACKED_MB`; Compose volume `uploads`.
+- `PATCH /api/audits/{id}/findings/{fid}/triage`: owner marks/undoes a false positive (reason >= 10 chars);
+  original status kept in `validation_result.triage`.
+- MCP `explain_finding`; scan results now include a stable 8-char finding `id`.
+- Frontend: "upload a zip" form, "Mark as false positive" / "Undo" on findings.
+
+### Notes
+- `POST /api/projects` refuses any path under `UPLOAD_DIR` so another user's upload cannot be registered.
+- The stored HTML report is a snapshot; triage does not regenerate it.

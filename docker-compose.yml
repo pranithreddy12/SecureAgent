@@ -33,8 +33,10 @@ services:
       ZAP_URL: http://zap:8080
       REPORTS_DIR: /app/reports
       SOURCE_ROOTS: /workspace
+      UPLOAD_DIR: /app/uploads
     volumes:
       - reports:/app/reports
+      - uploads:/app/uploads
       # Put the code to audit under ./workspace; it is mounted read-only (ADR-011).
       - ./workspace:/workspace:ro
     ports:
@@ -70,3 +72,4 @@ services:
 volumes:
   pgdata:
   reports:
+  uploads:

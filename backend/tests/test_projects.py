@@ -227,3 +227,110 @@ async def test_path_is_reconfined_when_the_audit_starts(
         pytest.skip("symlinks unavailable")
     res = await client.post(f"/api/projects/{pid}/audits", json={})
     assert res.status_code == 400 and "outside" in res.json()["detail"]
+
+
+# ---------------------------------------------------------------- upload (ADR-019)
+
+
+def _zip(entries: dict[str, str | bytes], *, symlink: str | None = None) -> bytes:
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in entries.items():
+            zf.writestr(name, data)
+        if symlink:
+            info = zipfile.ZipInfo(symlink)
+            info.create_system = 3
+            info.external_attr = (0o120777) << 16
+            zf.writestr(info, "/etc/passwd")
+    return buf.getvalue()
+
+
+@pytest.fixture
+def uploads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "uploads"
+    monkeypatch.setenv("UPLOAD_DIR", str(root))
+    monkeypatch.setenv("SOURCE_ROOTS", "")
+    monkeypatch.setenv("MAX_UPLOAD_FILES", "20")
+    monkeypatch.setenv("MAX_UPLOAD_UNPACKED_MB", "1")
+    get_settings.cache_clear()
+    yield root
+    get_settings.cache_clear()
+
+
+async def _upload(client: AsyncClient, body: bytes, name: str = "Zipped"):
+    return await client.post(
+        "/api/projects/upload",
+        params={"name": name},
+        content=body,
+        headers={"content-type": "application/zip"},
+    )
+
+
+async def test_upload_creates_project_flattens_wrapper_and_audits(
+    client: AsyncClient, uploads: Path, inline_runner: None
+) -> None:
+    await login(client, "u@example.com")
+    res = await _upload(client, _zip({"proj-main/app.py": APP, "proj-main/pkg/x.py": "x = 1\n"}))
+    assert res.status_code == 201, res.text
+    project = res.json()
+    path = Path(project["path"])
+    assert uploads.resolve() in path.parents and (path / "app.py").is_file()
+
+    assert (await client.post(f"/api/projects/{project['id']}/audits", json={})).status_code == 403
+    await client.post(f"/api/projects/{project['id']}/authorize", json={"confirmed": True})
+    audit = (await client.post(f"/api/projects/{project['id']}/audits", json={})).json()
+    done = (await client.get(f"/api/audits/{audit['id']}")).json()
+    assert done["status"] == "completed" and done["total_findings"] >= 1
+
+    assert (await client.delete(f"/api/projects/{project['id']}")).status_code == 204
+    assert not path.exists()  # the unpacked code is deleted with the project
+
+
+@pytest.mark.parametrize(
+    "entries,kwargs",
+    [
+        ({"../evil.py": "x"}, {}),
+        ({"/abs.py": "x"}, {}),
+        ({r"a\..\..\evil.py": "x"}, {}),
+        ({"ok.py": "x"}, {"symlink": "link"}),
+        ({}, {}),
+    ],
+)
+async def test_upload_rejects_hostile_archives(
+    client: AsyncClient, uploads: Path, entries: dict, kwargs: dict
+) -> None:
+    await login(client, "u@example.com")
+    res = await _upload(client, _zip(entries, **kwargs))
+    assert res.status_code == 400, res.text
+    assert (await client.get("/api/projects")).json() == []
+    assert not list(uploads.rglob("*.py"))  # nothing left behind, nothing escaped
+    assert not (uploads.parent / "evil.py").exists()
+
+
+async def test_upload_limits_and_not_a_zip(client: AsyncClient, uploads: Path) -> None:
+    await login(client, "u@example.com")
+    assert (await _upload(client, b"not a zip")).status_code == 400
+    bomb = _zip({"big.txt": "A" * (3 * 1024 * 1024)})  # ~3 KB compressed, 3 MB unpacked
+    assert len(bomb) < 20_000
+    assert (await _upload(client, bomb)).status_code == 400
+    many = _zip({f"f{i}.py": "x = 1\n" for i in range(25)})
+    assert (await _upload(client, many)).status_code == 400
+    assert list(uploads.glob("*/*")) == []
+
+
+async def test_upload_disabled_and_not_registrable_by_path(
+    client: AsyncClient, uploads: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await login(client, "u@example.com")
+    project = (await _upload(client, _zip({"app.py": APP}))).json()
+    # another registration of the uploaded path through the normal endpoint is refused
+    monkeypatch.setenv("SOURCE_ROOTS", str(uploads))
+    get_settings.cache_clear()
+    res = await client.post("/api/projects", json={"name": "x", "path": project["path"]})
+    assert res.status_code == 400
+    monkeypatch.setenv("UPLOAD_DIR", "")
+    get_settings.cache_clear()
+    assert (await _upload(client, _zip({"app.py": APP}))).status_code == 503

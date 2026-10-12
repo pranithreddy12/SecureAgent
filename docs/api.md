@@ -10,6 +10,8 @@ implemented; the target and live-audit endpoints in the full table are still des
 | POST | /api/audits/source | `{path, label?, authorization_confirmed, exclude[]}` -> 202; 400 without confirmation or for a path outside `SOURCE_ROOTS`; 503 if `SOURCE_ROOTS` is unset |
 | POST | /api/audits/{id}/retry[?resume=true] | Re-run a **failed** source audit: clean slate, or `resume=true` to continue from the failed stage (409 otherwise; owner only) |
 | POST | /api/projects | Register a source project (path under `SOURCE_ROOTS`; limit per user) |
+| POST | /api/projects/upload?name= | Create a project from a zip sent as the raw body (`application/zip`); 400 for hostile or invalid archives, 413 over `MAX_UPLOAD_MB`, 503 unless `UPLOAD_DIR` is set (ADR-019) |
+| PATCH | /api/audits/{id}/findings/{fid}/triage | `{false_positive, reason}` -- owner marks (reason >= 10 chars) or un-marks a finding; completed audits only (ADR-019) |
 | GET | /api/projects, /api/projects/{id} | List / detail incl. authorization history |
 | POST | /api/projects/{id}/authorize, /revoke | Append an authorization / revocation record |
 | POST | /api/projects/{id}/audits | Start an audit (403 without a current authorization; 429 over the concurrency limit) |

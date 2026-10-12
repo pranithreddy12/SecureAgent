@@ -218,6 +218,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-016 | Source-only agent pipeline (phases 4-12) | Accepted |
 | ADR-017 | Opt-in LLM review: consented, redacted, evidence-verified | Accepted |
 | ADR-018 | Opt-in AI validator and report-narrative stages | Accepted |
+| ADR-019 | Zip upload, owner triage, MCP `explain_finding` | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -322,10 +323,8 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Deep taint/dataflow SAST (CodeQL-class) — ADR-008 takes a lighter structural
   Application Model; full dataflow analysis is future work.
 - More language grammars for Code Intelligence beyond the initial stack(s).
-- **Zip/code upload in the web UI** (proposed, not built): safe extraction (zip-slip, bombs, size and file
-  limits), ephemeral workspace deleted after the audit, per-user quota. Needs an ADR before building.
-- **MCP `explain_finding`** (handler source + resolved helpers) and a UI "mark as false positive" that writes
-  `secureagent-suppressions.json` (proposed, not built).
+- Triage that persists across audits (a project-level suppression store); per-user disk quota accounting;
+  tar.gz upload.
 - Measure real-world precision/recall on independent projects and the LLM layer's accuracy (paper RQ1-RQ5).
 - Live-target pipeline (ADR-014/015) -- blocked on the owner-supplied target-management files.
 
@@ -426,3 +425,6 @@ acceptance criteria 15 done / 7 source-only / 6 partial / 0 not built.
 evaluation for the paper; decision on zip upload / `explain_finding` (see section 20); the untracked files from
 the other session stay untouched.
 
+**Upload / triage / explain (2026-10-12, ADR-019):** `POST /api/projects/upload` (raw zip body, safe extraction,
+`UPLOAD_DIR`), `PATCH .../findings/{id}/triage` (owner false-positive, reversible), MCP `explain_finding`;
+frontend upload form and triage control. 480 backend / 39 Vitest tests. The e2e suite was not extended.

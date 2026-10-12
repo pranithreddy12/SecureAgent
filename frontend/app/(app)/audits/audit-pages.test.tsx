@@ -24,6 +24,7 @@ const service = vi.hoisted(() => ({
   logs: vi.fn(),
   createSource: vi.fn(),
   retry: vi.fn(),
+  triage: vi.fn(),
   reportUrl: (id: string) => `/api/audits/${id}/report`,
 }));
 vi.mock("@/services/audits", () => ({ auditService: service }));
@@ -91,6 +92,34 @@ describe("AuditDetailPage", () => {
     expect(screen.getByText("View report")).toHaveAttribute("href", "/api/audits/audit-1/report");
     expect(screen.getByText(/no specific CVE/)).toBeInTheDocument();
     expect(screen.getByText(/CVSS not determined/)).toBeInTheDocument();
+  });
+
+  it("lets the owner mark a finding a false positive with a reason, and undo it", async () => {
+    service.get.mockResolvedValue(base);
+    service.triage
+      .mockResolvedValueOnce({
+        ...finding,
+        status: "false_positive",
+        status_reason: "Marked false positive by a@example.com: cache key only",
+      })
+      .mockResolvedValueOnce(finding);
+    render(<AuditDetailPage />);
+    await userEvent.click(await screen.findByText(/SQL injection/));
+    await userEvent.click(screen.getByRole("button", { name: "Mark as false positive" }));
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled(); // a reason is required
+    await userEvent.type(screen.getByLabelText(/Why is this not a real issue/), "cache key only");
+    await userEvent.click(save);
+    expect(service.triage).toHaveBeenCalledWith("audit-1", "f1", {
+      false_positive: true,
+      reason: "cache key only",
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Undo false positive" }));
+    expect(service.triage).toHaveBeenLastCalledWith("audit-1", "f1", {
+      false_positive: false,
+      reason: undefined,
+    });
+    expect(await screen.findByRole("button", { name: "Mark as false positive" })).toBeInTheDocument();
   });
 
   it("shows the static reconnaissance model and the validation notes", async () => {

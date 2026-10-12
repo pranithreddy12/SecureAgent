@@ -28,6 +28,79 @@ const STAGES = [
   { key: "report", label: "Generate report" },
 ];
 
+function Triage({
+  auditId,
+  finding,
+  onChange,
+}: {
+  auditId: string;
+  finding: Finding;
+  onChange: (f: Finding) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const marked = finding.status === "false_positive";
+
+  async function send(falsePositive: boolean) {
+    setErr(null);
+    try {
+      onChange(
+        await auditService.triage(auditId, finding.id, {
+          false_positive: falsePositive,
+          reason: falsePositive ? reason : undefined,
+        }),
+      );
+      setOpen(false);
+      setReason("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save");
+    }
+  }
+
+  if (marked && finding.status_reason?.startsWith("Marked false positive")) {
+    return (
+      <div>
+        <Button type="button" onClick={() => send(false)}>
+          Undo false positive
+        </Button>
+        {err && <p className="text-xs text-danger">{err}</p>}
+      </div>
+    );
+  }
+  if (marked) return null; // marked by a rule or a suppression file, not by the owner
+  if (!open) {
+    return (
+      <Button type="button" onClick={() => setOpen(true)} className="self-start">
+        Mark as false positive
+      </Button>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-xs font-medium" htmlFor={`reason-${finding.id}`}>
+        Why is this not a real issue? (at least 10 characters, kept with the finding)
+      </label>
+      <input
+        id={`reason-${finding.id}`}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        maxLength={500}
+        className="h-9 rounded-lg border border-border bg-background px-3"
+      />
+      {err && <p className="text-xs text-danger">{err}</p>}
+      <div className="flex gap-2">
+        <Button type="button" onClick={() => send(true)} disabled={reason.trim().length < 10}>
+          Save
+        </Button>
+        <Button type="button" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function AuditDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [audit, setAudit] = useState<AuditDetail | null>(null);
@@ -317,6 +390,15 @@ export default function AuditDetailPage() {
                           </>
                         )}
                       </p>
+                    )}
+                    {audit.status === "completed" && (
+                      <Triage
+                        auditId={audit.id}
+                        finding={f}
+                        onChange={(u) =>
+                          setFindings((list) => list.map((x) => (x.id === u.id ? u : x)))
+                        }
+                      />
                     )}
                     {f.evidence && (
                       <pre className="overflow-x-auto rounded bg-background p-2 font-mono text-xs">

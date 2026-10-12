@@ -82,6 +82,22 @@ TOOLS = [
         },
     },
     {
+        "name": "explain_finding",
+        "description": (
+            "Everything needed to judge ONE finding: the enclosing function, the helpers it calls, "
+            "the numbered source-to-sink taint path and the suggested remediation. Pass the `id` "
+            "from scan_path/scan_snippet results. Secret values are redacted. Read-only."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "id": {"type": "string", "description": "finding id (8+ hex chars) from a scan"},
+            },
+            "required": ["path", "id"],
+        },
+    },
+    {
         "name": "scan_diff",
         "description": (
             "Findings that are NEW compared with a git ref (branch, tag or commit), by "
@@ -147,8 +163,11 @@ def _findings_payload(result, limit: int = MAX_FINDINGS) -> dict[str, Any]:
 
     ctx = scan_to_report_context(result)
     findings = ctx.findings
+    from app.analysis.baseline import fingerprint
+
     items = [
         {
+            "id": fingerprint(f)[:8],
             "title": f.title,
             "type": f.type,
             "severity": f.severity.value,
@@ -285,6 +304,44 @@ def tool_suggest_fixes(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def tool_explain_finding(args: dict[str, Any]) -> dict[str, Any]:
+    from app.analysis import llm_review as lr
+    from app.analysis.baseline import fingerprint
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.scanner import scan_repo
+
+    root = confine(str(args.get("path", "")))
+    if not root.is_dir():
+        raise ToolError(f"not a directory: {root}")
+    wanted = str(args.get("id", "")).strip().lower()
+    if len(wanted) < 6:
+        raise ToolError("'id' must be at least 6 hex characters (see the scan results)")
+    findings = scan_to_report_context(scan_repo(str(root), check_osv=False)).findings
+    matches = [f for f in findings if fingerprint(f).startswith(wanted)]
+    if not matches:
+        raise ToolError(f"no finding with id {wanted!r}; re-run scan_path for current ids")
+    if len({fingerprint(f) for f in matches}) > 1:
+        raise ToolError(f"id {wanted!r} is ambiguous; use more characters")
+    f = matches[0]
+    path = lr.evidence_path(f.evidence)
+    context = lr.build_context(str(root), f, path)
+    return {
+        "id": fingerprint(f)[:8],
+        "title": f.title,
+        "type": f.type,
+        "severity": f.severity.value,
+        "status": f.status.value,
+        "status_reason": f.status_reason,
+        "location": f.endpoint,
+        "evidence": f.evidence,
+        "taint_path": list(path),
+        "remediation": f.remediation,
+        "code": context.text if context else None,
+        "files": context.files if context else [],
+        "note": "Static analysis; judge the code above, the finding is a review item, not proof.",
+    }
+
+
 def tool_scan_diff(args: dict[str, Any]) -> dict[str, Any]:
     from app.analysis.baseline import fingerprint
     from app.analysis.gitdiff import GitDiffError, base_fingerprints, split_new
@@ -341,6 +398,7 @@ HANDLERS = {
     "scan_path": tool_scan_path,
     "suggest_fixes": tool_suggest_fixes,
     "scan_diff": tool_scan_diff,
+    "explain_finding": tool_explain_finding,
     "application_model": tool_application_model,
     "authorization_matrix": tool_authorization_matrix,
 }

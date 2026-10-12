@@ -74,6 +74,9 @@ Status: Planned → In Progress → Implemented → Tested.
 | R67 | Diff mode: findings new since a git ref (`--since`, MCP `scan_diff`) | project (PR review) | backend/app/analysis/gitdiff.py, cli.py, mcp_server.py, tests/test_gitdiff.py | Implemented + Tested |
 | R68 | Opt-in LLM review of findings (consent, redaction, evidence-quote verification, never affects gating) | ADR-017, SPEC §6 (optional LLM with deterministic fallback) | backend/app/analysis/llm_review.py, cli.py `review`, tests/test_llm_review.py | Implemented + Tested with a fake transport; **live model call and accuracy not evaluated** |
 | R69 | Opt-in AI validator + report-narrative agents in the pipeline (consent, degrade-not-fail, no authority) | ADR-018 (extends ADR-016/017) | backend/app/pipeline/stages.py (`ai_validator`, `ai_narrative`), analysis/llm_review.py, api/audits.py, frontend AiConsent, tests/test_ai_pipeline.py | Implemented + Tested with a fake transport; **live call and accuracy not evaluated** |
+| R70 | Zip upload in the web UI with hostile-archive controls | ADR-019 | backend/app/services/upload_service.py, api/projects.py (`/upload`), frontend projects page, tests/test_projects.py | Implemented + Tested |
+| R71 | Owner triage: mark / undo a false positive with a recorded reason | ADR-019 | api/audits.py (`triage`), frontend audit page, tests/test_audits.py | Implemented + Tested; per audit only |
+| R72 | MCP `explain_finding` (evidence, taint path, helpers) | ADR-019 | backend/app/mcp_server.py, tests/test_mcp_server.py | Implemented + Tested |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.

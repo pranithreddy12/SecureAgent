@@ -25,7 +25,7 @@ persisted audits. An opt-in LLM layer gives second opinions but never has author
 | LLM second opinion | `secureagent review PATH [--dry-run] [--yes] [--report F]` (needs `ANTHROPIC_API_KEY`) | judging noisy findings |
 | Accuracy | `secureagent benchmark DIR` | measuring precision/recall |
 | Demo | `secureagent demo` | a labelled, deliberately vulnerable sample |
-| **MCP server** | `secureagent-mcp` -- tools `scan_snippet`, `scan_path`, `scan_diff`, `suggest_fixes`, `application_model`, `authorization_matrix` | Claude Code / Claude Desktop |
+| **MCP server** | `secureagent-mcp` -- tools `scan_snippet`, `scan_path`, `scan_diff`, `suggest_fixes`, `application_model`, `authorization_matrix`, `explain_finding` | Claude Code / Claude Desktop |
 | **Web app** | Docker Compose; projects, authorization, 9-stage pipeline, history, reports | teams, persisted audits |
 | Admin | `python -m app.manage create-admin` | first administrator |
 
@@ -62,10 +62,10 @@ persisted audits. An opt-in LLM layer gives second opinions but never has author
 | Piece | Detail |
 |---|---|
 | Auth | Argon2id, JWT in an httpOnly cookie, login throttling (429), admin bootstrap |
-| Projects | register a directory under `SOURCE_ROOTS`; append-only revocable authorization; per-user limits |
+| Projects | register a directory under `SOURCE_ROOTS` **or upload a zip** (safe extraction, private folder, deleted with the project); append-only revocable authorization; per-user limits |
 | Audits | owner-scoped; per-user concurrency limit; retry (clean) or **resume from the failed stage**; interrupted audits swept on restart |
 | Pipeline | LangGraph: authorization gate -> reconnaissance -> scanner -> fix verification -> validator -> *AI validator (opt-in)* -> correlation -> *AI summary (opt-in)* -> report |
-| Outputs | progress polling, findings with taint paths, attack chains, authorization matrix, activity log, HTML/PDF report |
+| Outputs | progress polling, findings with taint paths, attack chains, authorization matrix, activity log, HTML/PDF report; **mark as false positive** (owner, reasoned, reversible) |
 | UI | `/projects`, `/audits`, `/audits/[id]`, dashboard with real counts |
 | Stack | FastAPI, SQLAlchemy 2 (async), Alembic (3 migrations), PostgreSQL, Next.js 16, Docker Compose |
 
@@ -85,8 +85,8 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 470 passed, 2 skipped (PDF locally, Windows symlink); ~94% line coverage of tracked code |
-| Frontend | 36 Vitest tests; lint, typecheck, build |
+| Backend tests | 480 passed, 2 skipped (PDF locally, Windows symlink) |
+| Frontend | 39 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
 | Benchmark | 35 TP / 1 FP / 2 FN = 97% precision, 95% recall on an **author-written** corpus (a regression guard, not a real-world rate) |
@@ -100,7 +100,6 @@ gain / hallucination rate is unmeasured (paper RQ5).
   `docs/PROJECT_CLOSEOUT.md`.
 - Languages other than Python (deep) and JS/TS (shallow, regex-based).
 - Any measured real-world detection rate or LLM accuracy.
-- Zip/code upload in the web UI (audits read a directory mounted under `SOURCE_ROOTS`).
 - Per-user LLM keys in the web app (one operator key).
 
 ## 9. Architecture decisions
@@ -125,6 +124,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 016 | Source-only agent pipeline (phases 4-12) |
 | 017 | Opt-in LLM review |
 | 018 | Opt-in AI validator and narrative stages |
+| 019 | Zip upload, owner triage, MCP `explain_finding` |
 
 ## 10. Document map
 

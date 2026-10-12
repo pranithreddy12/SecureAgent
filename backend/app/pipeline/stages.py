@@ -80,7 +80,7 @@ async def authorization_gate(ctx: Ctx) -> None:
     audit = await ctx.audit()
     if not audit.authorization_statement or audit.authorized_at is None:
         raise StageFailure("The audit has no recorded authorization.")
-    roots = get_settings().source_roots
+    roots = get_settings().audit_roots
     if not roots:
         raise StageFailure("Source audits are disabled on this server.")
     try:

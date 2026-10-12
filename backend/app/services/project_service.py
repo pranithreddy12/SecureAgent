@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -52,7 +53,7 @@ class NotAuthorized(ProjectError):
 
 
 def _roots() -> list[str]:
-    roots = get_settings().source_roots
+    roots = get_settings().audit_roots
     if not roots:
         raise ProjectsDisabled(
             "Source projects are disabled: the server has no SOURCE_ROOTS configured."
@@ -60,23 +61,37 @@ def _roots() -> list[str]:
     return roots
 
 
-def confined_dir(path: str) -> str:
+def confined_dir(path: str, *, uploads: bool = False) -> str:
+    """Confine to the mounted source roots; ``uploads`` also allows the (private) upload dir."""
+    settings = get_settings()
+    _roots()  # raises ProjectsDisabled when nothing is configured
+    allowed = settings.audit_roots if uploads else settings.source_roots
     try:
-        resolved = confine_to_roots(path, _roots())
+        resolved = confine_to_roots(path, allowed)
     except PathNotAllowed:
         raise ProjectError("path is outside the allowed roots") from None
     if not resolved.is_dir():
         raise ProjectError("path is not a directory")
+    if not uploads and settings.upload_dir:
+        uploads_root = Path(settings.upload_dir).resolve()
+        if resolved == uploads_root or uploads_root in resolved.parents:
+            raise ProjectError("path is outside the allowed roots")  # other users' uploads
     return str(resolved)
 
 
-async def create_project(db: AsyncSession, user: User, data: ProjectCreate) -> SourceProject:
-    path = confined_dir(data.path)
+async def check_limit(db: AsyncSession, user: User) -> None:
     count = await db.scalar(
         select(func.count()).select_from(SourceProject).where(SourceProject.user_id == user.id)
     )
     if (count or 0) >= get_settings().max_targets_per_user:
         raise ProjectLimitReached("Project limit reached for this account.")
+
+
+async def create_project(
+    db: AsyncSession, user: User, data: ProjectCreate, *, uploaded: bool = False
+) -> SourceProject:
+    path = confined_dir(data.path, uploads=uploaded)
+    await check_limit(db, user)
     project = SourceProject(
         user_id=user.id, name=data.name, path=path, description=data.description
     )
@@ -128,7 +143,7 @@ async def start_audit(
     return await audit_service.create_source_audit(
         db,
         user,
-        path=confined_dir(project.path),  # re-confined at launch time
+        path=confined_dir(project.path, uploads=True),  # re-confined at launch time
         label=project.name,
         exclude=data.exclude,
         project_id=project.id,

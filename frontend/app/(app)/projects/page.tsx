@@ -13,6 +13,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -33,6 +34,26 @@ export default function ProjectsPage() {
       router.push(`/projects/${project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the project");
+      setBusy(false);
+    }
+  }
+
+  async function onUpload(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const input = e.currentTarget.elements.namedItem("archive") as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      setUploadError("Choose a .zip file to upload");
+      return;
+    }
+    setBusy(true);
+    setUploadError(null);
+    try {
+      const project = await projectService.upload(String(form.get("name")), file);
+      router.push(`/projects/${project.id}`);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Could not upload the archive");
       setBusy(false);
     }
   }
@@ -61,6 +82,23 @@ export default function ProjectsPage() {
           <ErrorMessage message={error} />
           <Button type="submit" disabled={busy} className="self-start">
             {busy ? "Registering…" : "Register project"}
+          </Button>
+        </form>
+      </Card>
+
+      <Card title="Or upload a zip of your code">
+        <form onSubmit={onUpload} className="flex flex-col gap-4">
+          <Field label="Project name" name="name" required maxLength={120} placeholder="Shop API" />
+          <Field
+            label="Zip archive"
+            name="archive"
+            type="file"
+            accept=".zip,application/zip"
+            hint="Unpacked into a private folder on the server, only read, and deleted when you delete the project. Symlinks and unsafe paths are rejected."
+          />
+          <ErrorMessage message={uploadError} />
+          <Button type="submit" disabled={busy} className="self-start">
+            {busy ? "Uploading…" : "Upload and create project"}
           </Button>
         </form>
       </Card>

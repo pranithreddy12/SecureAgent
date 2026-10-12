@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import tempfile
 import uuid
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 
 from app.api.audits import Launcher, get_launcher
@@ -20,7 +23,7 @@ from app.schemas.project import (
     ProjectDetail,
     ProjectOut,
 )
-from app.services import audit_service, project_service
+from app.services import audit_service, project_service, upload_service
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -41,6 +44,36 @@ async def create_project(data: ProjectCreate, db: DbSession, user: CurrentUser):
     try:
         return await project_service.create_project(db, user, data)
     except project_service.ProjectError as exc:
+        raise _http(exc) from None
+
+
+@router.post("/upload", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
+async def upload_project(
+    request: Request,
+    db: DbSession,
+    user: CurrentUser,
+    name: Annotated[str, Query(min_length=1, max_length=120)],
+):
+    """Create a project from a zip archive sent as the raw request body (ADR-019)."""
+    dest = None
+    try:
+        await project_service.check_limit(db, user)
+        root = upload_service.upload_root()
+        dest = upload_service.new_workspace(user.id)
+        root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=root) as tmp:
+            archive = Path(tmp) / "upload.zip"
+            await upload_service.save_body(request.stream(), archive)
+            await asyncio.to_thread(upload_service.extract_zip, archive, dest)
+        data = ProjectCreate(path=str(dest), name=name, description="Uploaded archive")
+        return await project_service.create_project(db, user, data, uploaded=True)
+    except upload_service.UploadError as exc:
+        if dest is not None:
+            upload_service.remove_workspace(str(dest))
+        raise HTTPException(exc.status_code, exc.detail) from None
+    except project_service.ProjectError as exc:
+        if dest is not None:
+            upload_service.remove_workspace(str(dest))
         raise _http(exc) from None
 
 
@@ -95,8 +128,10 @@ async def revoke_project(project_id: uuid.UUID, db: DbSession, user: CurrentUser
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(project_id: uuid.UUID, db: DbSession, user: CurrentUser) -> None:
     project = await _owned(db, user, project_id)
+    path = project.path
     await db.delete(project)
     await db.commit()
+    upload_service.remove_workspace(path)  # no-op unless it was an uploaded workspace
 
 
 @router.post("/{project_id}/audits", response_model=AuditOut, status_code=status.HTTP_202_ACCEPTED)
