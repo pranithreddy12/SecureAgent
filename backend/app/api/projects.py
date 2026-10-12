@@ -75,6 +75,10 @@ async def upload_project(
         if dest is not None:
             upload_service.remove_workspace(str(dest))
         raise _http(exc) from None
+    except Exception:
+        if dest is not None:  # never leave unpacked, unowned code on the server
+            upload_service.remove_workspace(str(dest))
+        raise
 
 
 @router.get("", response_model=list[ProjectOut])

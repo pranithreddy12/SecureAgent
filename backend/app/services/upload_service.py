@@ -20,6 +20,8 @@ from pathlib import Path, PurePosixPath
 from app.core.config import get_settings
 
 _CHUNK = 64 * 1024
+MAX_DEPTH = 40
+MAX_NAME = 200
 
 
 class UploadError(Exception):
@@ -48,11 +50,21 @@ def _safe_name(raw: str) -> PurePosixPath | None:
         raise UploadError("The archive contains an unsafe path.")
     if any(part in ("", ".") for part in path.parts[:-1]) or not path.parts:
         raise UploadError("The archive contains an unsafe path.")
+    if len(path.parts) > MAX_DEPTH or any(len(part) > MAX_NAME for part in path.parts):
+        raise UploadError("The archive contains a path that is too deep or too long.")
     return path
 
 
 def extract_zip(archive: Path, dest: Path) -> int:
     """Unpack ``archive`` into ``dest`` (created). Returns the number of files written."""
+    try:
+        return _extract(archive, dest)
+    except (OSError, zipfile.BadZipFile, RuntimeError, NotImplementedError):
+        # filesystem limits, truncated/corrupt members, unsupported compression
+        raise UploadError("The archive could not be unpacked.") from None
+
+
+def _extract(archive: Path, dest: Path) -> int:
     settings = get_settings()
     max_files = settings.max_upload_files
     max_bytes = settings.max_upload_unpacked_mb * 1024 * 1024

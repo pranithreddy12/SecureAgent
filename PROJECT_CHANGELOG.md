@@ -959,3 +959,20 @@ Every false-positive class was traced to a detector defect and fixed, with regre
 ### Notes
 - `POST /api/projects` refuses any path under `UPLOAD_DIR` so another user's upload cannot be registered.
 - The stored HTML report is a snapshot; triage does not regenerate it.
+
+## 2026-10-13 (live audit of the upload flow -- issues found and fixed)
+
+Drove a real uvicorn + PostgreSQL stack over HTTP (register, upload, authorize, audit, triage, report,
+delete) and the MCP server over stdio against the demo app (34 findings, `explain_finding` for each).
+
+### Fixed
+- A zip path too deep/long for the filesystem caused an **HTTP 500** and left the unpacked files behind;
+  now a 400, with path depth/length limits and cleanup on any unexpected error.
+- The upload response disclosed the server's absolute workspace path; uploaded projects now show
+  "(uploaded archive)".
+- A clean-looking audit hid files the scanner had not read (over 2 MiB, binary/UTF-16, generated): the audit
+  now records "Not analysed: N file(s)..." in its validation notes.
+
+### Observed, not changed
+- UTF-16 source files are skipped as unreadable (now disclosed); 4000 near-identical files produce 4000
+  findings in 22 s (no cross-file de-duplication).

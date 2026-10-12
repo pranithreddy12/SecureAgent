@@ -277,3 +277,17 @@ async def test_triage_marks_and_restores_a_finding(
         f"/api/audits/{audit_id}/findings/{uuid.uuid4()}/triage", json={"false_positive": False}
     )
     assert other.status_code == 404
+
+
+async def test_unread_files_are_disclosed_not_hidden(
+    client: AsyncClient, workspace: Path, inline_runner: None
+) -> None:
+    """A clean-looking result must say when files were skipped (too large / binary)."""
+    shop = workspace / "shop"
+    (shop / "huge.py").write_text("a = 1\n" * 500_000, encoding="utf-8")  # > 2 MiB
+    (shop / "blob.py").write_bytes(bytes(range(256)) * 20)
+    await register_login(client, "cov@example.com")
+    res = await client.post("/api/audits/source", json=create_body(shop))
+    detail = (await client.get(f"/api/audits/{res.json()['id']}")).json()
+    notes = " ".join(detail["validation_notes"])
+    assert "Not analysed" in notes and "too_large" in notes.replace(" ", "_")

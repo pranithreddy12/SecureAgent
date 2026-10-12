@@ -276,8 +276,10 @@ async def test_upload_creates_project_flattens_wrapper_and_audits(
     res = await _upload(client, _zip({"proj-main/app.py": APP, "proj-main/pkg/x.py": "x = 1\n"}))
     assert res.status_code == 201, res.text
     project = res.json()
-    path = Path(project["path"])
-    assert uploads.resolve() in path.parents and (path / "app.py").is_file()
+    assert project["path"] == "(uploaded archive)"  # the server location is not disclosed
+    unpacked = [p for p in uploads.glob("*/*") if p.is_dir()]
+    assert len(unpacked) == 1 and (unpacked[0] / "app.py").is_file()  # wrapper flattened
+    path = unpacked[0]
 
     assert (await client.post(f"/api/projects/{project['id']}/audits", json={})).status_code == 403
     await client.post(f"/api/projects/{project['id']}/authorize", json={"confirmed": True})
@@ -297,6 +299,8 @@ async def test_upload_creates_project_flattens_wrapper_and_audits(
         ({r"a\..\..\evil.py": "x"}, {}),
         ({"ok.py": "x"}, {"symlink": "link"}),
         ({}, {}),
+        ({"/".join(["d"] * 60) + "/x.py": "x"}, {}),
+        ({"n" * 300 + ".py": "x"}, {}),
     ],
 )
 async def test_upload_rejects_hostile_archives(

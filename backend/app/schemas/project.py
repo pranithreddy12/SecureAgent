@@ -43,11 +43,23 @@ class ProjectOut(BaseModel):
 
     id: uuid.UUID
     name: str
-    path: str
+    path: str  # an uploaded archive's server location is not disclosed
     description: str | None
     authorization_confirmed: bool
     authorization_timestamp: datetime | None
     created_at: datetime
+
+    @field_validator("path")
+    @classmethod
+    def _hide_upload_path(cls, v: str) -> str:
+        from pathlib import Path
+
+        from app.core.config import get_settings
+
+        root = get_settings().upload_dir
+        if root and Path(root).resolve() in Path(v).resolve().parents:
+            return "(uploaded archive)"
+        return v
 
 
 class AuthorizationOut(BaseModel):

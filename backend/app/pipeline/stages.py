@@ -145,6 +145,11 @@ async def reconnaissance(ctx: Ctx) -> None:
                 "routes": [r.__dict__ for r in routes],
                 "model": summary,
                 "files_scanned": stats.files_scanned,
+                "skipped": {
+                    "too_large": stats.skipped_too_large,
+                    "binary_or_unreadable": stats.skipped_binary,
+                    "generated": stats.skipped_generated,
+                },
                 "dependencies": len(deps),
             },
         )
@@ -264,6 +269,13 @@ async def validator(ctx: Ctx) -> None:
         "(see each finding's reason)."
         for rule, n in sorted(applied.items())
     ]
+    skipped = ((await _recon(ctx)).raw_result or {}).get("skipped") or {}
+    if any(skipped.values()):  # coverage honesty: "0 findings" must not hide unread files
+        state["validation_notes"].append(
+            "Not analysed: "
+            + ", ".join(f"{n} {label}" for label, n in skipped.items() if n)
+            + " file(s). Findings in them, if any, are not in this report."
+        )
     audit.stage_state = state
     await ctx.db.flush()
     ctx.notes["validator"] = f"{sum(applied.values())} reclassified"
