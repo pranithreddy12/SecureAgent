@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'eighth' marks the eighth batch (payatu/vuln-nodejs-app, 4auvar/VulnNodeApp): lists written and committed before the scanner was run on them; no detector was changed for them. Both deliberately test deep cross-file indirection (route -> controller -> model, or route -> helper util) between the request read and the sink.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -2018,6 +2018,134 @@
           "line": 43,
           "class": "sql_injection",
           "note": "template-literal SQL with req.params.id"
+        }
+      ]
+    },
+    "vuln-nodejs-app": {
+      "url": "https://github.com/payatu/vuln-nodejs-app",
+      "commit": "bc3c90920ba4e1c668d954e5027d9ca814d2d5c6",
+      "held_out": "eighth",
+      "known": [
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 53,
+          "class": "command_injection",
+          "note": "exec('ping -c 3 ' + req.body.ping)"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 79,
+          "class": "sql_injection",
+          "note": "string-concat SELECT, mysql2 con.query"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 111,
+          "class": "xxe",
+          "note": "libxmljs.parseXmlString(body, {noent: true})"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 144,
+          "class": "deserialization",
+          "note": "node-serialize unserialize(cookie)"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 161,
+          "class": "template_injection",
+          "note": "ejs.render(templateString built from ?path=)"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 190,
+          "class": "idor",
+          "note": "Notes.findAll({userid: req.params.userid}), no owner check"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 231,
+          "class": "weak_hash",
+          "note": "md5(req.body.password)"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 536,
+          "class": "nosql_injection",
+          "note": "collection.find({username: req.body.username})"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 555,
+          "class": "sql_injection",
+          "note": "GraphQL resolver arg concatenated into SQL (resolver args are not a tracked source)"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 699,
+          "class": "nosql_injection",
+          "note": "$where built from req.body.password"
+        },
+        {
+          "file": "controllers/vuln_controller.js",
+          "line": 647,
+          "class": "path_traversal",
+          "note": "upload path built from unsanitised filename"
+        }
+      ]
+    },
+    "VulnNodeApp": {
+      "url": "https://github.com/4auvar/VulnNodeApp",
+      "commit": "3393db1ae7813128067c8d243985b9cef57abcb1",
+      "held_out": "eighth",
+      "known": [
+        {
+          "file": "models/usersModel.js",
+          "line": 7,
+          "class": "sql_injection",
+          "note": "'WHERE id =' + parameter[0], called via a wrapper fn not .query("
+        },
+        {
+          "file": "models/usersModel.js",
+          "line": 15,
+          "class": "sql_injection",
+          "note": "login query concatenated from email/password"
+        },
+        {
+          "file": "models/usersModel.js",
+          "line": 41,
+          "class": "sql_injection",
+          "note": "LIKE '%' + username + '%'"
+        },
+        {
+          "file": "utils/utility.js",
+          "line": 63,
+          "class": "command_injection",
+          "note": "exec('ping -c 3 ' + ip), ip is a function parameter from the route"
+        },
+        {
+          "file": "utils/utility.js",
+          "line": 127,
+          "class": "xxe",
+          "note": "libxmljs.parseXmlString(xmlInput, {noent: true})"
+        },
+        {
+          "file": "utils/utility.js",
+          "line": 140,
+          "class": "deserialization",
+          "note": "node-serialize unserialize(base64 cookie data)"
+        },
+        {
+          "file": "routes/users/user.js",
+          "line": 204,
+          "class": "idor",
+          "note": "idorViewProfile: fetch any user's profile by ?id=, no owner check"
+        },
+        {
+          "file": "routes/users/user.js",
+          "line": 218,
+          "class": "idor",
+          "note": "idorUpdateProfile: update any user's profile by ?id=, no owner check"
         }
       ]
     }
