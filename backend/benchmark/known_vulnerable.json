@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'eighth' marks the eighth batch (payatu/vuln-nodejs-app, 4auvar/VulnNodeApp): lists written and committed before the scanner was run on them; no detector was changed for them. Both deliberately test deep cross-file indirection (route -> controller -> model, or route -> helper util) between the request read and the sink. 'held_out': 'ninth' marks the ninth batch (michealkeines/Vulnerable-API, devopslifter/Expense-Reimbursement-API, jorritfolmer/vulnerable-api): lists written and committed before the scanner was run on them; no detector was changed for them. VAPI-folmer deliberately mixes connexion path-param handlers (request data arrives as a function argument, already supported) with connexion.request.get_json()/.headers (a request access qualified by the connexion module, not flask's bare 'request' name) to test whether that alias is recognised as a source. 'held_out': 'tenth' marks the tenth batch (manuelz120/extremely-vulnerable-flask-app, R-Rothrock/testing-sites): lists written and committed before the scanner was run on them; no detector was changed for them. Both were picked to test specific hypotheses from ADR-031 (cross-file sink) and ADR-034 (a value assigned in one branch of a plain if/else, used after it, not carrying taint) rather than being a random sample.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'eighth' marks the eighth batch (payatu/vuln-nodejs-app, 4auvar/VulnNodeApp): lists written and committed before the scanner was run on them; no detector was changed for them. Both deliberately test deep cross-file indirection (route -> controller -> model, or route -> helper util) between the request read and the sink. 'held_out': 'ninth' marks the ninth batch (michealkeines/Vulnerable-API, devopslifter/Expense-Reimbursement-API, jorritfolmer/vulnerable-api): lists written and committed before the scanner was run on them; no detector was changed for them. VAPI-folmer deliberately mixes connexion path-param handlers (request data arrives as a function argument, already supported) with connexion.request.get_json()/.headers (a request access qualified by the connexion module, not flask's bare 'request' name) to test whether that alias is recognised as a source. 'held_out': 'tenth' marks the tenth batch (manuelz120/extremely-vulnerable-flask-app, R-Rothrock/testing-sites): lists written and committed before the scanner was run on them; no detector was changed for them. Both were picked to test specific hypotheses from ADR-031 (cross-file sink) and ADR-034 (a value assigned in one branch of a plain if/else, used after it, not carrying taint) rather than being a random sample. 'held_out': 'eleventh' marks the eleventh batch (Ayodub/leaky-flask, szelaya8/vulnerable-node, austimkelly/swiss-cheese): lists written and committed before the scanner was run on them; no detector was changed for them. Every line below was checked against a direct scan_repo run before freezing (ADR-036's lesson), not just read from source.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -2337,6 +2337,129 @@
           "line": 43,
           "class": "debug",
           "note": "app.run(debug=True)"
+        }
+      ]
+    },
+    "leaky-flask": {
+      "url": "https://github.com/Ayodub/leaky-flask",
+      "commit": "6a42961ba81bbbfa8ec66ddef53550705f73ca4c",
+      "held_out": "eleventh",
+      "known": [
+        {
+          "file": "main.py",
+          "line": 29,
+          "class": "secret",
+          "note": "SECRET_KEY = os.getenv(...) or 'literal' -- the 'or' fallback form, not getenv(x, 'literal')"
+        },
+        {
+          "file": "main.py",
+          "line": 55,
+          "class": "xxe",
+          "note": "etree.fromstring(xml, parser) with load_dtd=True"
+        },
+        {
+          "file": "main.py",
+          "line": 97,
+          "class": "template_injection",
+          "note": "render_template_string(template) built with '%s' % name"
+        },
+        {
+          "file": "main.py",
+          "line": 113,
+          "class": "template_injection",
+          "note": "404 handler: render_template_string(template) built with '%s' % request.url"
+        },
+        {
+          "file": "main.py",
+          "line": 153,
+          "class": "sql_injection",
+          "note": "db.engine.execute(\"...%s...\" % (uname, pword)) -- login1 of 8 near-identical labs"
+        }
+      ]
+    },
+    "szelaya8-vulnerable-node": {
+      "url": "https://github.com/szelaya8/vulnerable-node",
+      "commit": "92b24eeb125181bb2f118e5a102d6081a0be6923",
+      "held_out": "eleventh",
+      "known": [
+        {
+          "file": "app.js",
+          "line": 44,
+          "class": "secret",
+          "note": "express-session secret literal"
+        },
+        {
+          "file": "routes/login.js",
+          "line": 36,
+          "class": "open_redirect",
+          "note": "res.redirect(returnurl) from req.body.returnurl"
+        },
+        {
+          "file": "model/auth.js",
+          "line": 67,
+          "class": "sql_injection",
+          "note": "pg-promise db.one(q), q built by string concat; cross-file from routes/login.js"
+        },
+        {
+          "file": "model/products.js",
+          "line": 14,
+          "class": "sql_injection",
+          "note": "pg-promise db.one(q), getProduct; cross-file"
+        },
+        {
+          "file": "model/products.js",
+          "line": 21,
+          "class": "sql_injection",
+          "note": "pg-promise db.many(q), search; cross-file"
+        }
+      ]
+    },
+    "swiss-cheese": {
+      "url": "https://github.com/austimkelly/swiss-cheese",
+      "commit": "490f90150071871338642af4de8ca310102f087d",
+      "held_out": "eleventh",
+      "known": [
+        {
+          "file": "ssrf/ssrf.py",
+          "line": 10,
+          "class": "ssrf",
+          "note": "requests.get(url).text, url = request.args.get('url')"
+        },
+        {
+          "file": "command-injection/command-injection.py",
+          "line": 6,
+          "class": "command_injection",
+          "note": "os.system('cat ' + filename); filename from input(), not a web request"
+        },
+        {
+          "file": "sqli/sqli.py",
+          "line": 28,
+          "class": "sql_injection",
+          "note": "cursor.execute(query) built by string concat; username from input(), not a web request"
+        },
+        {
+          "file": "broken-auth/broken-auth.py",
+          "line": 5,
+          "class": "secret",
+          "note": "app.secret_key = b'secret_key' -- a bytes literal, not a plain string"
+        },
+        {
+          "file": "broken-auth/broken-auth.py",
+          "line": 9,
+          "class": "secret",
+          "note": "users dict with a literal password value"
+        },
+        {
+          "file": "idor/idor.py",
+          "line": 24,
+          "class": "missing_authorization",
+          "note": "PUT /api/users/<id> updates any user, no auth/ownership check at all"
+        },
+        {
+          "file": "xss/xss.py",
+          "line": 13,
+          "class": "reflected_xss",
+          "note": "render_template passes user_input to a template that renders it with |safe"
         }
       ]
     }
