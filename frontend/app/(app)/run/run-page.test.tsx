@@ -52,6 +52,7 @@ const audit: Audit = {
   completed_at: null,
   error_message: null,
   created_at: "2026-10-11T10:00:00Z",
+  authorized_at: null,
 };
 
 beforeEach(() => {
