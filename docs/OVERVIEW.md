@@ -143,6 +143,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 036 | Retracted the if/else taint gap; fixed five truth-list line errors |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
+| 037 | Classic, ledger-style design instead of the default dark-dashboard look |
 
 ## 10. Document map
 

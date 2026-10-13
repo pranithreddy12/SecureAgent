@@ -236,6 +236,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-036 | Retracted the if/else taint gap; fixed five truth-list line errors | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
+| ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -555,3 +556,10 @@ confirmed correct against a live response, on one account, one finding type.
 py_injection corpus fixture ran `ai_validator`/`ai_narrative` live: 15/15 findings reviewed, 13
 true_positive at 0.8-0.9 matching the genuine planted flaws, AI summary accepted and grounded in real
 facts, status/severity untouched. Previously only tested with a fake transport and one bare-CLI call.
+
+**Classic design pass (2026-10-14, ADR-037):** owner said the frontend "looks so AI". Changed design
+tokens and shared components only (`app/globals.css`, `layout.tsx`, `components/ui.tsx`,
+`Sidebar.tsx`, `AuthShell.tsx`): neon cyan -> muted brass accent, desaturated severity colours,
+`Source Serif 4` for headings/wordmark over the existing sans body, `rounded-xl/-lg` -> `rounded-sm`
+throughout, filled button -> outlined, sidebar active-link pill -> hairline left rule. Same layout/data,
+new look, applied everywhere via shared tokens so no page-by-page rewrite was needed.

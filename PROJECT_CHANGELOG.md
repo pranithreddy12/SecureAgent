@@ -1192,3 +1192,13 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   in the same expression, missing a page templated from an external file.
 - Corrected recall: eighth set 10/19 (53%, was 42%); ninth set 13/14 (93%, was 79%); tenth set 7/12 (58%,
   was 50%). Pooled untouched over ten sets: 188/344 (55%, was 53%).
+
+## 2026-10-14 (classic ledger-style design -- ADR-037)
+
+- Replaced the neon-cyan-on-black theme with a classic ink/parchment/brass palette, desaturated
+  severity colours, `Source Serif 4` headings over the existing sans body, and `rounded-sm` in place
+  of `rounded-xl`/`rounded-lg` throughout. Changed only `app/globals.css`, `layout.tsx` and the
+  shared components (`ui.tsx`, `Sidebar.tsx`, `AuthShell.tsx`), plus a few leftover radius classes
+  on individual pages, so every page picked it up without a rewrite. Verified against the real app in
+  Docker (login, dashboard, /run, audit list, a completed audit with all five severities). tsc/eslint/
+  vitest (40/40)/next build all clean.

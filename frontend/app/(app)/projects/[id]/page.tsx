@@ -175,7 +175,7 @@ export default function ProjectPage() {
       <Card title="Danger zone">
         <Button
           disabled={busy}
-          className="bg-danger text-background hover:bg-danger/80"
+          className="border-danger/50 bg-danger text-background hover:border-danger hover:bg-danger/80 hover:text-background"
           onClick={() => {
             if (window.confirm("Delete this project? Its audits are kept but unlinked.")) {
               void run(() => projectService.remove(id), () => router.push("/projects"));

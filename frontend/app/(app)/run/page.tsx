@@ -139,7 +139,7 @@ export default function RunPage() {
                 setConfirmed(false);
                 setError(null);
               }}
-              className={`rounded-lg border px-3 py-2 ${
+              className={`rounded-sm border px-3 py-2 ${
                 source === key ? "border-accent text-accent" : "border-border text-muted"
               }`}
             >
@@ -192,7 +192,7 @@ export default function RunPage() {
               <select
                 value={existingId}
                 onChange={(e) => onExistingPicked(e.target.value)}
-                className="h-10 rounded-lg border border-border bg-background px-3"
+                className="h-10 rounded-sm border border-border bg-background px-3"
               >
                 <option value="">Choose a project…</option>
                 {projects.map((p) => (
@@ -220,7 +220,7 @@ export default function RunPage() {
       {resolved && (
         <Card title="2 · How to analyse it">
           <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2 rounded-lg border border-accent/40 bg-accent/5 p-3 text-sm">
+            <div className="flex items-start gap-2 rounded-sm border border-accent/40 bg-accent/5 p-3 text-sm">
               <span aria-hidden>✓</span>
               <span>
                 <span className="font-medium">Static analysis</span>
@@ -231,7 +231,7 @@ export default function RunPage() {
               </span>
             </div>
             <AiConsent checked={aiReview} onChange={setAiReview} />
-            <div className="flex items-start gap-2 rounded-lg border border-border p-3 text-sm text-muted/60">
+            <div className="flex items-start gap-2 rounded-sm border border-border p-3 text-sm text-muted/60">
               <span aria-hidden>○</span>
               <span className="flex-1">
                 <span className="font-medium">Agent (MCP-driven)</span>

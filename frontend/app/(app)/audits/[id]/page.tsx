@@ -86,7 +86,7 @@ function Triage({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         maxLength={500}
-        className="h-9 rounded-lg border border-border bg-background px-3"
+        className="h-9 rounded-sm border border-border bg-background px-3"
       />
       {err && <p className="text-xs text-danger">{err}</p>}
       <div className="flex gap-2">
@@ -298,7 +298,7 @@ export default function AuditDetailPage() {
           </p>
           <ul className="flex flex-col gap-3">
             {audit.attack_chains.map((c) => (
-              <li key={c.id} className="rounded-lg border border-border">
+              <li key={c.id} className="rounded-sm border border-border">
                 <details>
                   <summary className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-3">
                     <SeverityBadge severity={c.severity} />
@@ -357,7 +357,7 @@ export default function AuditDetailPage() {
         ) : (
           <ul className="flex flex-col gap-3">
             {visible.map((f) => (
-              <li key={f.id} className="rounded-lg border border-border">
+              <li key={f.id} className="rounded-sm border border-border">
                 <details>
                   <summary className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-3">
                     <SeverityBadge severity={f.severity} />

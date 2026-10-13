@@ -23,7 +23,7 @@ export function AiConsent({
 
   if (!available) return null;
   return (
-    <label className="flex items-start gap-2 rounded-lg border border-border p-3 text-sm">
+    <label className="flex items-start gap-2 rounded-sm border border-border p-3 text-sm">
       <input
         type="checkbox"
         className="mt-1"

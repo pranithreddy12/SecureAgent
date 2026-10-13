@@ -1,24 +1,26 @@
 @import "tailwindcss";
 
-/* SecureAgent dark security theme. Severity colours are reserved for findings. */
+/* SecureAgent: a classic, ledger-like theme -- ink and parchment, brass accent, serif headings.
+   Deliberately not the neon-on-black "AI dashboard" look: desaturated severity colours, hairline
+   borders, small radii, serif display type set against a quiet sans body. */
 :root {
-  --background: #0a0e14;
-  --surface: #111721;
-  --surface-raised: #18202c;
-  --border: #243041;
-  --foreground: #e6edf3;
-  --muted: #8b98a9;
-  --accent: #22d3ee;
-  --accent-strong: #06b6d4;
-  --danger: #f87171;
-  --success: #34d399;
-  --warning: #fbbf24;
+  --background: #0e0f12;
+  --surface: #15171b;
+  --surface-raised: #1b1e23;
+  --border: #2b2d33;
+  --foreground: #e9e4d8;
+  --muted: #9b9488;
+  --accent: #b6904f;
+  --accent-strong: #967a44;
+  --danger: #9a4b43;
+  --success: #5c7a5e;
+  --warning: #a98a3e;
 
-  --sev-critical: #e11d48;
-  --sev-high: #f97316;
-  --sev-medium: #eab308;
-  --sev-low: #3b82f6;
-  --sev-info: #64748b;
+  --sev-critical: #7a3b36;
+  --sev-high: #a3622f;
+  --sev-medium: #a98a3e;
+  --sev-low: #41607a;
+  --sev-info: #6b6d72;
 }
 
 @theme inline {
@@ -40,10 +42,19 @@
   --color-sev-info: var(--sev-info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-serif);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }

@@ -26,21 +26,21 @@ export function Sidebar({ user }: { user: User | null }) {
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-border bg-surface md:min-h-screen md:w-60 md:border-r md:border-b-0">
-      <div className="px-5 py-5">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-accent">SecureAgent</p>
-        <p className="mt-1 text-xs text-muted">AI Security Auditor</p>
+      <div className="border-b border-border px-5 py-5">
+        <p className="font-serif text-lg text-foreground">SecureAgent</p>
+        <p className="mt-0.5 text-xs text-muted">Application Security Auditor</p>
       </div>
-      <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:pb-0">
+      <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-3 py-3 md:flex-col">
         {NAV.map(({ label, href }) =>
           href ? (
             <Link
               key={label}
               href={href}
               aria-current={pathname.startsWith(href) ? "page" : undefined}
-              className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm transition ${
+              className={`whitespace-nowrap rounded-sm border-l-2 px-3 py-2 text-sm transition ${
                 pathname.startsWith(href)
-                  ? "bg-surface-raised text-accent"
-                  : "text-foreground hover:bg-surface-raised"
+                  ? "border-accent bg-surface-raised text-accent"
+                  : "border-transparent text-foreground hover:bg-surface-raised"
               }`}
             >
               {label}
@@ -50,10 +50,12 @@ export function Sidebar({ user }: { user: User | null }) {
               key={label}
               aria-disabled="true"
               title="Not implemented yet"
-              className="flex items-center justify-between gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm text-muted/60"
+              className="flex items-center justify-between gap-2 whitespace-nowrap rounded-sm border-l-2 border-transparent px-3 py-2 text-sm text-muted/60"
             >
               {label}
-              <span className="rounded border border-border px-1.5 text-[10px] uppercase">soon</span>
+              <span className="rounded-sm border border-border px-1.5 text-[10px] uppercase">
+                soon
+              </span>
             </span>
           ),
         )}

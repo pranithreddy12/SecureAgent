@@ -10,9 +10,11 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-border bg-surface p-5 ${className}`}>
+    <section className={`rounded-sm border border-border bg-surface p-5 ${className}`}>
       {title && (
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">{title}</h2>
+        <h2 className="mb-4 border-b border-border pb-2 font-serif text-base text-foreground">
+          {title}
+        </h2>
       )}
       {children}
     </section>
@@ -25,7 +27,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`inline-flex h-10 items-center justify-center rounded-lg bg-accent-strong px-4 text-sm font-semibold text-background transition hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex h-10 items-center justify-center rounded-sm border border-accent/50 bg-transparent px-4 text-sm tracking-wide text-accent transition hover:border-accent hover:bg-accent hover:text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       {...props}
     />
   );
@@ -48,7 +50,7 @@ export function Field({
       <input
         id={id}
         aria-describedby={hint ? hintId : undefined}
-        className="h-10 rounded-lg border border-border bg-background px-3 text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+        className="h-10 rounded-sm border border-border bg-background px-3 text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
         {...props}
       />
       {hint && (
@@ -63,7 +65,7 @@ export function Field({
 export function ErrorMessage({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+    <p role="alert" className="rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
       {message}
     </p>
   );
