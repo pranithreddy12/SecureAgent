@@ -145,6 +145,14 @@ CLASS_FAMILY: dict[str, frozenset[str]] = {
     "insecure_session": frozenset({"insecure_session_cookie"}),
     "plaintext_password": frozenset({"plaintext_password"}),
     "reflected_xss": frozenset({"reflected_xss", "xss_sink"}),
+    "mass_assignment": frozenset(
+        {"mass_assignment", "client_trusted_privilege", "client_trusted_value"}
+    ),
+    "sensitive_data_in_log": frozenset({"sensitive_data_in_log"}),
+    "template_autoescape_off": frozenset({"template_autoescape_off"}),
+    "missing_authorization": frozenset(
+        {"missing_function_level_authorization", "inconsistent_authorization"}
+    ),
 }
 LINE_TOLERANCE = 3
 
@@ -202,7 +210,15 @@ def known_recall(truth_path: str, apps_dir: str) -> dict[str, Any]:
                 for f, rel, _ in located
                 if rel.startswith(d) or f"/{d}" in rel
             ]
+        clean = []
+        for c in spec.get("clean_files", []):
+            clean += [
+                {"type": f.type, "location": f.endpoint, "severity": f.severity.value}
+                for f, rel, _ in located
+                if rel.endswith(c)
+            ]
         out["repos"][name] = {
+            "clean_file_findings": clean,
             "commit": spec.get("commit"),
             "files_scanned": None,
             "findings_total": len(findings),
@@ -228,6 +244,10 @@ def render_recall(r: dict[str, Any]) -> str:
         for k in d["known"]:
             mark = {"found": "  ok ", "missed": "  MISS", "outside_taxonomy": "  n/a "}[k["result"]]
             lines.append(f"{mark} {k['file']}:{k['line']} {k['class']}  {k.get('note', '')}")
+        if d.get("clean_file_findings"):
+            lines.append(
+                f"  FALSE POSITIVES in files that must be clean: {len(d['clean_file_findings'])}"
+            )
         if d["fixed_dir_findings"]:
             lines.append(
                 "  findings inside patched dirs (false-positive candidates): "

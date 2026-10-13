@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives).",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -572,6 +572,485 @@
           "line": 49,
           "class": "reflected_xss",
           "note": "bypassSecurityTrustHtml of order id"
+        }
+      ]
+    },
+    "VAmPI": {
+      "url": "https://github.com/erev0s/VAmPI",
+      "commit": "f16052dce83f05847133ec98f01c5193a41de7d8",
+      "held_out": "third",
+      "known": [
+        {
+          "file": "models/user_model.py",
+          "line": 73,
+          "class": "sql_injection",
+          "note": "f-string SELECT executed via text()"
+        },
+        {
+          "file": "api_views/books.py",
+          "line": 51,
+          "class": "idor",
+          "note": "BOLA: book fetched by title only"
+        },
+        {
+          "file": "api_views/users.py",
+          "line": 187,
+          "class": "idor",
+          "note": "password of another user updated by path username"
+        },
+        {
+          "file": "api_views/users.py",
+          "line": 60,
+          "class": "mass_assignment",
+          "note": "'admin' accepted from request"
+        },
+        {
+          "file": "api_views/users.py",
+          "line": 24,
+          "class": "missing_authorization",
+          "note": "unauthenticated /_debug lists users and passwords"
+        },
+        {
+          "file": "config.py",
+          "line": 13,
+          "class": "secret",
+          "note": "SECRET_KEY = 'random' (JWT signing key)"
+        },
+        {
+          "file": "models/user_model.py",
+          "line": 24,
+          "class": "plaintext_password",
+          "note": "password stored as given"
+        },
+        {
+          "file": "api_views/users.py",
+          "line": 144,
+          "class": "redos",
+          "note": "regex DoS",
+          "in_taxonomy": false
+        },
+        {
+          "file": "api_views/users.py",
+          "line": 101,
+          "class": "user_enumeration",
+          "note": "distinct login errors",
+          "in_taxonomy": false
+        }
+      ]
+    },
+    "dvpwa": {
+      "url": "https://github.com/anxolerd/dvpwa",
+      "commit": "a1d8f89fac2e57093189853c6527c2b01fc1d9c1",
+      "held_out": "third",
+      "known": [
+        {
+          "file": "sqli/dao/student.py",
+          "line": 45,
+          "class": "sql_injection",
+          "note": "name interpolated into INSERT"
+        },
+        {
+          "file": "sqli/app.py",
+          "line": 35,
+          "class": "template_autoescape_off",
+          "note": "jinja autoescape=False"
+        },
+        {
+          "file": "sqli/dao/user.py",
+          "line": 41,
+          "class": "weak_hash",
+          "note": "md5 password hash"
+        },
+        {
+          "file": "sqli/app.py",
+          "line": 24,
+          "class": "debug",
+          "note": "aiohttp debug=True"
+        }
+      ]
+    },
+    "nodejs-goof": {
+      "url": "https://github.com/snyk-labs/nodejs-goof",
+      "commit": "add14ba59e98240d9e00a235dd7d42cd61ae9912",
+      "held_out": "third",
+      "known": [
+        {
+          "file": "routes/index.js",
+          "line": 174,
+          "class": "command_injection",
+          "note": "exec('identify ' + url)"
+        },
+        {
+          "file": "routes/index.js",
+          "line": 52,
+          "class": "nosql_injection",
+          "note": "User.find with request username/password"
+        },
+        {
+          "file": "routes/index.js",
+          "line": 29,
+          "class": "open_redirect",
+          "note": "res.redirect(redirectPage)"
+        },
+        {
+          "file": "routes/index.js",
+          "line": 74,
+          "class": "open_redirect",
+          "note": "res.redirect(redirectPage)"
+        },
+        {
+          "file": "routes/index.js",
+          "line": 270,
+          "class": "path_traversal",
+          "note": "zip slip: extractAllTo"
+        },
+        {
+          "file": "app.js",
+          "line": 43,
+          "class": "secret",
+          "note": "session secret 'keyboard cat'"
+        }
+      ]
+    },
+    "vulnerable-node": {
+      "url": "https://github.com/cr0hn/vulnerable-node",
+      "commit": "d68f2a3c9277ece2c2feb9976052033bdecd7fbe",
+      "held_out": "third",
+      "known": [
+        {
+          "file": "model/db.js",
+          "line": 13,
+          "class": "sql_injection",
+          "note": "login concatenation"
+        },
+        {
+          "file": "model/db.js",
+          "line": 25,
+          "class": "sql_injection",
+          "note": "ILIKE interpolation"
+        },
+        {
+          "file": "model/db.js",
+          "line": 101,
+          "class": "sql_injection",
+          "note": "ORDER BY ${sort}"
+        },
+        {
+          "file": "model/db.js",
+          "line": 112,
+          "class": "mass_assignment",
+          "note": "profile keys become columns"
+        },
+        {
+          "file": "routes/auth.js",
+          "line": 23,
+          "class": "sensitive_data_in_log",
+          "note": "password in logs"
+        },
+        {
+          "file": "routes/auth.js",
+          "line": 35,
+          "class": "open_redirect",
+          "note": "returnurl unvalidated"
+        },
+        {
+          "file": "routes/auth.js",
+          "line": 52,
+          "class": "mass_assignment",
+          "note": "whole body to INSERT (role)"
+        },
+        {
+          "file": "routes/extras.js",
+          "line": 17,
+          "class": "path_traversal",
+          "note": "?file= joined to images dir"
+        },
+        {
+          "file": "routes/extras.js",
+          "line": 33,
+          "class": "command_injection",
+          "note": "ping host in shell"
+        },
+        {
+          "file": "routes/orders.js",
+          "line": 68,
+          "class": "idor",
+          "note": "any order id readable"
+        },
+        {
+          "file": "routes/shop.js",
+          "line": 41,
+          "class": "nosql_injection",
+          "note": "raw JSON into Mongo filter"
+        },
+        {
+          "file": "routes/shop.js",
+          "line": 58,
+          "class": "nosql_injection",
+          "note": "query operators into Mongo filter"
+        },
+        {
+          "file": "routes/tools.js",
+          "line": 21,
+          "class": "ssrf",
+          "note": "fetch(req.body.url)"
+        },
+        {
+          "file": "config.js",
+          "line": 9,
+          "class": "secret",
+          "note": "session secret fallback literal"
+        },
+        {
+          "file": "config.js",
+          "line": 16,
+          "class": "secret",
+          "note": "jwt secret fallback literal"
+        },
+        {
+          "file": "model/merge.js",
+          "line": 14,
+          "class": "prototype_pollution",
+          "note": "recursive merge",
+          "in_taxonomy": false
+        },
+        {
+          "file": "routes/tools.js",
+          "line": 44,
+          "class": "redos",
+          "note": "new RegExp(user pattern)",
+          "in_taxonomy": false
+        },
+        {
+          "file": "sast/seeds/crypto-weak.js",
+          "line": 5,
+          "class": "weak_hash",
+          "note": "md5"
+        },
+        {
+          "file": "sast/seeds/deserialization.js",
+          "line": 11,
+          "class": "deserialization",
+          "note": "node-serialize unserialize"
+        },
+        {
+          "file": "sast/seeds/deserialization.js",
+          "line": 21,
+          "class": "command_injection",
+          "note": "exec('ping ' + host)"
+        },
+        {
+          "file": "sast/seeds/eval-code.js",
+          "line": 7,
+          "class": "code_injection",
+          "note": "eval(expr)"
+        },
+        {
+          "file": "sast/seeds/eval-code.js",
+          "line": 16,
+          "class": "code_injection",
+          "note": "new Function with request value"
+        },
+        {
+          "file": "sast/seeds/hardcoded-secret.js",
+          "line": 4,
+          "class": "secret",
+          "note": "API_SECRET literal"
+        },
+        {
+          "file": "sast/seeds/hardcoded-secret.js",
+          "line": 5,
+          "class": "secret",
+          "note": "DB_PASSWORD literal"
+        },
+        {
+          "file": "sast/seeds/hardcoded-secret.js",
+          "line": 11,
+          "class": "secret",
+          "note": "AWS access key id"
+        },
+        {
+          "file": "sast/seeds/hardcoded-secret.js",
+          "line": 17,
+          "class": "secret",
+          "note": "jwt.sign literal key"
+        },
+        {
+          "file": "sast/seeds/nosql-operator.js",
+          "line": 8,
+          "class": "nosql_injection",
+          "note": "findOne(body)"
+        },
+        {
+          "file": "sast/seeds/nosql-operator.js",
+          "line": 17,
+          "class": "nosql_injection",
+          "note": "filter from request params"
+        },
+        {
+          "file": "sast/seeds/open-redirect.js",
+          "line": 7,
+          "class": "open_redirect",
+          "note": "res.redirect(next)"
+        },
+        {
+          "file": "sast/seeds/open-redirect.js",
+          "line": 12,
+          "class": "open_redirect",
+          "note": "res.location(req.query.to)"
+        },
+        {
+          "file": "sast/seeds/path-traversal.js",
+          "line": 7,
+          "class": "path_traversal",
+          "note": "readFileSync(join(base, user))"
+        },
+        {
+          "file": "sast/seeds/path-traversal.js",
+          "line": 12,
+          "class": "path_traversal",
+          "note": "readFileSync(dir + name)"
+        },
+        {
+          "file": "sast/seeds/sqli-concat.js",
+          "line": 6,
+          "class": "sql_injection",
+          "note": "concat"
+        },
+        {
+          "file": "sast/seeds/sqli-concat.js",
+          "line": 10,
+          "class": "sql_injection",
+          "note": "template literal"
+        },
+        {
+          "file": "sast/seeds/ssrf-fetch.js",
+          "line": 7,
+          "class": "ssrf",
+          "note": "fetch(url) from handler"
+        },
+        {
+          "file": "sast/seeds/xss-raw-echo.js",
+          "line": 7,
+          "class": "reflected_xss",
+          "note": "res.send('<h1>' + name)"
+        },
+        {
+          "file": "sast/seeds/xss-raw-echo.js",
+          "line": 16,
+          "class": "reflected_xss",
+          "note": "unescaped template placeholder"
+        },
+        {
+          "file": "sast/seeds/prototype-pollution.js",
+          "line": 8,
+          "class": "prototype_pollution",
+          "note": "deepMerge",
+          "in_taxonomy": false
+        },
+        {
+          "file": "sast/seeds/redos-nested.js",
+          "line": 4,
+          "class": "redos",
+          "note": "new RegExp(pattern)",
+          "in_taxonomy": false
+        }
+      ],
+      "clean_files": [
+        "sast/seeds/clean-escaped.js",
+        "sast/seeds/clean-parameterized.js"
+      ]
+    },
+    "dvws-node": {
+      "url": "https://github.com/snoopysecurity/dvws-node",
+      "commit": "eb6e2886f2206b88bf709fe1fa311adc3ae3c34f",
+      "held_out": "third",
+      "known": [
+        {
+          "file": "src/controllers/notes.js",
+          "line": 79,
+          "class": "command_injection",
+          "note": "exec(req.params.command)"
+        },
+        {
+          "file": "src/controllers/notes.js",
+          "line": 90,
+          "class": "xpath_injection",
+          "note": "xpath.evaluate with concatenation"
+        },
+        {
+          "file": "src/controllers/notes.js",
+          "line": 173,
+          "class": "nosql_injection",
+          "note": "$where built from search"
+        },
+        {
+          "file": "src/controllers/notes.js",
+          "line": 228,
+          "class": "xxe",
+          "note": "libxmljs noent: true"
+        },
+        {
+          "file": "src/controllers/notes.js",
+          "line": 142,
+          "class": "mass_assignment",
+          "note": "findOneAndUpdate(..., req.body)"
+        },
+        {
+          "file": "src/controllers/passphrase.js",
+          "line": 44,
+          "class": "sql_injection",
+          "note": "INSERT via template literal"
+        },
+        {
+          "file": "src/controllers/passphrase.js",
+          "line": 59,
+          "class": "sql_injection",
+          "note": "SELECT via template literal"
+        },
+        {
+          "file": "src/controllers/passphrase.js",
+          "line": 96,
+          "class": "deserialization",
+          "note": "node-serialize unserialize"
+        },
+        {
+          "file": "src/controllers/users.js",
+          "line": 51,
+          "class": "mass_assignment",
+          "note": "new User(req.body)"
+        },
+        {
+          "file": "src/controllers/users.js",
+          "line": 99,
+          "class": "open_redirect",
+          "note": "redirect to http:// + param"
+        },
+        {
+          "file": "src/controllers/files.js",
+          "line": 90,
+          "class": "path_traversal",
+          "note": "filename joined to upload dir"
+        },
+        {
+          "file": "src/services/soap/user-service.js",
+          "line": 49,
+          "class": "xxe",
+          "note": "libxmljs noent: true"
+        },
+        {
+          "file": "src/controllers/users.js",
+          "line": 348,
+          "class": "ldap_injection",
+          "note": "filter concatenation",
+          "in_taxonomy": false
+        },
+        {
+          "file": "src/controllers/users.js",
+          "line": 216,
+          "class": "xml_injection",
+          "note": "XML built from input",
+          "in_taxonomy": false
         }
       ]
     }
