@@ -60,8 +60,10 @@ CATEGORY_META = {
     "xml_entity_expansion": (
         "CWE-776",
         "A05:2021 Security Misconfiguration",
-        "The standard-library XML parser does not load external entities but can be exhausted by "
-        "entity expansion; use defusedxml when parsing untrusted XML.",
+        "Not XXE, SSRF or file disclosure: the standard-library XML parser does not load external "
+        "entities. It can only be exhausted by entity expansion (denial of service), so the "
+        "impact is low. Use defusedxml when parsing untrusted XML (there is no `resolve_entities` "
+        "option on xml.etree's XMLParser; that is lxml).",
     ),
 }
 
