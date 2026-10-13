@@ -112,6 +112,44 @@ class SinkFinding:
         return f"{self.category.replace('_', ' ').title()}: {self.rule}"
 
 
+def _mark_nonsecurity_hashes(tree: ast.AST) -> None:
+    """``int(hashlib.md5(x).hexdigest(), 16) % n`` (bucketing) and a ``.hexdigest()[:6]`` short code
+    are not password/integrity uses: a numeric or truncated digest is no security boundary. The
+    inner md5/sha1 call is marked so it is not reported."""
+
+    def inner(call: ast.AST):
+        # <hash>(...).hexdigest() / .digest()
+        if (
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr in {"hexdigest", "digest"}
+            and isinstance(call.func.value, ast.Call)
+        ):
+            return call.func.value
+        return None
+
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "int"
+            and node.args
+        ):
+            target = inner(node.args[0])
+            if target is not None:
+                target._sa_nonsecurity_hash = True  # type: ignore[attr-defined]
+        elif isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice):
+            upper = node.slice.upper
+            if (
+                isinstance(upper, ast.Constant)
+                and isinstance(upper.value, int)
+                and upper.value <= 16
+            ):
+                target = inner(node.value)
+                if target is not None:
+                    target._sa_nonsecurity_hash = True  # type: ignore[attr-defined]
+
+
 def scan_sinks(relpath: str, text: str) -> list[SinkFinding]:
     if relpath.endswith(".py"):
         return _python_sinks(relpath, text)
@@ -129,6 +167,7 @@ def _python_sinks(relpath: str, text: str) -> list[SinkFinding]:
     except (SyntaxError, ValueError):
         return []
     lines = text.splitlines()
+    _mark_nonsecurity_hashes(tree)
     visitor = _SinkVisitor(relpath, lines, _collect_aliases(tree))
     visitor.visit(tree)
     return visitor.findings
@@ -210,8 +249,12 @@ class _SinkVisitor(ast.NodeVisitor):
         elif name.endswith("_create_unverified_context"):
             self._add("disabled_tls_verification", name, node.lineno)
 
-        # Weak hashing
-        if last in {"md5", "sha1"} and ("hashlib" in name or name == last):
+        # Weak hashing (not when the digest is only turned into a bucket index or a short code)
+        if (
+            last in {"md5", "sha1"}
+            and ("hashlib" in name or name == last)
+            and not getattr(node, "_sa_nonsecurity_hash", False)
+        ):
             self._add("weak_hash", name, node.lineno)
 
         # Insecure temp file
@@ -319,9 +362,32 @@ _JS_RULES = [
 ]
 
 
+_JS_STRINGS = re.compile(r"""'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`""")
+
+
+def _constant_assignment(text: str, end: int) -> bool:
+    """True when the statement starting at ``end`` (just after ``innerHTML =``) assigns only string
+    literals (no ``+`` of variables, no ``${}`` interpolation): constant markup is not XSS."""
+    stop = text.find(";", end)
+    stmt = text[end : stop if stop != -1 else end + 1500]
+    if "${" in stmt:
+        return False
+    rest = _JS_STRINGS.sub("", stmt)
+    return (
+        not rest.replace("+", "").strip()
+        and "+" not in rest.strip().strip("+")
+        and bool(stmt.strip())
+    )
+
+
 def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:
     findings: list[SinkFinding] = []
     uses_child_process = "child_process" in text
+    offsets: list[int] = []
+    pos = 0
+    for raw in text.splitlines(keepends=True):
+        offsets.append(pos)
+        pos += len(raw)
     for lineno, line in enumerate(text.splitlines(), start=1):
         if len(line) > 4000:
             continue
@@ -329,6 +395,12 @@ def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:
             m = pattern.search(line)
             if m and category == "command_injection" and not uses_child_process:
                 continue  # no child_process in this file: `exec(` is something else
+            if (
+                m
+                and category == "xss_sink"
+                and _constant_assignment(text, offsets[lineno - 1] + m.end())
+            ):
+                continue
             if m:
                 sev, conf, _ = CATEGORY_RISK[category]
                 findings.append(

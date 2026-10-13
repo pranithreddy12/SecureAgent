@@ -91,10 +91,35 @@ def scan_logging(relpath: str, text: str) -> list[LoggingFinding]:
             sens = _sensitive_arg(node)
             if sens:
                 add("sensitive_data_in_log", f"logs sensitive value '{sens}'", node.lineno)
-        elif isinstance(node, ast.ExceptHandler) and _is_swallowed(node):
+        elif (
+            isinstance(node, ast.ExceptHandler)
+            and _is_swallowed(node)
+            and not _is_deliberate(node, lines)
+        ):
             add("swallowed_exception", "except block only does pass/...", node.lineno)
 
     return out
+
+
+_DELIBERATE_COMMENT = re.compile(
+    r"(?i)noqa|best[- ]effort|fall ?back|optional|non-?fatal|expected|intentional|deliberate|"
+    r"cleanup|harmless|not critical|ignore[sd]?\b|may fail|can fail|safe to"
+)
+
+
+def _is_deliberate(handler: ast.ExceptHandler, lines: list[str]) -> bool:
+    """A narrow handler (``except ValueError: pass``) is ordinary control flow, and a handler the
+    author commented (``# best effort``, ``# noqa: BLE001 - reason``) is a recorded decision."""
+    typ = _dotted(handler.type) if handler.type is not None else None
+    if typ is not None and typ.rsplit(".", 1)[-1] not in {"Exception", "BaseException"}:
+        return True
+    if isinstance(handler.type, ast.Tuple):  # except (A, B): pass -- still narrow
+        return True
+    for lineno in {handler.lineno, handler.body[0].lineno if handler.body else handler.lineno}:
+        if 0 < lineno <= len(lines) and "#" in lines[lineno - 1]:
+            if _DELIBERATE_COMMENT.search(lines[lineno - 1].split("#", 1)[1]):
+                return True
+    return False
 
 
 def _is_log_call(call: ast.Call) -> bool:

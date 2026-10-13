@@ -147,13 +147,15 @@ def analyze_taint_project(sources: list[tuple[str, str]]) -> list[TaintFinding]:
             gfuncs.setdefault(name, []).append((node, relpath, lines))
         findings += _python_taint_tree(tree, relpath, lines, funcs)  # intra + within-file
 
-    # Cross-file: from each handler, follow calls that resolve to other modules.
+    # Cross-file: from each handler, follow calls that resolve to other modules. Each file keeps
+    # its own return-value context so a helper's same-file callees are judged by their bodies.
+    ctxs = {rel: _Ctx(funcs, 0, {}) for rel, _t, _l, funcs, _i in parsed}
     for relpath, ptree, _lines, _funcs, _imports in parsed:
         for func in _all_function_nodes(ptree):
             if _is_handler(func):
-                tainted = _function_tainted(func, _handler_param_taint(func))
+                tainted = _function_tainted(func, _handler_param_taint(func), ctxs.get(relpath))
                 findings += _propagate_cross(
-                    func, relpath, tainted, gfuncs, imports_by_file, 0, set()
+                    func, relpath, tainted, gfuncs, imports_by_file, 0, set(), ctxs
                 )
 
     unique: dict[tuple, TaintFinding] = {}
@@ -181,7 +183,8 @@ def _resolve_callee(call, caller_imports, gfuncs):
     return None  # ambiguous name with no import hint: stay conservative
 
 
-def _propagate_cross(func, relpath, tainted, gfuncs, imports_by_file, depth, visited):
+def _propagate_cross(func, relpath, tainted, gfuncs, imports_by_file, depth, visited, ctxs=None):
+    ctxs = ctxs or {}
     if depth >= MAX_CALL_DEPTH:
         return []
     caller_imports = imports_by_file.get(relpath, {})
@@ -193,7 +196,8 @@ def _propagate_cross(func, relpath, tainted, gfuncs, imports_by_file, depth, vis
         if resolved is None:
             continue
         callee, crel, clines = resolved
-        passed = _tainted_params_for_call(call, tainted, callee)
+        cctx = ctxs.get(crel)
+        passed = _tainted_params_for_call(call, tainted, callee, ctxs.get(relpath))
         if not passed:
             continue
         key = (crel, getattr(callee, "name", ""), frozenset(passed))
@@ -201,10 +205,12 @@ def _propagate_cross(func, relpath, tainted, gfuncs, imports_by_file, depth, vis
             continue
         visited.add(key)
         ctaint = _function_tainted(
-            callee, passed, None, _call_origins(call, callee, tainted, relpath, passed)
+            callee, passed, cctx, _call_origins(call, callee, tainted, relpath, passed)
         )
-        out += _sinks_in_function(callee, ctaint, crel, clines)
-        out += _propagate_cross(callee, crel, ctaint, gfuncs, imports_by_file, depth + 1, visited)
+        out += _sinks_in_function(callee, ctaint, crel, clines, cctx)
+        out += _propagate_cross(
+            callee, crel, ctaint, gfuncs, imports_by_file, depth + 1, visited, ctxs
+        )
     return out
 
 
@@ -389,6 +395,7 @@ class _TaintSet(set):
 
     origins: dict[str, list[str]]
     parents: dict[str, tuple[int, ast.expr]]
+    orm_names: set[str] = frozenset()  # type: ignore[assignment]
 
 
 def _function_tainted(
@@ -400,6 +407,7 @@ def _function_tainted(
     guarded = _allowlist_guarded(func)
     tainted = _TaintSet(set(initial) - guarded)
     tainted.parents = {}
+    tainted.orm_names = _orm_statement_names(func)
     if origins is None:  # entry point: its parameters are the request input
         origins = {n: [f"handler parameter `{n}` (request input)"] for n in initial}
     tainted.origins = origins
@@ -410,7 +418,7 @@ def _function_tainted(
         for targets, value, lineno in assigns:
             if _expr_tainted(value, tainted, ctx):
                 for t in targets:
-                    if t not in tainted and t not in guarded:
+                    if t not in tainted and t not in guarded and t not in tainted.orm_names:
                         tainted.add(t)
                         tainted.parents[t] = (lineno, value)
                         changed = True
@@ -599,6 +607,42 @@ _ORM_ROOTS = {"select", "insert", "update", "delete", "exists", "union", "union_
 _RAW_SQL_BUILDERS = {"text", "literal_column", "literal"}
 
 
+def _orm_statement_names(func) -> set[str]:
+    """Variables that only ever hold a SQLAlchemy statement built from ``select(...)`` & co.
+
+    ``stmt = select(X).where(...)`` then ``stmt = stmt.where(X.a == v)``: the values are bound
+    parameters, so the statement object is not tainted by what is passed into ``.where()``."""
+    assigns: dict[str, list[ast.expr]] = {}
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    assigns.setdefault(t.id, []).append(node.value)
+    names = set(assigns)  # greatest fixpoint: `stmt = stmt.where(...)` refers to itself
+    changed = True
+    while changed:
+        changed = False
+        for name in list(names):
+            if not all(_is_orm_chain(v, names) for v in assigns[name]):
+                names.discard(name)
+                changed = True
+    return names
+
+
+def _is_orm_chain(node: ast.expr, known: set[str]) -> bool:
+    root = node
+    while isinstance(root, (ast.Call, ast.Attribute)):
+        root = root.func if isinstance(root, ast.Call) else root.value
+    if not (isinstance(root, ast.Name) and (root.id in _ORM_ROOTS or root.id in known)):
+        return False
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Call) and (_dotted(sub.func) or "").rsplit(".", 1)[-1] in (
+            _RAW_SQL_BUILDERS
+        ):
+            return False  # text(f"...") keeps the finding
+    return True
+
+
 def _is_parameterised_orm_expr(node, tainted: set[str], ctx: _Ctx | None) -> bool:
     """``select(...).where(col == value)``: SQLAlchemy binds ``value`` as a parameter, so a
     tainted value inside it is not SQL injection. Raw-SQL builders nested inside (``text(f"..")``)
@@ -606,7 +650,8 @@ def _is_parameterised_orm_expr(node, tainted: set[str], ctx: _Ctx | None) -> boo
     root = node
     while isinstance(root, ast.Call) or isinstance(root, ast.Attribute):
         root = root.func if isinstance(root, ast.Call) else root.value
-    if not (isinstance(root, ast.Name) and root.id in _ORM_ROOTS):
+    orm_names = getattr(tainted, "orm_names", ())
+    if not (isinstance(root, ast.Name) and (root.id in _ORM_ROOTS or root.id in orm_names)):
         return False
     for sub in ast.walk(node):
         if (
@@ -894,6 +939,40 @@ _SANITIZER_DOTTED = (
 )
 
 
+_PATH_CLASSES = {"Path", "PurePath", "PurePosixPath", "PureWindowsPath"}
+
+
+def _is_basename_or_char_filter(n: ast.AST) -> bool:
+    """``Path(x).name`` (a basename) and ``"".join(c if c.isalnum() else "_" for c in x)`` (a
+    character whitelist) cannot carry a path separator, so they neutralise path traversal."""
+    if (
+        isinstance(n, ast.Attribute)
+        and n.attr == "name"
+        and isinstance(n.value, ast.Call)
+        and (_dotted(n.value.func) or "").rsplit(".", 1)[-1] in _PATH_CLASSES
+    ):
+        return True
+    if (
+        isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "join"
+        and isinstance(n.func.value, ast.Constant)
+        and n.func.value.value == ""
+        and n.args
+        and isinstance(n.args[0], ast.GeneratorExp)
+    ):
+        elt = n.args[0].elt
+        test = elt.test if isinstance(elt, ast.IfExp) else None
+        if test is not None:
+            return any(
+                isinstance(c, ast.Call)
+                and isinstance(c.func, ast.Attribute)
+                and c.func.attr in {"isalnum", "isalpha", "isdigit"}
+                for c in ast.walk(test)
+            )
+    return False
+
+
 def _is_sanitizer_call(call: ast.Call) -> bool:
     name = _dotted(call.func) or ""
     if name.rsplit(".", 1)[-1] in _SANITIZER_NAMES:
@@ -909,6 +988,8 @@ def _iter_unsanitized(node: ast.expr, sanitize: bool = True, ctx: _Ctx | None = 
         yield n
         if getattr(n, "_sa_const", False):
             continue  # a lookup into the program's own constant table
+        if _is_basename_or_char_filter(n):
+            continue
         if isinstance(n, ast.IfExp):
             # `"DESC" if request.args.get("dir") == "desc" else "ASC"`: the test only *selects*
             # between the branches; the value is whichever branch, not the request data.

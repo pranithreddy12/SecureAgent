@@ -28,13 +28,16 @@ from app.analysis.taint import (
 )
 
 # ORM-ish receivers for a by-id lookup (reduces false hits on dict/cache .get()).
-QUERY_BASES = ("query", "session", "objects", "db", "repository", "repo", "store")
+QUERY_BASES = ("query", "session", "objects", "db", "repository", "repo")
 GET_METHODS = {"get", "get_or_404", "get_object_or_404"}
 FILTER_METHODS = {"filter", "filter_by", "exclude", "where"}
 ID_KEYS = {"id", "pk", "uuid", "guid", "slug", "_id", "oid", "key"}
 
 CURRENT_USER_RE = re.compile(r"(?i)(current_user|request\.user|g\.user|get_current_user|\bowner\b)")
-OWNER_ATTRS = {"user_id", "owner_id", "account_id", "tenant_id", "org_id", "user", "owner"}
+OWNER_ATTRS = {
+    "user_id", "owner_id", "account_id", "tenant_id", "org_id", "organization_id",
+    "organisation_id", "workspace_id", "team_id", "user", "owner",
+}  # fmt: skip
 ADMIN_RE = re.compile(r"(?i)(admin|superuser|staff_member|require_admin)")
 
 
@@ -135,6 +138,7 @@ def _by_id_lookups(func, tainted: set[str]) -> list[tuple[int, str]]:
     """Return (line, description) for record-by-request-id lookups with no owner scoping
     in the call itself."""
     hits: list[tuple[int, str]] = []
+    scoped = _scoped_receivers(func)
     for call in ast.walk(func):
         if not isinstance(call, ast.Call):
             continue
@@ -143,6 +147,8 @@ def _by_id_lookups(func, tainted: set[str]) -> list[tuple[int, str]]:
 
         if _scoped_to_user(call):
             continue  # the query itself filters by the current user
+        if name.split(".")[0] in scoped:
+            continue  # `repo = Repo(db, user.tenant_id)`: every call on it is already scoped
 
         if last in {"get_or_404", "get_object_or_404"} and _any_req(call, tainted):
             hits.append((call.lineno, name or last))
@@ -155,6 +161,19 @@ def _by_id_lookups(func, tainted: set[str]) -> list[tuple[int, str]]:
         elif last in FILTER_METHODS and _filter_id_eq_request(call, tainted):
             hits.append((call.lineno, name))
     return hits
+
+
+def _scoped_receivers(func) -> set[str]:
+    """Names bound to an object built from the current user/tenant, e.g.
+    ``repo = CustomerRepository(db, user.tenant_id)``: a repository scoped at construction."""
+    names: set[str] = set()
+    for node in ast.walk(func):
+        if not (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)):
+            continue
+        args = [*node.value.args, *(k.value for k in node.value.keywords)]
+        if any(_is_current_user(a) for a in args if _dotted(a)):
+            names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+    return names
 
 
 def _receiver_tokens(node) -> list[str]:

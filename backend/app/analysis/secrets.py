@@ -39,8 +39,19 @@ _SECRET_PAIRS = frozenset(
 _WORD_SPLIT = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
 
 
+# A trailing word that makes the key a *description* of a token, not the token: a URL, a count,
+# a type, a name (`tokenUrl`, `max_tokens`, `token_type`, `password_field`).
+_NOT_A_VALUE_SUFFIX = frozenset(
+    {"url", "uri", "path", "endpoint", "type", "name", "field", "header", "prefix", "count",
+     "limit",
+     "tokens", "length", "size", "ttl", "expiry", "expires", "id", "contract", "address", "label"}
+)  # fmt: skip
+
+
 def key_looks_secret(key: str) -> bool:
     words = [w.lower() for w in _WORD_SPLIT.findall(key)]
+    if len(words) > 1 and words[-1] in _NOT_A_VALUE_SUFFIX:
+        return False
     if any(w in _SECRET_WORDS for w in words):
         return True
     return any(pair in _SECRET_PAIRS for pair in zip(words, words[1:], strict=False))
@@ -152,6 +163,17 @@ _CLIENT_PUBLIC = re.compile(
 )
 
 
+_WORD_VALUE = re.compile(r"^[A-Za-z]+(?:[._:-][A-Za-z]+)*$")
+_CHAIN_ADDRESS = re.compile(r"^0x[0-9a-fA-F]{40}$")
+_TYPE_ALIAS = re.compile(r"^\s*(?:export\s+)?(?:declare\s+)?type\s+\w+\s*=")
+
+
+def _is_identifier_value(value: str) -> bool:
+    """A single-case word such as ``access_token`` / ``TOKEN_TRANSFER`` / ``loading``: an
+    identifier or enum member, not a credential (those carry digits, symbols or mixed case)."""
+    return bool(_WORD_VALUE.match(value)) and (value.islower() or value.isupper())
+
+
 def _is_placeholder(value: str) -> bool:
     v = value.strip()
     if _PLACEHOLDER.match(v) or _ENV_REFERENCE.search(v) or v.lower() in _BENIGN_VALUES:
@@ -160,6 +182,8 @@ def _is_placeholder(value: str) -> bool:
         return True  # the *name* of a variable (PASSWORD_ENV = "APP_PASSWORD"), not a value
     if any(w in v.lower() for w in _FAKE_WORDS):
         return True
+    if "..." in v or v.startswith("/") or _CHAIN_ADDRESS.match(v) or v.replace(".", "").isdigit():
+        return True  # elided example, a URL path, a public blockchain address, a number
     if _URL_NO_USERINFO.match(v):
         return True  # a plain URL (author_url, redirect_uri) carries no credential
     return len(set(v)) <= 2  # e.g. "aaaaaa", "------"
@@ -235,6 +259,10 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
             key, val = m.group("key"), m.group("val")
             if not key_looks_secret(key) or _is_placeholder(val):
                 continue
+            if _is_identifier_value(val) or _TYPE_ALIAS.match(line):
+                continue
+            if relpath.lower().endswith((".md", ".rst", ".txt")):
+                continue  # prose describes credentials; provider-format keys are still caught above
             if _fingerprint(val) in provider_fps:
                 continue
             if any(c.isspace() for c in val):

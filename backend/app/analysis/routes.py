@@ -67,10 +67,19 @@ def extract_routes(relpath: str, text: str) -> list[Route]:
     return []
 
 
+# Paths that are public on purpose: capability URLs (a secret token in the path), sign-in and
+# sign-up, token refresh, health probes, provider webhooks/callbacks, explicitly "public" areas.
+PUBLIC_BY_DESIGN = re.compile(
+    r"(?i)(?:[{<:]\s*(?:token|code|slug|key|share_?id|invite)\b)"
+    r"|/(?:login|logout|signin|sign-in|register|signup|sign-up|refresh|health|healthz|ready|"
+    r"readyz|ping|status|webhooks?|callback|inbound|public|oauth|forgot)(?:/|$|\b)"
+)
+
+
 def route_findings(routes: list[Route]) -> list[RouteFinding]:
     findings: list[RouteFinding] = []
     for r in routes:
-        if r.protected:
+        if r.protected or PUBLIC_BY_DESIGN.search(r.path):
             continue
         privileged = bool(PRIVILEGED_PATH.search(r.path))
         if r.method not in STATE_CHANGING and not privileged:
@@ -338,11 +347,15 @@ def _depends_guard_in(call: ast.Call) -> str | None:
 # require_member ... Used only for names passed to Depends()/Security().
 DEPENDS_HINT = re.compile(
     r"(?i)(verify|owner|owned|ownership|access|role|scope|member|principal|identity|tenant|acl|"
-    r"rbac|can_|check_|authoriz)"
+    r"rbac|can_|check_|authoriz|current)"
 )
+# `get_current_user_optional`: resolves the user when present but does not require one.
+_OPTIONAL_GUARD = re.compile(r"(?i)optional|maybe|anonymous|allow_?anon|opt_")
 
 
 def _is_guard_dependency(name: str) -> bool:
+    if _OPTIONAL_GUARD.search(name):
+        return False
     return bool(AUTH_HINT.search(name) or DEPENDS_HINT.search(name))
 
 
@@ -464,9 +477,20 @@ def _is_route_name(name: str) -> bool:
 # --------------------------------------------------------------------------- JS / TS
 
 
+_JS_SERVER = re.compile(
+    r"""(?x)(?:require\(\s*|from\s+|import\s+)['"](?:express|fastify|koa|koa-router|@koa/router|
+    restify|hapi|@hapi/hapi|polka|hono|@nestjs/\w+)['"]|\bexpress\s*\(|\bRouter\s*\(|\bFastify\s*\("""
+)
+
+
 def _js_routes(relpath: str, text: str) -> list[Route]:
     routes: list[Route] = []
+    # `api.put("/settings")` in a client component is an HTTP *call*, not a route definition: an
+    # `api` receiver counts only in a file that uses a server framework (and is not a component).
+    is_server = _JS_SERVER.search(text) is not None and not relpath.endswith((".jsx", ".tsx"))
     for m in _JS_ROUTE.finditer(text):
+        if m.group(0).startswith("api.") and not is_server:
+            continue  # an `api` client object, not a router
         method = m.group(1).upper()
         if method == "ALL":
             method = "ANY"
@@ -512,9 +536,14 @@ def _nest_routes(relpath: str, text: str) -> list[Route]:
     first_method_line = (
         text.count("\n", 0, first_method.start()) + 1 if first_method else len(lines)
     )
+    # Class decorators may sit above or below @Controller (@ApiTags, @UseGuards, ...).
+    class_line = next(
+        (i + 1 for i in range(max(controller_line - 1, 0), len(lines)) if " class " in lines[i]),
+        first_method_line,
+    )
     class_guarded = any(
         "@UseGuards" in lines[i]
-        for i in range(max(controller_line - 1, 0), min(first_method_line, len(lines)))
+        for i in range(max(controller_line - 10, 0), min(class_line, len(lines)))
     )
 
     routes: list[Route] = []
