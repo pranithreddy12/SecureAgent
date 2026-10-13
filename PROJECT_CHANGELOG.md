@@ -1123,7 +1123,7 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Misses: SSRF/redirect from a `url.parse(req.url, true).query` value (not `req.query`); a template-literal
   sink returned directly from `res.send`/`client.query` without an intermediate variable.
 
-## 2026-10-14 (unified Run page -- ADR-030)
+## 2026-10-14 (unified Run page -- ADR-032)
 
 - New `/run` page: pick a local folder (zipped client-side) or an existing project, see the real
   authorization statement, choose static / +AI review (MCP agent mode shown but disabled -- not wired

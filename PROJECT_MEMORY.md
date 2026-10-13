@@ -231,6 +231,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-029 | Sixth untouched set (skf-labs, DVGA, DVRestaurant) | Accepted |
 | ADR-030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) | Accepted |
 | ADR-031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap | Accepted |
+| ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -498,7 +499,7 @@ sources, `Markup()`/template XSS, `app.secret_key` in `__main__`.
 52/49/41/46/58/68/75%, pooled 53%. New narrow gaps: `url.parse(req.url, true).query` as a source; a
 template-literal sink returned directly from `res.send`/`client.query`.
 
-**Unified Run page (2026-10-14, ADR-030):** `/run` chains the existing upload/authorize/start-audit
+**Unified Run page (2026-10-14, ADR-032):** `/run` chains the existing upload/authorize/start-audit
 APIs into one page with a real folder picker (client-side zip via `jszip`) and shows, but disables, an
 "MCP agent mode" option since the in-progress agent files (`app/agents/`, `app/tools/`, `app/workflows/`,
 the two target-management services) are not wired into `app/main.py` and this session was told not to

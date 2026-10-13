@@ -1,4 +1,4 @@
-# ADR-030: A single "Run" page instead of three separate forms
+# ADR-032: A single "Run" page instead of three separate forms
 
 - **Date:** 2026-10-14
 - **Status:** Accepted (owner: "i want a application ui ... select some project folder and maybe i
