@@ -572,6 +572,15 @@ def _check_sink(
         return "sql_injection", name
     if last == "text" and _tainted(a0, tainted, ctx):
         return "sql_injection", name
+    if (
+        last == "send_header"
+        and len(args) >= 2
+        and isinstance(a0, ast.Constant)
+        and isinstance(a0.value, str)
+        and a0.value.lower() == "location"
+        and _tainted(args[1], tainted, ctx)
+    ):
+        return "open_redirect", name
     if (name in {"os.system", "os.popen"} or last in {"system", "popen", "getoutput"}) and any(
         _tainted(a, tainted, ctx) for a in args
     ):
@@ -694,18 +703,25 @@ def _is_http_call(name: str, last: str) -> bool:
 
 # --------------------------------------------------------------------------- JS / TS
 
-_JS_SOURCE = re.compile(r"\breq(?:uest)?\.(?:query|params|body|cookies|headers)\b")
-_JS_ASSIGN = re.compile(
-    r"(?:const|let|var)\s+(\w+)\s*=\s*[^;]*req(?:uest)?\.(?:query|params|body|cookies|headers)"
-)
+_JS_REQ_PARTS = r"(?:query|params|body|cookies|headers|files|file)"
+_JS_SOURCE = re.compile(r"\breq(?:uest)?\." + _JS_REQ_PARTS + r"\b")
+_JS_ASSIGN = re.compile(r"(?:const|let|var)\s+(\w+)\s*=\s*[^;]*req(?:uest)?\." + _JS_REQ_PARTS)
 _JS_DESTRUCTURE = re.compile(
-    r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*req(?:uest)?\.(?:query|params|body|cookies|headers)"
+    r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*req(?:uest)?\." + _JS_REQ_PARTS
 )
+_JS_BUILT = re.compile(r"[`+]|\$\{")
 _JS_SINKS = [
     ("sql_injection", re.compile(r"\.(query|execute)\s*\("), re.compile(r"[`+]|\$\{")),
     ("command_injection", re.compile(r"\b(?:child_process\.)?(?:exec|execSync)\s*\("), None),
     ("code_injection", re.compile(r"\beval\s*\(|\bnew\s+Function\s*\("), None),
-    ("ssrf", re.compile(r"\b(?:axios|fetch)\s*\(|\bhttps?\.(?:get|request)\s*\("), None),
+    (
+        "ssrf",
+        re.compile(
+            r"\b(?:axios|fetch)\s*\(|\bhttps?\.(?:get|request)\s*\(|"
+            r"\b(?:axios|needle|got|superagent)\.(?:get|post|put|patch|delete|head|request)\s*\("
+        ),
+        None,
+    ),
     (
         "path_traversal",
         re.compile(
@@ -720,9 +736,12 @@ _JS_SINKS = [
 def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
     lines = text.splitlines()
     tainted: set[str] = set()
+    built: set[str] = set()  # tainted variables assigned from a concatenation / template
     for line in lines:
         for m in _JS_ASSIGN.finditer(line):
             tainted.add(m.group(1))
+            if _JS_BUILT.search(line):
+                built.add(m.group(1))
         for m in _JS_DESTRUCTURE.finditer(line):
             tainted.update(re.findall(r"\w+", m.group(1)))
 
@@ -736,9 +755,10 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
             continue
         for vuln_type, sink_re, extra_re in _JS_SINKS:
             m = sink_re.search(line)
+            built_here = any(re.search(r"\b" + re.escape(v) + r"\b", line) for v in built)
             if (
                 m
-                and (extra_re is None or extra_re.search(line))
+                and (extra_re is None or extra_re.search(line) or built_here)
                 and (vuln_type, lineno) not in seen
             ):
                 seen.add((vuln_type, lineno))
@@ -784,6 +804,28 @@ def _is_depends(node) -> bool:
         "Depends",
         "Security",
     }
+
+
+_HTTP_SERVER_METHODS = frozenset(
+    {"do_GET", "do_POST", "do_PUT", "do_DELETE", "do_HEAD", "do_PATCH", "do_OPTIONS"}
+)
+_HTTP_SERVER_SOURCES = frozenset({"path", "headers", "rfile"})
+
+
+def _mark_http_server_handlers(tree: ast.AST) -> None:
+    """``BaseHTTPRequestHandler.do_GET``: the request is ``self.path`` / ``self.headers`` /
+    ``self.rfile``. Mark the method as a handler and those attribute reads as request input."""
+    for func in ast.walk(tree):
+        if isinstance(func, ast.FunctionDef) and func.name in _HTTP_SERVER_METHODS:
+            func._sa_handler = True  # type: ignore[attr-defined]
+            for node in ast.walk(func):
+                if (
+                    isinstance(node, ast.Attribute)
+                    and node.attr in _HTTP_SERVER_SOURCES
+                    and isinstance(node.value, ast.Name)
+                    and node.value.id == "self"
+                ):
+                    node._sa_source = True  # type: ignore[attr-defined]
 
 
 def _mark_constant_lookups(tree: ast.AST) -> None:
@@ -838,6 +880,7 @@ def mark_view_handlers(tree: ast.AST) -> None:
     analysers treat them as handlers. Methods of a view whose ``get_queryset`` filters by
     the requesting user are additionally marked ``_sa_scoped`` (ownership enforced there)."""
     _mark_constant_lookups(tree)
+    _mark_http_server_handlers(tree)
     for cls in ast.walk(tree):
         if not isinstance(cls, ast.ClassDef):
             continue
@@ -1068,6 +1111,8 @@ def _call_returns_tainted(call: ast.Call, tainted: set[str], ctx: _Ctx) -> bool:
 
 
 def _is_source(node: ast.expr) -> bool:
+    if getattr(node, "_sa_source", False):
+        return True
     return (
         isinstance(node, (ast.Attribute, ast.Subscript, ast.Call))
         and _root_name(node) in SOURCE_ROOTS

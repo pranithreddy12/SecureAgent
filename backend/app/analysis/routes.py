@@ -303,15 +303,40 @@ def _python_handler_guard(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str |
 
 # Helper names that load-or-deny: _get_owned_cat(cat_id, user), ensure_member(...), ...
 _GUARD_CALL = re.compile(
-    r"(?i)^_?(verify|ensure|require|authori[sz]e|enforce|can_|get_owned|load_owned|owned)"
+    r"(?i)^_?(verify|ensure|require|authori[sz]e|authenticate|enforce|can_|get_owned|load_owned|owned)"
     r"|^_?check_(owner|ownership|access|permission|auth|member|user|role|consent)"
     r"|owner|ownership|permission"
 )  # not `check_output` / `check_call`: those are subprocess helpers, not access checks
 _OWNER_ATTRS = {"owner_id", "user_id", "account_id", "tenant_id", "org_id", "created_by", "owner"}
 
 
+def _session_gate(test: ast.expr) -> bool:
+    """``'username' not in g.session`` / ``not session.get('user')`` / ``not session['uid']``."""
+
+    def is_session(n: ast.AST) -> bool:
+        root = _dotted_name(n) if isinstance(n, (ast.Name, ast.Attribute)) else None
+        return bool(root) and root.rsplit(".", 1)[-1] == "session"
+
+    if isinstance(test, ast.Compare) and any(isinstance(o, ast.NotIn) for o in test.ops):
+        return any(is_session(c) for c in test.comparators)
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        inner = test.operand
+        while isinstance(inner, (ast.Call, ast.Subscript, ast.Attribute)):
+            inner = inner.func if isinstance(inner, ast.Call) else inner.value
+            if is_session(inner):
+                return True
+    return False
+
+
 def _body_guard(func: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
     for node in ast.walk(func):
+        if (
+            isinstance(node, ast.If)
+            and node.body
+            and isinstance(node.body[-1], (ast.Return, ast.Raise))
+            and _session_gate(node.test)
+        ):
+            return "in-handler check: session gate"
         if isinstance(node, ast.Call):
             name = (_dotted_name(node.func) or "").rsplit(".", 1)[-1]
             if name and _GUARD_CALL.search(name):

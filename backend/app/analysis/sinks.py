@@ -169,6 +169,7 @@ def _python_sinks(relpath: str, text: str) -> list[SinkFinding]:
     lines = text.splitlines()
     _mark_nonsecurity_hashes(tree)
     visitor = _SinkVisitor(relpath, lines, _collect_aliases(tree))
+    visitor.const_strings = _module_string_constants(tree)
     visitor.visit(tree)
     return visitor.findings
 
@@ -192,6 +193,7 @@ class _SinkVisitor(ast.NodeVisitor):
         self.lines = lines
         self.aliases = aliases
         self.quoted: set[str] = set()
+        self.const_strings: set[str] = set()  # module-level NAME = "literal"
         self.findings: list[SinkFinding] = []
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802 (ast API)
@@ -267,9 +269,50 @@ class _SinkVisitor(ast.NodeVisitor):
         ):
             # The standard-library parsers do not fetch external entities; they remain open to
             # entity-expansion DoS. lxml resolves entities unless configured not to.
-            self._add("xml_entity_expansion" if _is_stdlib_xml(name) else "xxe", name, node.lineno)
+            # ... but XML that is the program's own literal (a built-in document) is not input.
+            if not (first_arg is not None and _is_constant_expr(first_arg, self.const_strings)):
+                self._add(
+                    "xml_entity_expansion" if _is_stdlib_xml(name) else "xxe", name, node.lineno
+                )
 
         self.generic_visit(node)
+
+
+def _module_string_constants(tree: ast.AST) -> set[str]:
+    """Names assigned a string/bytes literal at module level and bound nowhere else (a rebinding
+    inside a function, even through ``global``, makes the value input-dependent)."""
+    literal: set[str] = set()
+    for stmt in getattr(tree, "body", []):
+        if (
+            isinstance(stmt, ast.Assign)
+            and isinstance(stmt.value, ast.Constant)
+            and isinstance(stmt.value.value, (str, bytes))
+        ):
+            literal.update(t.id for t in stmt.targets if isinstance(t, ast.Name))
+    stores: dict[str, int] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            stores[node.id] = stores.get(node.id, 0) + 1
+    return {n for n in literal if stores.get(n, 0) == 1}
+
+
+def _is_constant_expr(node: ast.expr, consts: set[str]) -> bool:
+    """A literal, a module-level string constant, or a pure transformation of those
+    (``USERS_XML.encode()``, ``io.BytesIO(DOC)``)."""
+    if isinstance(node, ast.Constant):
+        return True
+    if isinstance(node, ast.Name):
+        return node.id in consts
+    if isinstance(node, ast.Call):
+        func_ok = (
+            _is_constant_expr(node.func.value, consts)
+            if isinstance(node.func, ast.Attribute)
+            else isinstance(node.func, ast.Name | ast.Attribute)
+        )
+        return func_ok and bool(node.args) and all(_is_constant_expr(a, consts) for a in node.args)
+    if isinstance(node, ast.Attribute):
+        return _is_constant_expr(node.value, consts)
+    return False
 
 
 _QUOTERS = {"shlex.quote", "pipes.quote"}
@@ -353,8 +396,14 @@ _JS_RULES = [
             r"|(?<![\w.$])(?:exec|execSync)\s*\("
         ),
     ),
-    ("insecure_deserialization", re.compile(r"\b(yaml|jsYaml)\.load\s*\(")),
+    (
+        "insecure_deserialization",
+        # node-serialize's unserialize() executes functions embedded in the payload
+        re.compile(r"\b(yaml|jsYaml)\.load\s*\(|\bserialize\.unserialize\s*\(|\bunserialize\s*\("),
+    ),
     ("xss_sink", re.compile(r"\.innerHTML\s*=")),
+    # libxmljs: parseXml(String)(data, {noent: true}) resolves external entities
+    ("xxe", re.compile(r"\bparseXml(?:String)?\s*\(.*\bnoent\s*:\s*true")),
     (
         "disabled_tls_verification",
         re.compile(r"rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED"),

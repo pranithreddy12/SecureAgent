@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy' is false where SecureAgent has no detector class (e.g. SSTI, NoSQL injection, XPath injection, insecure session design); those are listed so recall is not inflated by omission. Clone each repository at the pinned commit; never run the code.",
+  "repos": {
+    "DSVW": {
+      "url": "https://github.com/stamparm/DSVW",
+      "commit": "9ca3c9acf3defa0a6148d40e5f5cebeb5dcbb908",
+      "known": [
+        {"file": "dsvw.py", "line": 22, "class": "sql_injection", "note": "?id= concatenated into SELECT"},
+        {"file": "dsvw.py", "line": 42, "class": "sql_injection", "note": "?comment= formatted into INSERT"},
+        {"file": "dsvw.py", "line": 61, "class": "sql_injection", "note": "login password concatenated"},
+        {"file": "dsvw.py", "line": 27, "class": "deserialization", "note": "pickle.loads(?object=)"},
+        {"file": "dsvw.py", "line": 29, "class": "path_traversal", "note": "open(?path=) and URL fetch"},
+        {"file": "dsvw.py", "line": 31, "class": "command_injection", "note": "nslookup + ?domain= with shell=True"},
+        {"file": "dsvw.py", "line": 33, "class": "xxe", "note": "lxml parser with entities and DTD enabled"},
+        {"file": "dsvw.py", "line": 49, "class": "code_injection", "note": "exec of ?include= content"},
+        {"file": "dsvw.py", "line": 70, "class": "open_redirect", "note": "Location header from ?redir="},
+        {"file": "dsvw.py", "line": 35, "class": "xpath_injection", "in_taxonomy": false},
+        {"file": "dsvw.py", "line": 55, "class": "template_injection", "in_taxonomy": false},
+        {"file": "dsvw.py", "line": 25, "class": "reflected_xss", "in_taxonomy": false}
+      ]
+    },
+    "Vulnerable-Flask-App": {
+      "url": "https://github.com/we45/Vulnerable-Flask-App",
+      "commit": "b6a4f97afd466e83e1f60781494252dec1c37039",
+      "known": [
+        {"file": "app/app.py", "line": 141, "class": "weak_hash", "note": "md5 for passwords"},
+        {"file": "app/app.py", "line": 97, "class": "jwt", "note": "jwt.decode(verify=False)"},
+        {"file": "app/app.py", "line": 208, "class": "idor", "note": "Customer.query.get(id from body)"},
+        {"file": "app/app.py", "line": 231, "class": "idor", "note": "Customer.query.get(cust_id)"},
+        {"file": "app/app.py", "line": 265, "class": "sql_injection", "note": "raw query built from search term"},
+        {"file": "app/app.py", "line": 329, "class": "deserialization", "note": "yaml.load"},
+        {"file": "app/app.py", "line": 63, "class": "secret", "note": "admin/admin123 seed credential"},
+        {"file": "app/app.py", "line": 114, "class": "template_injection", "in_taxonomy": false},
+        {"file": "app/app.py", "line": 281, "class": "template_injection", "in_taxonomy": false}
+      ]
+    },
+    "vulpy": {
+      "url": "https://github.com/fportantier/vulpy",
+      "commit": "5249cc8b05a1c37f6b2f757b1cf16a509c327122",
+      "known": [
+        {"file": "bad/libuser.py", "line": 12, "class": "sql_injection", "note": "login"},
+        {"file": "bad/libuser.py", "line": 25, "class": "sql_injection", "note": "create"},
+        {"file": "bad/libuser.py", "line": 53, "class": "sql_injection", "note": "password_change"},
+        {"file": "bad/vulpy.py", "line": 55, "class": "debug", "note": "app.run(debug=True)"},
+        {"file": "bad/libsession.py", "line": 6, "class": "insecure_session", "in_taxonomy": false},
+        {"file": "bad/libuser.py", "line": 25, "class": "plaintext_password", "in_taxonomy": false}
+      ],
+      "fixed_dirs": ["good/"]
+    },
+    "dvna": {
+      "url": "https://github.com/appsecco/dvna",
+      "commit": "9ba473add536f66ac9007966acb2a775dd31277a",
+      "known": [
+        {"file": "core/appHandler.js", "line": 11, "class": "sql_injection", "note": "raw sequelize query from login"},
+        {"file": "core/appHandler.js", "line": 39, "class": "command_injection", "note": "exec('ping ' + address)"},
+        {"file": "core/appHandler.js", "line": 188, "class": "open_redirect", "note": "res.redirect(req.query.url)"},
+        {"file": "core/appHandler.js", "line": 197, "class": "code_injection", "note": "mathjs.eval(req.body.eqn)"},
+        {"file": "core/appHandler.js", "line": 218, "class": "deserialization", "note": "node-serialize unserialize"},
+        {"file": "core/appHandler.js", "line": 235, "class": "xxe", "note": "libxmljs parseXmlString noent:true"},
+        {"file": "core/appHandler.js", "line": 147, "class": "idor", "note": "User.find by req.body.id"}
+      ]
+    },
+    "NodeGoat": {
+      "url": "https://github.com/OWASP/NodeGoat",
+      "commit": "c5cb68a7084e4ae7dcc60e6a98768720a81841e8",
+      "known": [
+        {"file": "app/routes/contributions.js", "line": 32, "class": "code_injection", "note": "eval(req.body.preTax)"},
+        {"file": "app/routes/contributions.js", "line": 33, "class": "code_injection", "note": "eval(req.body.afterTax)"},
+        {"file": "app/routes/contributions.js", "line": 34, "class": "code_injection", "note": "eval(req.body.roth)"},
+        {"file": "app/routes/index.js", "line": 72, "class": "open_redirect", "note": "res.redirect(req.query.url)"},
+        {"file": "app/routes/research.js", "line": 16, "class": "ssrf", "note": "needle.get(req.query.url + symbol)"},
+        {"file": "config/env/all.js", "line": 8, "class": "secret", "note": "cookieSecret"},
+        {"file": "config/env/development.js", "line": 6, "class": "secret", "note": "zapApiKey"},
+        {"file": "app/data/allocations-dao.js", "line": 73, "class": "nosql_injection", "in_taxonomy": false}
+      ]
+    }
+  }
+}

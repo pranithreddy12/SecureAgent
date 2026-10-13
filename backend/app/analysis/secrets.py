@@ -48,6 +48,23 @@ _NOT_A_VALUE_SUFFIX = frozenset(
 )  # fmt: skip
 
 
+_STRONG_WORDS = frozenset(
+    {"secret", "password", "passwd", "pwd", "credential", "credentials", "apikey"}
+)
+
+
+def _strong_secret_key(key: str) -> bool:
+    """Keys that name a secret outright (``cookieSecret``, ``DB_PASSWORD``, ``api_key``): an
+    identifier-looking value is still a hardcoded secret there (``"change_me_secret_key"``)."""
+    words = [w.lower() for w in _WORD_SPLIT.findall(key)]
+    if any(w in _STRONG_WORDS for w in words):
+        return True
+    return any(
+        p in {("api", "key"), ("private", "key"), ("secret", "key")}
+        for p in zip(words, words[1:], strict=False)
+    )
+
+
 def key_looks_secret(key: str) -> bool:
     words = [w.lower() for w in _WORD_SPLIT.findall(key)]
     if len(words) > 1 and words[-1] in _NOT_A_VALUE_SUFFIX:
@@ -259,7 +276,7 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
             key, val = m.group("key"), m.group("val")
             if not key_looks_secret(key) or _is_placeholder(val):
                 continue
-            if _is_identifier_value(val) or _TYPE_ALIAS.match(line):
+            if _TYPE_ALIAS.match(line):
                 continue
             if relpath.lower().endswith((".md", ".rst", ".txt")):
                 continue  # prose describes credentials; provider-format keys are still caught above
@@ -267,8 +284,25 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
                 continue
             if any(c.isspace() for c in val):
                 continue  # real credentials are tokens, not phrases (cuts natural-language FPs)
-            if len(val) >= ENTROPY_MIN_LEN and shannon_entropy(val) < ENTROPY_THRESHOLD:
-                continue  # long but low-entropy (e.g. a sentence) -> probably not a key
+            weak = (
+                len(val) >= ENTROPY_MIN_LEN and shannon_entropy(val) < ENTROPY_THRESHOLD
+            ) or _is_identifier_value(val)
+            if weak and not _strong_secret_key(key):
+                continue  # long but low-entropy (a sentence) / identifier -> probably not a key
+            if weak:
+                # A placeholder-looking value under a key that names a secret (a config default
+                # such as "<name>_secret_key_here"). If it ships unchanged it IS the secret.
+                _add(
+                    findings,
+                    seen,
+                    f"Hardcoded placeholder-style credential ({key})",
+                    "low",
+                    0.4,
+                    relpath,
+                    lineno,
+                    val,
+                )
+                continue
             conf = 0.75 if len(val) >= ENTROPY_MIN_LEN else 0.6
             _add(
                 findings,

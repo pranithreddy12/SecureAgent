@@ -77,13 +77,16 @@ def test_safe_code_produces_no_findings(demo_findings) -> None:
     assert safe == [], f"false positives on correct code: {[f.title for f in safe]}"
 
 
-def test_placeholder_secret_is_not_reported(demo_findings) -> None:
+def test_placeholder_secret_is_only_a_low_placeholder_finding(demo_findings) -> None:
+    """A placeholder-looking value under a secret-named key is not a live credential, but it IS
+    the secret if shipped unchanged: reported low, never as a medium hardcoded credential."""
     config_secrets = [
         f
         for f in demo_findings.findings
-        if f.type == "hardcoded_secret" and "config.py" in f.endpoint
+        if f.type == "hardcoded_secret" and "config.py" in f.endpoint and "SECRET_KEY" in f.title
     ]
-    assert all("SECRET_KEY" not in f.title for f in config_secrets)
+    assert config_secrets
+    assert all("placeholder-style" in f.title and f.severity.value == "low" for f in config_secrets)
 
 
 def test_provider_key_is_reported_once_not_twice(demo_findings) -> None:

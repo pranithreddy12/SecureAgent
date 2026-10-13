@@ -193,6 +193,18 @@ def _looks_binary(sample: bytes) -> bool:
     return nontext / len(sample) > 0.30
 
 
+def _is_plain_env_dir(name: str, path: Path) -> bool:
+    """``config/env/`` holds configuration, not a virtualenv: ``env``/``venv`` are ignored only when
+    they look like one (``pyvenv.cfg`` or an ``activate`` script)."""
+    if name not in {"env", "venv"}:
+        return False
+    return not (
+        (path / "pyvenv.cfg").exists()
+        or (path / "bin" / "activate").exists()
+        or (path / "Scripts" / "activate").exists()
+    )
+
+
 def iter_source_files(
     root: str | os.PathLike[str],
     *,
@@ -210,7 +222,12 @@ def iter_source_files(
 
     for dirpath, dirnames, filenames in os.walk(root_path, followlinks=False):
         # Prune ignored directories in place so os.walk does not descend into them.
-        kept = [d for d in dirnames if d not in IGNORED_DIRS and not _is_ignored_hidden(d)]
+        kept = [
+            d
+            for d in dirnames
+            if not (d in IGNORED_DIRS and not _is_plain_env_dir(d, Path(dirpath) / d))
+            and not _is_ignored_hidden(d)
+        ]
         st.skipped_dirs += len(dirnames) - len(kept)
         dirnames[:] = kept
 

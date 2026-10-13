@@ -86,3 +86,49 @@ python -m app.evaluation score eval_run/labels.json
 ```
 
 Keep `labels.json` out of version control: it contains code excerpts.
+
+## Recall on intentionally vulnerable applications (2026-10-13)
+
+Precision needs a reader; recall needs a list of what is really there. Five public applications that
+*plant* their flaws were cloned at pinned commits, read by hand, and every planted flaw was recorded
+(`backend/benchmark/known_vulnerable.json`). `python -m app.evaluation recall --apps DIR` scores the scanner
+against that list: a flaw counts as found when a finding of a matching type sits in the same file within 3
+lines. Flaws in classes the scanner has no detector for (template injection, NoSQL injection, XPath
+injection, insecure session design, plaintext passwords) are listed as *outside the taxonomy* and are not
+counted -- they are reported so the figure is not flattered by omission.
+
+| Application | Language | Planted (in taxonomy) | Found before | Found after |
+|---|---|---|---|---|
+| DSVW | Python | 9 | 4 | 9 |
+| Vulnerable-Flask-App | Python | 7 | 7 | 7 |
+| vulpy (`bad/`) | Python | 4 | 4 | 4 |
+| dvna | JavaScript | 7 | 3 | 6 |
+| NodeGoat | JavaScript | 7 | 4 | 7 |
+| **Total** | | **34** | **22 (65%)** | **33 (97%)** |
+
+- **65% is the honest number.** It was measured before any change was made for these applications.
+- **97% is not independent.** The misses were fixed *using these same applications*, so it shows the
+  fixes work, not that the scanner finds 97% of planted flaws in code it has not seen.
+- What the misses were: `BaseHTTPRequestHandler` requests (`self.path`) not seen as input; a `Location`
+  header from a parameter; JS SQL queries built on an earlier line; `needle` / `axios.get` as SSRF
+  clients; `node-serialize` `unserialize()`; libxmljs `noent: true`; configuration directories named
+  `env/` skipped as virtualenvs; placeholder-style secrets under `cookieSecret`-type keys.
+- Still missed: dvna's Sequelize `User.find({where: {id: req.body.id}})` (IDOR in JavaScript).
+- Eight planted flaws are outside the taxonomy: SSTI x3, XPath injection, reflected XSS in string
+  formatting, NoSQL injection, insecure session cookie, plaintext password storage.
+
+### False positives on the patched twin
+
+vulpy ships a vulnerable `bad/` and a patched `good/` of the same code. The SQL injections correctly
+disappear in `good/`. The scanner still reports 10 findings there: 4 are real (a hardcoded JWT secret, two
+`debug=True`, a swallowed exception around session loading), 2 are in attack-tooling scripts, and 4 are
+"no visible authorization" on endpoints that are public by design (sign-up, key creation by credentials,
+public reads).
+
+### Limits
+
+- Five applications, 34 planted flaws, one reader (a model). Small and tuned-on.
+- "Planted" lists are what I found by reading, not an official register; a flaw I overlooked is not
+  counted either way.
+- Intentionally vulnerable applications are denser in flaws and simpler in structure than production
+  code. Do not read 97% as a real-world recall.

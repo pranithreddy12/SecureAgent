@@ -124,6 +124,118 @@ def prepare(repos: list[str], out_dir: str, per_type: int = 6) -> dict[str, Any]
     return data
 
 
+# planted-flaw class -> the finding types that count as detecting it
+CLASS_FAMILY: dict[str, frozenset[str]] = {
+    "sql_injection": frozenset({"sql_injection"}),
+    "command_injection": frozenset({"command_injection"}),
+    "code_injection": frozenset({"code_injection"}),
+    "path_traversal": frozenset({"path_traversal", "ssrf"}),
+    "ssrf": frozenset({"ssrf"}),
+    "deserialization": frozenset({"insecure_deserialization"}),
+    "xxe": frozenset({"xxe", "xml_entity_expansion"}),
+    "open_redirect": frozenset({"open_redirect"}),
+    "idor": frozenset({"idor"}),
+    "secret": frozenset({"hardcoded_secret"}),
+    "weak_hash": frozenset({"weak_hash"}),
+    "jwt": frozenset({"jwt_verification_disabled", "disabled_tls_verification"}),
+    "debug": frozenset({"debug_enabled"}),
+}
+LINE_TOLERANCE = 3
+
+
+def known_recall(truth_path: str, apps_dir: str) -> dict[str, Any]:
+    """Score the scanner against planted vulnerabilities (``benchmark/known_vulnerable.json``).
+
+    A planted flaw counts as found when a finding of a matching type sits in the same file within
+    ``LINE_TOLERANCE`` lines. Flaws whose class has no detector (``in_taxonomy: false``) are
+    reported separately so recall is not flattered by leaving them out. Findings under a repo's
+    ``fixed_dirs`` (a patched twin of the vulnerable code) are listed as false-positive candidates.
+    """
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.scanner import scan_repo
+
+    truth = json.loads(Path(truth_path).read_text(encoding="utf-8"))
+    out: dict[str, Any] = {"repos": {}, "found": 0, "missed": 0, "outside": 0}
+    for name, spec in truth["repos"].items():
+        root = Path(apps_dir) / name
+        if not root.is_dir():
+            out["repos"][name] = {"error": f"not cloned at {root}"}
+            continue
+        findings = scan_to_report_context(scan_repo(str(root), check_osv=False)).findings
+
+        def locate(f):
+            rel, _, line = f.endpoint.rpartition(":")
+            return rel.replace("\\", "/"), int(line) if line.isdigit() else 0
+
+        located = [(f, *locate(f)) for f in findings if f.status.value != "false_positive"]
+        rows = []
+        for k in spec["known"]:
+            if k.get("in_taxonomy") is False:
+                out["outside"] += 1
+                rows.append({**k, "result": "outside_taxonomy"})
+                continue
+            family = CLASS_FAMILY.get(k["class"], frozenset({k["class"]}))
+            hit = next(
+                (
+                    f
+                    for f, rel, line in located
+                    if rel.endswith(k["file"])
+                    and f.type in family
+                    and abs(line - k["line"]) <= LINE_TOLERANCE
+                ),
+                None,
+            )
+            out["found" if hit else "missed"] += 1
+            rows.append(
+                {**k, "result": "found" if hit else "missed", "finding": hit.type if hit else None}
+            )
+        fixed = []
+        for d in spec.get("fixed_dirs", []):
+            fixed += [
+                {"type": f.type, "location": f.endpoint, "severity": f.severity.value}
+                for f, rel, _ in located
+                if rel.startswith(d) or f"/{d}" in rel
+            ]
+        out["repos"][name] = {
+            "commit": spec.get("commit"),
+            "files_scanned": None,
+            "findings_total": len(findings),
+            "known": rows,
+            "fixed_dir_findings": fixed,
+        }
+    in_scope = out["found"] + out["missed"]
+    out["recall"] = out["found"] / in_scope if in_scope else None
+    return out
+
+
+def render_recall(r: dict[str, Any]) -> str:
+    lines = []
+    for name, d in r["repos"].items():
+        if "error" in d:
+            lines.append(f"{name}: {d['error']}")
+            continue
+        f = sum(1 for k in d["known"] if k["result"] == "found")
+        m = sum(1 for k in d["known"] if k["result"] == "missed")
+        lines.append(
+            f"{name}: {f} found / {f + m} in-taxonomy planted  ({d['findings_total']} findings)"
+        )
+        for k in d["known"]:
+            mark = {"found": "  ok ", "missed": "  MISS", "outside_taxonomy": "  n/a "}[k["result"]]
+            lines.append(f"{mark} {k['file']}:{k['line']} {k['class']}  {k.get('note', '')}")
+        if d["fixed_dir_findings"]:
+            lines.append(
+                "  findings inside patched dirs (false-positive candidates): "
+                f"{len(d['fixed_dir_findings'])}"
+            )
+    rec = r["recall"]
+    lines.append(
+        f"RECALL (in-taxonomy): {r['found']}/{r['found'] + r['missed']}"
+        + (f" = {100 * rec:.0f}%" if rec is not None else "")
+        + f";  {r['outside']} planted flaws are outside the detector taxonomy and not counted"
+    )
+    return "\n".join(lines)
+
+
 def _pct(num: int, den: int) -> str:
     return f"{100 * num / den:.0f}%" if den else "n/a"
 
@@ -201,6 +313,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("repos", nargs="+")
     p.add_argument("--out", required=True)
     p.add_argument("--per-type", type=int, default=6)
+    k = sub.add_parser("recall", help="score against a list of planted vulnerabilities")
+    k.add_argument(
+        "--truth",
+        default=str(Path(__file__).resolve().parent.parent / "benchmark" / "known_vulnerable.json"),
+    )
+    k.add_argument("--apps", required=True, help="directory containing the cloned applications")
+    k.add_argument("--json", action="store_true")
     s = sub.add_parser("score", help="score a filled-in labels.json")
     s.add_argument("labels")
     s.add_argument("--json", action="store_true")
@@ -218,6 +337,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"({m['findings_reviewable']} reviewable), sampled {m['sampled']}"
             )
         print(f'wrote {Path(args.out) / "labels.json"} -- fill in each item\'s "label"')
+        return 0
+    if args.cmd == "recall":
+        rec = known_recall(args.truth, args.apps)
+        print(json.dumps(rec, indent=2) if args.json else render_recall(rec))
         return 0
     result = score(args.labels)
     print(json.dumps(result, indent=2) if args.json else render(result))

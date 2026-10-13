@@ -176,7 +176,7 @@ SQLI_APP = (
     "def s():\n"
     "    cur.execute('SELECT * FROM t WHERE n = ' + request.args['n'])\n"
     "import hashlib\nhashlib.md5(b'x')\n"
-    "import xml.etree.ElementTree as ET\nET.fromstring(b'<a/>')\n"
+    "import xml.etree.ElementTree as ET\ndef parse(data):\n    return ET.fromstring(data)\n"
 )
 
 

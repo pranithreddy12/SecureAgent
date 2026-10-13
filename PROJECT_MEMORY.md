@@ -221,6 +221,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-019 | Zip upload, owner triage, MCP `explain_finding` | Accepted |
 | ADR-020 | MCP trust layer, opt-in verdict recording, detector gaps | Accepted |
 | ADR-021 | Real-project evaluation harness and the fixes it drove | Accepted |
+| ADR-022 | Recall scoring against planted vulnerabilities | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -449,3 +450,8 @@ RQ1 with these caveats.
 **Third evaluation set (2026-10-13):** 48% precision (20/42) on 23 untouched projects, all noise from
 `xss_sink`; fixed to 56%. Use 48% as the honest generalisation number, not the 82-83% figures from sets that
 guided fixes. Still needed: a human-labelled set, and a set of known-vulnerable apps for recall.
+
+**Recall (2026-10-13, ADR-022):** 65% (22/34) of in-taxonomy planted flaws in 5 public vulnerable apps before
+fixes; 97% after fixes tuned on the same apps. 8 planted flaws have no detector (SSTI, NoSQL, XPath, session
+design, plaintext passwords) -- candidates for new detector classes. Truth file:
+`backend/benchmark/known_vulnerable.json`; apps are cloned on demand, never vendored or run.

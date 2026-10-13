@@ -1034,3 +1034,22 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   `encodeURIComponent`), numeric, a literal choice, or renders a file-local constant table; reported only as
   low when the file reads no input/network or the value comes from an opaque call.
 - Same items after: 56% (20 / 36), 20 / 20 real findings kept. Dev 82%, holdout 83%.
+
+## 2026-10-13 (recall on known-vulnerable apps -- ADR-022)
+
+### Added
+- `python -m app.evaluation recall --apps DIR`; `backend/benchmark/known_vulnerable.json` (DSVW, vulpy,
+  Vulnerable-Flask-App, dvna, NodeGoat at pinned commits; 34 in-taxonomy planted flaws, 8 outside).
+- Recall **22/34 (65%)** before fixes, **33/34 (97%)** after fixes made on the same apps.
+
+### Changed (detectors)
+- `BaseHTTPRequestHandler.do_*`: `self.path/headers/rfile` are request input; `send_header("Location", x)`
+  open redirect; XML parse of a module-level literal not reported; `config/env/` no longer skipped as a
+  virtualenv; JS: query built on an earlier line, `req.files`, `needle`/`got`/`axios.get` SSRF,
+  `unserialize()`, libxmljs `noent: true`; session-gate and `authenticate()` in-handler guards;
+  placeholder-style secrets under secret-named keys are reported as low.
+
+### Notes
+- Policy change: the benchmark corpus's "safe" `SECRET_KEY = "load-me-from-the-environment"` now expects a
+  low finding (corpus 36/37 TP, 97% precision, 95% recall); the demo test was rewritten.
+- Backend 533 passed, 2 skipped.

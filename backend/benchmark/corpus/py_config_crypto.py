@@ -49,7 +49,7 @@ def v_swallow():
 
 # ----------------------------------------------------------------------------- safe
 
-SECRET_KEY = "load-me-from-the-environment"
+SECRET_KEY = "load-me-from-the-environment"  # VULN:hardcoded_secret (placeholder-style, low)
 API_URL = "https://api.example.com"
 PLACEHOLDER_TOKEN = "{TOKEN}"
 
