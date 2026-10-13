@@ -42,6 +42,27 @@ Claude Desktop / any client with a JSON config:
 }
 ```
 
+OpenCode (`opencode.json` in the project root, or `~/.config/opencode/opencode.json` for all projects).
+`SECUREAGENT_MCP_ROOTS` lists the directories the tools may read; separate several with `;` on Windows or
+`:` elsewhere. Without it the server is confined to the directory it was started from:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "secureagent": {
+      "type": "local",
+      "command": ["secureagent-mcp"],
+      "enabled": true,
+      "environment": { "SECUREAGENT_MCP_ROOTS": "C:\Pranith\Personal Projects\10-02-2026-Security_Auditor_Pranith" }
+    }
+  }
+}
+```
+
+From a checkout without installing, use `"command": ["<repo>\backend\.venv\Scripts\python.exe", "-m",
+"app.mcp_server"]` and make sure the working directory is `backend/`. Not tested against OpenCode itself.
+
 Without installing, from a checkout: `python -m app.mcp_server` with `backend/` as the working directory.
 
 ## Safety model
