@@ -219,6 +219,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-017 | Opt-in LLM review: consented, redacted, evidence-verified | Accepted |
 | ADR-018 | Opt-in AI validator and report-narrative stages | Accepted |
 | ADR-019 | Zip upload, owner triage, MCP `explain_finding` | Accepted |
+| ADR-020 | MCP trust layer, opt-in verdict recording, detector gaps | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -428,3 +429,8 @@ the other session stay untouched.
 **Upload / triage / explain (2026-10-12, ADR-019):** `POST /api/projects/upload` (raw zip body, safe extraction,
 `UPLOAD_DIR`), `PATCH .../findings/{id}/triage` (owner false-positive, reversible), MCP `explain_finding`;
 frontend upload form and triage control. 480 backend / 39 Vitest tests. The e2e suite was not extended.
+
+**MCP trust layer (2026-10-13, ADR-020):** guidance per finding type, paging/filters/cache, opt-in
+`record_verdict`, `security_review` prompt, new infra/secret-fallback detectors, two taint precision fixes.
+501 backend tests. Still not done: a scored with/without-MCP evaluation harness on independent repos
+(plan phase 4) and a live run of the new MCP behaviour in a client.

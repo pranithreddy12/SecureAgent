@@ -210,7 +210,10 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
 
         # Fallback literal for a secret-named environment variable: deployed without the variable,
         # the application silently runs with a public, guessable secret.
-        for m in _FALLBACK.finditer(line):
+        prose = relpath.endswith((".md", ".rst", ".txt")) or line.lstrip().startswith(
+            ("#", "//", "*", "/*")
+        )  # documentation and comments describe the pattern; they are not code that runs
+        for m in () if prose else _FALLBACK.finditer(line):
             key = m.group("k1") or m.group("k2")
             val = m.group("v1") or m.group("v2")
             if not key_looks_secret(key) or _fingerprint(val) in provider_fps:

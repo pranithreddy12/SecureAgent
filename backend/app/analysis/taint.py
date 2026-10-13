@@ -320,11 +320,39 @@ def _allowlist_guarded(func) -> set[str]:
     guarded: set[str] = set()
     for node in ast.walk(func):
         if isinstance(node, ast.If) and _membership_name(node.test, negated=True):
-            if _exits(node.body):
-                guarded.add(_membership_name(node.test, negated=True))
+            name = _membership_name(node.test, negated=True)
+            if _exits(node.body) or _resets_to_default(node.body, name, func):
+                guarded.add(name)
         elif isinstance(node, ast.Assert) and _membership_name(node.test, negated=False):
             guarded.add(_membership_name(node.test, negated=False))
     return guarded
+
+
+def _resets_to_default(body: list[ast.stmt], name: str, func) -> bool:
+    """``if col not in ALLOWED: col = "name"`` -- the invalid value is replaced by a constant (or
+    by a parameter whose default is a constant), so afterwards ``col`` is always an allowed one."""
+    const_defaults: set[str] = set()
+    args = func.args
+    positional = [*args.posonlyargs, *args.args]
+    for a, d in zip(reversed(positional), reversed(args.defaults), strict=False):
+        if isinstance(d, ast.Constant):
+            const_defaults.add(a.arg)
+    for a, d in zip(args.kwonlyargs, args.kw_defaults, strict=True):
+        if isinstance(d, ast.Constant):
+            const_defaults.add(a.arg)
+    for stmt in body:
+        if (
+            isinstance(stmt, ast.Assign)
+            and len(stmt.targets) == 1
+            and isinstance(stmt.targets[0], ast.Name)
+            and stmt.targets[0].id == name
+            and (
+                isinstance(stmt.value, ast.Constant)
+                or (isinstance(stmt.value, ast.Name) and stmt.value.id in const_defaults)
+            )
+        ):
+            return True
+    return False
 
 
 def _membership_name(test, *, negated: bool) -> str | None:
@@ -333,7 +361,10 @@ def _membership_name(test, *, negated: bool) -> str | None:
         and len(test.ops) == 1
         and isinstance(test.left, ast.Name)
         and isinstance(test.ops[0], ast.NotIn if negated else ast.In)
-        and isinstance(test.comparators[0], (ast.Name, ast.Attribute, ast.Set, ast.List, ast.Tuple))
+        and isinstance(
+            test.comparators[0],
+            (ast.Name, ast.Attribute, ast.Subscript, ast.Set, ast.List, ast.Tuple),
+        )
     ):
         return test.left.id
     return None
@@ -710,10 +741,58 @@ def _is_depends(node) -> bool:
     }
 
 
+def _mark_constant_lookups(tree: ast.AST) -> None:
+    """Mark ``CONFIG[key]`` / ``CONFIG.get(key)`` where CONFIG is a module-level dict literal.
+
+    The result is one of the program's own constants whatever ``key`` is (a missing key raises or
+    yields None), so it is not attacker-shaped -- the usual "dataset name selects a config" idiom.
+    A name that is rebound anywhere else, or written into through a subscript, is not constant."""
+    names: set[str] = set()
+    for stmt in getattr(tree, "body", []):
+        if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Dict):
+            names.update(t.id for t in stmt.targets if isinstance(t, ast.Name))
+        elif (
+            isinstance(stmt, ast.AnnAssign)
+            and isinstance(stmt.value, ast.Dict)
+            and isinstance(stmt.target, ast.Name)
+        ):
+            names.add(stmt.target.id)
+    if not names:
+        return
+    stores: dict[str, int] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            stores[node.id] = stores.get(node.id, 0) + 1
+        elif (  # CONFIG["k"] = ... mutates it
+            isinstance(node, ast.Subscript)
+            and isinstance(node.ctx, ast.Store)
+            and isinstance(node.value, ast.Name)
+        ):
+            stores[node.value.id] = stores.get(node.value.id, 0) + 2
+    names = {n for n in names if stores.get(n, 0) == 1}  # exactly the one module-level binding
+    if not names:
+        return
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.ctx, ast.Load)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in names
+        ) or (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id in names
+        ):
+            node._sa_const = True  # type: ignore[attr-defined]
+
+
 def mark_view_handlers(tree: ast.AST) -> None:
     """Mark request-handling methods of Django/DRF class-based views so the taint and IDOR
     analysers treat them as handlers. Methods of a view whose ``get_queryset`` filters by
     the requesting user are additionally marked ``_sa_scoped`` (ownership enforced there)."""
+    _mark_constant_lookups(tree)
     for cls in ast.walk(tree):
         if not isinstance(cls, ast.ClassDef):
             continue
@@ -822,13 +901,30 @@ def _is_sanitizer_call(call: ast.Call) -> bool:
     return any(name == d or name.endswith("." + d) for d in _SANITIZER_DOTTED)
 
 
-def _iter_unsanitized(node: ast.expr, sanitize: bool = True):
+def _iter_unsanitized(node: ast.expr, sanitize: bool = True, ctx: _Ctx | None = None):
     """Walk an expression but do not descend into the arguments of sanitizing calls."""
     stack = [node]
     while stack:
         n = stack.pop()
         yield n
+        if getattr(n, "_sa_const", False):
+            continue  # a lookup into the program's own constant table
+        if isinstance(n, ast.IfExp):
+            # `"DESC" if request.args.get("dir") == "desc" else "ASC"`: the test only *selects*
+            # between the branches; the value is whichever branch, not the request data.
+            stack.extend((n.body, n.orelse))
+            continue
         if sanitize and isinstance(n, ast.Call) and _is_sanitizer_call(n):
+            continue
+        if (
+            ctx is not None
+            and isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id in ctx.functions
+        ):
+            # A call to a function defined in this file: whether it returns request data is
+            # decided by its body (_call_returns_tainted), not by merely receiving a tainted
+            # argument -- `_cfg(name)` returns a constant config entry however `name` is chosen.
             continue
         if isinstance(n, ast.Call) and (_dotted(n.func) or "").rsplit(".", 1)[-1] == "Request":
             # urllib/requests Request(url, data=..., headers=...): only the URL decides where it
@@ -850,7 +946,7 @@ def _expr_tainted(
 
     ``sanitize=False`` ignores sanitizers: access-control analysis asks "does the *client choose*
     this id", and ``int(order_id)`` is still client-chosen even though it cannot inject."""
-    for sub in _iter_unsanitized(node, sanitize):
+    for sub in _iter_unsanitized(node, sanitize, ctx):
         if isinstance(sub, ast.Name) and sub.id in tainted:
             return True
         if _is_source(sub):

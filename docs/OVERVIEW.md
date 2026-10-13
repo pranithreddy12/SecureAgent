@@ -125,6 +125,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 017 | Opt-in LLM review |
 | 018 | Opt-in AI validator and narrative stages |
 | 019 | Zip upload, owner triage, MCP `explain_finding` |
+| 020 | MCP trust layer, opt-in verdict recording, detector gaps |
 
 ## 10. Document map
 

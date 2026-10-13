@@ -115,7 +115,7 @@ Details: [docs/deployment.md](docs/deployment.md).
 
 ```bash
 make testdb                              # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q        # 480 passed, 2 skipped
+cd backend && python -m pytest -q        # 501 passed, 2 skipped
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 39 unit tests
 cd frontend && npm run e2e               # 7 Playwright tests against the Docker stack
 ```
@@ -128,7 +128,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 |---|---|
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (19 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (20 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

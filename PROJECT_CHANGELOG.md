@@ -985,3 +985,20 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   reported. Now "Hardcoded fallback for secret (KEY)": medium, or low when the value is a placeholder word.
 - The stdlib XML finding's remediation now states it is not XXE/SSRF/file disclosure (an assistant had
   inflated it and suggested an lxml-only option).
+
+## 2026-10-13 (MCP improvement plan, phases 1-3 -- ADR-020)
+
+### Added
+- Phase 1: per-type `impact_ceiling` / `not_claimed` / `verify_with`; server `instructions`; severity-ordered,
+  filterable, paged `scan_path` with `by_type` and `coverage`; scan cache; `suggest_fixes` by `id`.
+- Phase 2: opt-in `record_verdict` (`SECUREAGENT_MCP_WRITE=1`), `security_review` prompt.
+- Phase 3: container root/privileged, CSP unsafe-inline, unbounded export detectors.
+
+### Fixed (precision)
+- Two false positives reproduced from an assistant review: a dataset-name -> config-dict lookup and an
+  allow-list reset (`if col not in ALLOWED: col = default`) plus a literal ternary. The nearest true
+  variants (unvalidated reset, mutated table, passthrough helper, no check) are still reported.
+- The new secret-fallback rule ignores comments and docs (it flagged this project's own changelog).
+
+### Notes
+- Backend 501 passed, 2 skipped; benchmark unchanged (97% / 95% on the author corpus).

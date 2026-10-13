@@ -16,9 +16,31 @@ SecureAgent's static analyser can be called directly by an AI coding assistant o
 | `application_model` | Static reconnaissance: technologies, inputs read, outbound hosts, env vars. Reads files only. |
 | `authorization_matrix` | Route × guard grid for a directory, grouped by resource. |
 
+| `record_verdict` | **Opt-in** (`SECUREAGENT_MCP_WRITE=1`; hidden otherwise). Records a justified false positive in `secureagent-suppressions.json`. |
+
+Prompt: `security_review(path)` -- scan, verify each finding with `explain_finding`, report honestly.
+
+### Making answers trustworthy
+
+- `scan_path` returns a **severity-ordered page** (default 25, max 200): narrow it with `min_severity`,
+  `types`, `file`, `status`; continue with `cursor` = the previous `next_cursor`. It also returns
+  `by_type` counts and a `coverage` block (what is and is not analysed), so silence is not read as safety.
+- Every finding carries `impact_ceiling` (the worst realistic outcome of that *kind* of finding) and
+  `not_claimed` (what it does not establish); `explain_finding` adds `verify_with`, questions that settle
+  it from the code shown. The server `instructions` tell the model never to report above the ceiling.
+- Scans are **cached** while the tree is unchanged (paths, sizes, mtimes), so `explain_finding`,
+  `suggest_fixes` and repeated pages do not re-scan.
+- `suggest_fixes` accepts an `id` for the patch of one finding.
+
 Findings carry `severity`, `status` (`likely` / `suspicious`, never `confirmed`), `confidence`,
-`location`, `cwe`, `owasp`, `evidence` and `remediation`. At most 200 findings are returned per call
-(`truncated` says if more exist).
+`location`, `cwe`, `owasp`, `evidence` and `remediation`.
+
+### Recording a verdict (write access)
+
+Off by default. Start the server with `SECUREAGENT_MCP_WRITE=1` and `record_verdict(path, id, reason,
+expires?)` appends a justified (>= 10 characters), optionally expiring entry to the project's
+`secureagent-suppressions.json`. The finding becomes `false_positive` on the next scan and is never
+deleted; the file is the reviewable trail. Writes are confined to the allowed roots.
 
 ## Install and register
 
@@ -67,8 +89,9 @@ Without installing, from a checkout: `python -m app.mcp_server` with `backend/` 
 
 ## Safety model
 
-- **Read-only.** Scanned code is never executed; nothing is written except a private temp directory
-  that `scan_snippet` deletes.
+- **Read-only by default.** Scanned code is never executed; nothing is written except a private temp
+  directory that `scan_snippet` deletes, and (only with `SECUREAGENT_MCP_WRITE=1`) the suppressions file
+  that `record_verdict` appends to.
 - **Path-confined.** `path` and `intent` must resolve (symlinks and `..` included) under an allowed
   root: the server's working directory by default, or the `os.pathsep`-separated
   `SECUREAGENT_MCP_ROOTS` environment variable. Anything else is returned as a tool error.

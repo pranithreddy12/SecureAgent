@@ -146,3 +146,11 @@ def test_hardcoded_fallback_for_a_secret_env_var_is_reported():
     js = secrets.scan_text("a.js", 'const k = process.env.JWT_SECRET || "s3cr3t-fallback-1";\n')
     assert [f.rule for f in js] == ["Hardcoded fallback for secret (JWT_SECRET)"]
     assert "s3cr3t-fallback-1" not in str(js[0].redacted)  # never echoed in full
+
+
+def test_fallback_rule_ignores_comments_and_documentation():
+    sample = '# e.g. os.environ.get("SECRET_KEY", "dev-only-not-secret")\n'
+    assert secrets.scan_text("app.py", sample) == []
+    assert secrets.scan_text("docs/notes.md", sample.lstrip("# ")) == []
+    js = '// process.env.JWT_SECRET || "s3cr3t-fallback-1"\n'
+    assert secrets.scan_text("a.js", js) == []

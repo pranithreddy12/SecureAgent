@@ -369,3 +369,71 @@ def test_subprocess_check_output_is_not_mistaken_for_an_access_check():
     )
     (route,) = extract_routes("app.py", src)
     assert route.protected is False
+
+
+# --------------------------------------------- config-driven queries (OpenCode run)
+
+CONFIG_DRIVEN = """
+    import sqlite3
+    from flask import Flask, request, abort, jsonify
+    app = Flask(__name__)
+    DATASETS = {"funds": {"table": "funds", "cols": ["name", "amount"], "search": ["name"]}}
+
+    def _cfg(name):
+        cfg = DATASETS.get(name)
+        if cfg is None:
+            abort(404)
+        return cfg
+
+    def parse_sort(cfg, default="name"):
+        col = request.args.get("sort", default)
+        if col not in cfg["cols"]:
+            col = default
+        direction = "DESC" if request.args.get("dir") == "desc" else "ASC"
+        return col, direction
+
+    @app.route("/<name>/data")
+    def data(name):
+        cfg = _cfg(name)
+        col, direction = parse_sort(cfg)
+        q = request.args.get("q", "")
+        sql = f"SELECT * FROM {cfg['table']} WHERE name LIKE ? ORDER BY {col} {direction}"
+        return jsonify(sqlite3.connect("x").execute(sql, [q]).fetchall())
+"""
+
+
+def _sqli(source: str) -> list:
+    return [
+        f
+        for f in analyze_taint("app.py", textwrap.dedent(source))
+        if f.vuln_type == "sql_injection"
+    ]
+
+
+def test_config_selected_by_request_value_is_not_request_data():
+    """A dataset name picks an entry from a constant table; table/column names then come from it,
+    the sort column is allow-listed and the direction is one of two literals."""
+    assert _sqli(CONFIG_DRIVEN) == []
+
+
+def test_the_nearest_real_variants_are_still_reported():
+    # the column is NOT validated: the allow-list reset assigns request data, not a constant
+    unvalidated = CONFIG_DRIVEN.replace("col = default", "col = request.args.get('fallback')")
+    assert _sqli(unvalidated)
+    # no allow-list at all
+    no_check = CONFIG_DRIVEN.replace(
+        '        if col not in cfg["cols"]:\n            col = default\n', ""
+    )
+    assert _sqli(no_check)
+    # the "constant" table is mutated from request data, so it is not constant
+    mutated = CONFIG_DRIVEN.replace(
+        '    @app.route("/<name>/data")',
+        '    DATASETS["funds"] = {"table": request.args.get("t"), "cols": [], "search": []}\n\n'
+        '    @app.route("/<name>/data")',
+    )
+    assert _sqli(mutated)
+    # a local helper that passes request data through is still tainted
+    passthrough = CONFIG_DRIVEN.replace(
+        "        return cfg\n", "        return request.args.get('table')\n"
+    )
+    assert _sqli(passthrough)

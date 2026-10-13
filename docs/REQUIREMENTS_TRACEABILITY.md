@@ -77,6 +77,9 @@ Status: Planned → In Progress → Implemented → Tested.
 | R70 | Zip upload in the web UI with hostile-archive controls | ADR-019 | backend/app/services/upload_service.py, api/projects.py (`/upload`), frontend projects page, tests/test_projects.py | Implemented + Tested |
 | R71 | Owner triage: mark / undo a false positive with a recorded reason | ADR-019 | api/audits.py (`triage`), frontend audit page, tests/test_audits.py | Implemented + Tested; per audit only |
 | R72 | MCP `explain_finding` (evidence, taint path, helpers) | ADR-019 | backend/app/mcp_server.py, tests/test_mcp_server.py | Implemented + Tested |
+| R73 | MCP trust: per-type impact ceiling / not-claimed / verify-with, server instructions, coverage, paging, scan cache | ADR-020 | backend/app/analysis/guidance.py, mcp_server.py, tests/test_mcp_server.py | Implemented + Tested |
+| R74 | MCP `record_verdict` (opt-in write) and `security_review` prompt | ADR-020 | backend/app/mcp_server.py, tests/test_mcp_server.py | Implemented + Tested |
+| R75 | Detector gaps from an assistant comparison: secret fallbacks, container root/privileged, CSP unsafe-inline, unbounded export; config-table and allow-list-reset precision | ADR-020 | analysis/secrets.py, misconfig.py, taint.py, tests/test_infra_checks.py, test_realworld_fp.py | Implemented + Tested on constructed cases; real-world rate unmeasured |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.

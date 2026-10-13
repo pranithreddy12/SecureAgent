@@ -269,7 +269,7 @@ _cache: dict[tuple, tuple[Any, Any]] = {}  # key -> (ScanResult, ReportContext),
 
 def _tree_signature(root: Path) -> str:
     """A cheap fingerprint of the tree (paths, sizes, mtimes) used to reuse a scan."""
-    h = hashlib.sha1(usedforsecurity=False)
+    h = hashlib.blake2b(digest_size=20)
     seen = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(d for d in dirnames if d not in _PRUNE)

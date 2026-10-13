@@ -188,6 +188,44 @@ GUIDANCE: dict[str, Guidance] = {
         "That the application calls the vulnerable function.",
         "Is the vulnerable API/feature used? Is a fixed version available and compatible?",
     ),
+    "container_runs_as_root": _g(
+        "A process compromise is root inside the container (and a stepping stone to escape).",
+        "That the container can be escaped, or that it is reachable.",
+        "Does the image drop privileges (USER in the final stage, or a runtime `user:` override)?",
+        "Is a root user needed (binding a low port, writing a host-mounted volume)?",
+    ),
+    "privileged_container": _g(
+        "Near-host access from a compromised container.",
+        "That the container is exposed or that escape was shown.",
+        "Is privileged mode actually needed, or would specific capabilities do?",
+    ),
+    "csp_unsafe_inline": _g(
+        "Injected inline script would run, weakening XSS defence in depth.",
+        "That an XSS exists; the policy is a mitigation, not a vulnerability by itself.",
+        "Is 'unsafe-inline' on script-src/default-src (not just style-src)?",
+        "Can inline scripts be moved out or given nonces?",
+    ),
+    "unbounded_query": _g(
+        "Memory/CPU exhaustion or a slow request from loading the whole table.",
+        "That the table is large or that the endpoint is reachable by untrusted users.",
+        "How many rows can the table hold, and who can call this endpoint?",
+        "Is a limit, pagination or streaming applied elsewhere (query helper, DB view)?",
+    ),
+    "template_autoescape_off": _g(
+        "Cross-site scripting through template output.",
+        "That user data reaches the unescaped template.",
+        "Do templates with autoescape off render any request-derived value?",
+    ),
+    "allowed_hosts_wildcard": _g(
+        "Host-header poisoning (password-reset links, cache keys).",
+        "That the application builds URLs from the Host header.",
+        "Is the wildcard only in development settings, or behind a proxy that validates Host?",
+    ),
+    "insecure_cookie": _g(
+        "Cookie readable by script or sent over plain HTTP.",
+        "That the cookie holds a session or credential.",
+        "Does the cookie carry authentication state? Is HTTPS enforced in front of the app?",
+    ),
 }
 
 DEFAULT: Guidance = _g(

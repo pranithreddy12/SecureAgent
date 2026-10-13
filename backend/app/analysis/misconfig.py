@@ -10,6 +10,7 @@ definite settings present in the source, so they report as "likely". Safe varian
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass
 
 # category -> (cwe, owasp, remediation, severity, confidence)
@@ -56,6 +57,35 @@ CATEGORY = {
         "medium",
         0.7,
     ),
+    "container_runs_as_root": (
+        "CWE-250",
+        "A05:2021 Security Misconfiguration",
+        "Add a non-root USER (or `user:`) so a compromised process is not root in the container.",
+        "low",
+        0.5,
+    ),
+    "privileged_container": (
+        "CWE-250",
+        "A05:2021 Security Misconfiguration",
+        "Remove `privileged: true`; grant only the specific capabilities that are needed.",
+        "medium",
+        0.7,
+    ),
+    "csp_unsafe_inline": (
+        "CWE-693",
+        "A05:2021 Security Misconfiguration",
+        "Remove 'unsafe-inline' from script-src/default-src; use nonces or hashes for inline code.",
+        "low",
+        0.5,
+    ),
+    "unbounded_query": (
+        "CWE-770",
+        "A04:2021 Insecure Design",
+        "Page or cap bulk export/list endpoints (LIMIT, pagination, streaming) so one request "
+        "cannot load the whole table.",
+        "low",
+        0.4,
+    ),
     "insecure_cookie": (
         "CWE-614",
         "A05:2021 Security Misconfiguration",
@@ -93,9 +123,118 @@ class MisconfigFinding:
         return f"Security misconfiguration: {self.rule}"
 
 
+_DOCKERFILE = re.compile(r"(?i)(^|/)([^/]*\.dockerfile|dockerfile[^/]*)$")
+_COMPOSE = re.compile(r"(?i)(^|/)(docker-)?compose[^/]*\.ya?ml$")
+_ROOT_USER = re.compile(r"""(?i)^\s*user\s*:\s*["']?(root|0)(?:[:"'\s]|$)""")
+_PRIVILEGED = re.compile(r"(?i)^\s*privileged\s*:\s*[\"']?true\b")
+_CSP_INLINE = re.compile(r"(?i)(script-src|default-src)[^;]*unsafe-inline")
+_BULK_NAME = re.compile(r"(?i)export|download|dump|backup|csv|(?:^|[_/.-])all(?:$|[_/.-])")
+_LIMIT_HINT = re.compile(
+    r"(?i)\blimit\b|paginat|per_page|page_size|max_rows|fetchmany|\.first\(|islice|\[:\s*\w+\]|\.slice"
+)
+_ROUTE_DECORATORS = {"route", "get", "post", "put", "patch", "delete", "api_view"}
+_TEXT_SUFFIXES = (
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    ".html",
+    ".conf",
+    ".yml",
+    ".yaml",
+)
+
+
+def _infra_findings(relpath: str, text: str) -> list[MisconfigFinding]:
+    """Container and header settings: root user, compose privileges, CSP unsafe-inline."""
+    lines = text.splitlines()
+    found: list[MisconfigFinding] = []
+
+    def add(category: str, rule: str, line: int) -> None:
+        snippet = lines[line - 1].strip()[:160] if 0 < line <= len(lines) else ""
+        sev, conf = CATEGORY[category][3], CATEGORY[category][4]
+        found.append(MisconfigFinding(category, rule, sev, conf, relpath, line, snippet))
+
+    if _DOCKERFILE.search(relpath):
+        last_from, user = 0, None
+        for i, raw in enumerate(lines, start=1):
+            word = raw.strip().split(None, 1)
+            if not word:
+                continue
+            if word[0].upper() == "FROM":
+                last_from, user = i, None
+            elif word[0].upper() == "USER" and len(word) > 1:
+                user = word[1].strip().split(":")[0].lower()
+        if last_from and user in (None, "root", "0"):
+            add("container_runs_as_root", "Dockerfile: final stage runs as root", last_from)
+    elif _COMPOSE.search(relpath):
+        for i, raw in enumerate(lines, start=1):
+            if _ROOT_USER.match(raw):
+                add("container_runs_as_root", "compose: service runs as root", i)
+            elif _PRIVILEGED.match(raw):
+                add("privileged_container", "compose: privileged container", i)
+    if relpath.lower().endswith(_TEXT_SUFFIXES):
+        for i, raw in enumerate(lines, start=1):
+            if "unsafe-inline" in raw and _CSP_INLINE.search(raw):
+                add("csp_unsafe_inline", "CSP allows 'unsafe-inline' scripts", i)
+    return found
+
+
+def _is_route(func: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool, list[str]]:
+    """Whether the function has a route-like decorator, and the string paths it declares."""
+    paths: list[str] = []
+    is_route = False
+    for dec in func.decorator_list:
+        call = dec if isinstance(dec, ast.Call) else None
+        target = call.func if call else dec
+        name = target.attr if isinstance(target, ast.Attribute) else getattr(target, "id", "")
+        if name in _ROUTE_DECORATORS:
+            is_route = True
+        if call:
+            paths += [
+                a.value
+                for a in call.args
+                if isinstance(a, ast.Constant) and isinstance(a.value, str)
+            ]
+    return is_route, paths
+
+
+def _unbounded_findings(relpath: str, tree: ast.AST, lines: list[str]) -> list[MisconfigFinding]:
+    """Bulk export/list handlers that load a whole result set with no limit."""
+    out: list[MisconfigFinding] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        is_route, paths = _is_route(node)
+        if not is_route or not (
+            _BULK_NAME.search(node.name) or any(_BULK_NAME.search(p) for p in paths)
+        ):
+            continue
+        body = "\n".join(lines[node.lineno - 1 : node.end_lineno])
+        if re.search(r"\.(fetchall|all)\(\s*\)", body) and not _LIMIT_HINT.search(body):
+            snippet = lines[node.lineno - 1].strip()[:160]
+            cat = CATEGORY["unbounded_query"]
+            out.append(
+                MisconfigFinding(
+                    "unbounded_query",
+                    f"{node.name}() loads an entire result set with no limit",
+                    cat[3],
+                    cat[4],
+                    relpath,
+                    node.lineno,
+                    snippet,
+                )
+            )
+    return out
+
+
 def scan_misconfig(relpath: str, text: str) -> list[MisconfigFinding]:
+    infra = _infra_findings(relpath, text)
     if not relpath.endswith(".py"):
-        return []
+        return infra
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
@@ -103,7 +242,7 @@ def scan_misconfig(relpath: str, text: str) -> list[MisconfigFinding]:
     lines = text.splitlines()
     visitor = _Visitor(relpath, lines)
     visitor.visit(tree)
-    return visitor.findings
+    return infra + visitor.findings + _unbounded_findings(relpath, tree, lines)
 
 
 class _Visitor(ast.NodeVisitor):
