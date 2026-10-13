@@ -976,3 +976,12 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 ### Observed, not changed
 - UTF-16 source files are skipped as unreadable (now disclosed); 4000 near-identical files produce 4000
   findings in 22 s (no cross-file de-duplication).
+
+## 2026-10-13 (found by comparing OpenCode runs with and without the MCP server)
+
+### Fixed
+- **Missed class:** a secret that falls back to a literal when its environment variable is unset
+  (`os.environ.get("SECRET_KEY", "dev-only-not-secret")`, `os.getenv`, `process.env.X || "literal"`) was not
+  reported. Now "Hardcoded fallback for secret (KEY)": medium, or low when the value is a placeholder word.
+- The stdlib XML finding's remediation now states it is not XXE/SSRF/file disclosure (an assistant had
+  inflated it and suggested an lxml-only option).

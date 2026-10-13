@@ -165,6 +165,16 @@ def _is_placeholder(value: str) -> bool:
     return len(set(v)) <= 2  # e.g. "aaaaaa", "------"
 
 
+# A secret that falls back to a literal when the environment variable is unset:
+#   os.environ.get("SECRET_KEY", "dev-only")   os.getenv("JWT_SECRET", "x")   process.env.KEY || "x"
+_FALLBACK = re.compile(
+    r"""(?x)
+    (?:(?:os\.)?(?:environ\.get|getenv)\(\s*["'](?P<k1>[A-Za-z0-9_.-]+)["']\s*,\s*["'](?P<v1>[^"'\s]{4,})["']\s*\)
+      |process\.env\.(?P<k2>[A-Za-z0-9_]+)\s*(?:\|\||\?\?)\s*["'](?P<v2>[^"'\s]{4,})["'])
+    """
+)
+
+
 def scan_text(relpath: str, text: str) -> list[SecretFinding]:
     """Return secret findings for one file's text. Pure; no I/O."""
     findings: list[SecretFinding] = []
@@ -197,6 +207,25 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
         provider_fps = {
             _fingerprint(m.group(0)) for rule in PROVIDER_RULES for m in rule.pattern.finditer(line)
         }
+
+        # Fallback literal for a secret-named environment variable: deployed without the variable,
+        # the application silently runs with a public, guessable secret.
+        for m in _FALLBACK.finditer(line):
+            key = m.group("k1") or m.group("k2")
+            val = m.group("v1") or m.group("v2")
+            if not key_looks_secret(key) or _fingerprint(val) in provider_fps:
+                continue
+            fake = _is_placeholder(val)
+            _add(
+                findings,
+                seen,
+                f"Hardcoded fallback for secret ({key})",
+                "low" if fake else "medium",
+                0.5 if fake else 0.7,
+                relpath,
+                lineno,
+                val,
+            )
 
         # Generic: a secret-named key assigned a non-placeholder, high-entropy value.
         for m in ASSIGNMENT.finditer(line):

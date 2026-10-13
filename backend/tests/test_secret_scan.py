@@ -128,3 +128,21 @@ def test_env_var_names_are_not_secrets():
     assert scan_text("a.py", 'API_KEY_VAR = "STRIPE_SECRET_KEY"\n') == []
     # a real-looking value is still reported
     assert scan_text("a.py", 'DB_PASSWORD = "Tr0ub4dor&3xK9vQ2mZ"\n')
+
+
+def test_hardcoded_fallback_for_a_secret_env_var_is_reported():
+    py = (
+        'SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-not-secret")\n'
+        'JWT = os.getenv("JWT_SECRET", "k3y-9f8a7b6c5d4e3f2a")\n'
+        'PORT = os.environ.get("PORT", "8080")\n'
+        'TOKEN = os.environ["API_TOKEN"]\n'
+    )
+    found = secrets.scan_text("app.py", py)
+    assert sorted(f.rule for f in found) == [
+        "Hardcoded fallback for secret (JWT_SECRET)",
+        "Hardcoded fallback for secret (SECRET_KEY)",
+    ]
+    assert all(f.line in (1, 2) for f in found)
+    js = secrets.scan_text("a.js", 'const k = process.env.JWT_SECRET || "s3cr3t-fallback-1";\n')
+    assert [f.rule for f in js] == ["Hardcoded fallback for secret (JWT_SECRET)"]
+    assert "s3cr3t-fallback-1" not in str(js[0].redacted)  # never echoed in full
