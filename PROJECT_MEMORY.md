@@ -229,6 +229,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-027 | Django urls.py view functions are handlers | Accepted |
 | ADR-028 | Fifth untouched set (Pixi, DVSA, crAPI) | Accepted |
 | ADR-029 | Sixth untouched set (skf-labs, DVGA, DVRestaurant) | Accepted |
+| ADR-030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -491,3 +492,7 @@ findings are noisy on API-heavy projects (Pixi 108, crAPI 132).
 **Sixth untouched set (2026-10-13, ADR-029):** 68% (39/57), no detector changed; 63% excluding secrets;
 DVGA 1/7. Six untouched: 52/49/41/46/58/68%, pooled 52%. Next candidates: GraphQL resolver args as
 sources, `Markup()`/template XSS, `app.secret_key` in `__main__`.
+
+**Seventh untouched set (2026-10-14, ADR-030):** 75% (12/16), no detector changed. Seven untouched:
+52/49/41/46/58/68/75%, pooled 53%. New narrow gaps: `url.parse(req.url, true).query` as a source; a
+template-literal sink returned directly from `res.send`/`client.query`.

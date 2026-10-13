@@ -342,3 +342,21 @@ is the blind spot, not simple Flask code.
 Gaps recorded (not fixed here): GraphQL/graphene resolver arguments as sources; `Markup()` and
 template-level XSS; `app.secret_key = "..."` in a `__main__` block and `config['SECRET_KEY']` with a
 short word; `text("..." + x)` as a statement argument; `current_app.open_resource`; `pulldom`.
+
+## Seventh untouched set: Vulnerable-Flask-App (videvelopers), ivna, vulnerable-app-nodejs-express (2026-10-14)
+
+16 in-taxonomy planted flaws were committed before scoring (`3cd70d2`); the scanner was the post-ADR-029
+version, **unchanged**. All three are small, real GitHub projects (not single-vuln labs).
+
+| Application | Planted | Found | Missed |
+|---|---|---|---|
+| Vulnerable-Flask-App (videvelopers, Python) | 6 | 6 | none |
+| ivna (Node/Express/Mongoose) | 7 | 5 | `needle.get(query.url)` SSRF and the `res.redirect(query.url)` right after it (both read the URL from a hand-parsed `url.parse(req.url, true).query`, not `req.query`) |
+| vulnerable-app-nodejs-express (Express/pg) | 3 | 1 | `` res.send(`Hello, ${req.query.name}`) `` reflected XSS and a template-literal SQL string built from `req.params.id`, both one-line files with no other taint context |
+| **Total** | **16** | **12 (75%)** | |
+
+Seven untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%; pooled 158/299 = 53%.** The two misses
+worth generalising: a URL taken from `url.parse(req.url, true).query` instead of `req.query`/`req.body`,
+and an SQL/XSS sink built with a JS template literal (`` `...${x}` ``) that is also a `res.send`/`client.query`
+single-expression return rather than an assignment first. Both are narrow aliasing gaps in the JS taint
+pass, not a new class of miss.

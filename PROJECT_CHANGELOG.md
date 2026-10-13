@@ -1115,3 +1115,10 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Truth frozen (`9cb3618`), scanner unchanged: 39/57 (68%): skf-labs 35/47, DVGA 1/7, DVRestaurant 3/3.
   Pooled untouched over six sets 146/283 (52%); overall 220/283 (78%). Set is easy (tiny labs, literal
   secrets); DVGA shows the resolver-argument blind spot.
+
+## 2026-10-14 (seventh untouched set -- ADR-030)
+
+- Truth frozen (`3cd70d2`), scanner unchanged: 12/16 (75%): Vulnerable-Flask-App(videvelopers) 6/6, ivna
+  5/7, vulnerable-app-nodejs-express 1/3. Pooled untouched over seven sets 158/299 (53%).
+- Misses: SSRF/redirect from a `url.parse(req.url, true).query` value (not `req.query`); a template-literal
+  sink returned directly from `res.send`/`client.query` without an intermediate variable.

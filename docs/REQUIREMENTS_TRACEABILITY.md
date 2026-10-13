@@ -90,6 +90,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R83 | Django urls.py view functions treated as handlers; same-site redirect prefix | ADR-027 | analysis/openapi_spec.py (`parse_django_urls`), scanner.py, taint.py, tests/test_django_urls.py | Implemented + Tested; django.nV 5/17 -> 15/17 (tuned-on) |
 | R84 | Fifth untouched set measured without changing detectors | ADR-028 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 58% (11/19); pooled untouched 47% (107/226) |
 | R85 | Sixth untouched set measured without changing detectors | ADR-029 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 68% (39/57); pooled untouched 52% (146/283) |
+| R86 | Seventh untouched set measured without changing detectors | ADR-030 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 75% (12/16); pooled untouched 53% (158/299) |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.
