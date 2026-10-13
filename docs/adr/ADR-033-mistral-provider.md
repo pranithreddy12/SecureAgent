@@ -45,6 +45,23 @@ the code actually sent (not downgraded to `unclear`), on the first try. Redactio
 response parsing and the "never changes status/gate" behaviour all held against a live response, not
 just the fake-transport tests.
 
+## Live run through the actual product (2026-10-14)
+
+The run above used the bare `secureagent review` CLI. Separately, restarted the backend
+(`docker compose up -d --build postgres backend`) with `LLM_PROVIDER=mistral`,
+`LLM_MODEL=codestral-latest` in `.env`, and ran a full audit through the real pipeline: registered a
+throwaway user, created a project at `/workspace/py_injection` (the same corpus fixture, mounted
+read-only under `SOURCE_ROOTS`), authorized it, and started an audit with `ai_review: true` via
+`POST /api/projects/{id}/audits` -- the actual `ai_validator`/`ai_narrative` LangGraph stages, not a
+direct call into `Reviewer`.
+
+Result: `status: completed`, `ai: {enabled: true, model: codestral-latest, reviewed: 15, problems:
+[]}`. All 15 deterministic findings got a live AI verdict (13 `true_positive` at 0.8-0.9 confidence on
+the genuine planted flaws, correctly matching), and the AI-written executive summary was accepted
+(passed `acceptable_narrative`'s banned-claims and shape checks) and is grounded in the real finding
+counts and locations -- no invented vulnerabilities, no "confirmed exploited" language. Status and
+severity on every finding were untouched by the AI stage, as designed.
+
 ## Not claimed
 
 This is one live run, on one account, on one finding type, with a free-tier key. It establishes that

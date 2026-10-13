@@ -1171,3 +1171,13 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   attempt. `codestral-latest`: worked -- TRUE POSITIVE 90% on a real code_injection finding, quote
   verified against the code sent. Confirms the provider abstraction is correct end to end, not just
   against the fake-transport tests. `MISTRAL_DEFAULT_MODEL` left as `mistral-large-latest`.
+
+## 2026-10-14 (first live AI-pipeline run, via the real product -- ADR-033)
+
+- Restarted the backend with `LLM_PROVIDER=mistral`/`LLM_MODEL=codestral-latest`; ran a full audit
+  (register -> project -> authorize -> `POST /projects/{id}/audits` with `ai_review: true`) against
+  the py_injection corpus fixture under `/workspace`. `ai_validator`/`ai_narrative` stages ran live:
+  15/15 findings reviewed, 13 true_positive at 0.8-0.9 confidence matching the genuine planted flaws,
+  AI executive summary accepted and grounded in real facts. Status/severity untouched, as designed.
+  First time the opt-in AI pipeline stages have run against a live LLM (previously fake-transport
+  tests only, then one bare-CLI `secureagent review` call).

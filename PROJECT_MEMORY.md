@@ -536,3 +536,9 @@ global list needs cross-handler state modelling, not a taint fix.
 plan needed); `mistral-small-latest` tier-allowed but 429 rate-limited repeatedly; `codestral-latest`
 worked -- real TRUE POSITIVE verdict, quote verified. Provider wiring (payload/headers/parsing)
 confirmed correct against a live response, on one account, one finding type.
+
+**First live AI-pipeline run via the real product (2026-10-14, ADR-033):** backend restarted with
+`LLM_MODEL=codestral-latest`; a full audit (register -> project -> authorize -> start) against the
+py_injection corpus fixture ran `ai_validator`/`ai_narrative` live: 15/15 findings reviewed, 13
+true_positive at 0.8-0.9 matching the genuine planted flaws, AI summary accepted and grounded in real
+facts, status/severity untouched. Previously only tested with a fake transport and one bare-CLI call.
