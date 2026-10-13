@@ -199,3 +199,38 @@ hashes, `innerHTML ===` is not an assignment, constant arguments to `execSync` /
 - 30 of 103 sampled findings were "unsure" and are excluded from precision.
 - Juice Shop produces 337 findings; most are third-party or teaching code. A real triage would suppress
   `data/static/codefixes` and vendored assets.
+
+## Third held-out set: VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node (2026-10-13)
+
+Truth lists (64 in-taxonomy planted flaws, 8 more outside the taxonomy) were written and committed
+before the scanner was run (`150fec2`). vulnerable-node ships a `sast/seeds/` directory of labelled
+vulnerable and clean files, which supplied 20 of the flaws and two clean-file negatives.
+
+| | Planted | Found, scanner as it was | Found after fixes |
+|---|---|---|---|
+| VAmPI (Flask / connexion) | 7 | 1 | 4 |
+| dvpwa (aiohttp) | 4 | 1 | 4 |
+| nodejs-goof (Express) | 6 | 3 | 4 |
+| vulnerable-node (Express) | 35 | 16 | 27 |
+| dvws-node (Express) | 12 | 5 | 12 |
+| **Total** | **64** | **26 (41%)** | **52 (81%, tuned-on)** |
+
+**Untouched recall: 41%** -- the third untouched measurement (52%, 49%, 41%). Across all twelve
+applications and 153 planted flaws the scanner as first run found about half; after fixes made on those
+applications it finds 88% (135/153).
+
+What the misses were: spec-first (connexion) handlers named only in an OpenAPI document; SQL assembled
+from function arguments rather than request fields (no taint source in the file); NoSQL filters built in a
+variable one line earlier; `new User(req.body)`; secrets in logs; zip extraction; `res.location`;
+`xpath.evaluate` and `noent: true` split across lines; `app.config['SECRET_KEY'] = 'random'`;
+`web.Application(debug=True)`; `setup_jinja(autoescape=False)`.
+
+Costs: structural SQL/NoSQL rules fire without a request source, so volume rises (nodejs-goof 23 -> 31
+findings, vulnerable-node 39 -> 54). Of 11 unlisted findings of those classes, 3 look false (a `$where`
+over a constant, a lab slug path, a public product lookup). The benchmark stayed at 97% precision
+and rose to 97% recall; the two clean seed files reported two false positives before a validated-redirect
+and escaped-output check, and none after.
+
+Still missed: Mongoose `User.find({password: req.body.password})`-style bodies through helpers,
+`findById`-by-title BOLA in spec-first handlers (VAmPI), mass assignment of an alias (`const fields =
+req.body`), `fetch(url)` in a helper, template placeholders, `readFileSync(join(base, user))`.

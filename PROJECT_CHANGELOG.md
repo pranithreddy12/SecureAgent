@@ -1083,3 +1083,11 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   `create_user` hashes, `request.user.is_authenticated` guard (also in class-based views).
 - Two more backspace characters from shell-escaped `\b` were found and fixed.
 - Backend 555 passed, 2 skipped; benchmark unchanged (97% / 95%).
+
+## 2026-10-13 (third held-out set -- ADR-025)
+
+- Untouched recall 26/64 (41%) on VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node; 52/64 (81%) after
+  fixes tuned on them. Twelve apps / 153 planted flaws: 135 (88%) after, about half untouched.
+- Added OpenAPI spec-first handlers/routes, structural SQL (Python and JS), JS NoSQL/mass-assignment/log
+  rules, generalised debug/autoescape keywords, validated-redirect and escaped-output exemptions.
+- Backend 562 passed, 2 skipped; benchmark 97% / 97%.

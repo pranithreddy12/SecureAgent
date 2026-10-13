@@ -265,7 +265,6 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
             val = m.group("val")
             if (
                 not _is_placeholder(val)
-                and not _is_identifier_value(val.replace(" ", "_"))
                 and _fingerprint(val) not in provider_fps
                 and re.search(r"(?i)session|cookie|express|jwt", text)
             ):

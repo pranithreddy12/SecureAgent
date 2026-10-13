@@ -224,6 +224,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-022 | Recall scoring against planted vulnerabilities | Accepted |
 | ADR-023 | Detector classes for planted flaws that had none | Accepted |
 | ADR-024 | Held-out vulnerable applications (pygoat, Juice Shop) | Accepted |
+| ADR-025 | Third held-out set and structural rules | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -466,3 +467,7 @@ They report nothing on 22 real projects: no FP cost, but also no real-world TP e
 recall (23/47); 51% untouched over all 89 planted flaws in 7 apps; 94% after generic fixes (tuned-on). Use
 ~50% as the honest planted-flaw recall for code the scanner has not been tuned on. Template-level flaws are
 invisible; Juice Shop yields 337 findings, mostly teaching/third-party code.
+
+**Third held-out set (2026-10-13, ADR-025):** untouched recall 41% (26/64) -> 81% after tuned-on fixes. Three
+untouched measurements (52%, 49%, 41%) agree: expect roughly 40-50% planted-flaw recall on unseen apps.
+Structural rules raise volume; precision of the new rules was only spot-checked (3 of 11 unlisted look false).

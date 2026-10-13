@@ -85,7 +85,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 555 passed, 2 skipped (PDF locally, Windows symlink) |
+| Backend tests | 562 passed, 2 skipped (PDF locally, Windows symlink) |
 | Frontend | 39 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
@@ -131,6 +131,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 022 | Recall scoring against planted vulnerabilities |
 | 023 | Detector classes for planted flaws that had none |
 | 024 | Held-out vulnerable applications (pygoat, Juice Shop) |
+| 025 | Third held-out set and structural rules |
 
 ## 10. Document map
 

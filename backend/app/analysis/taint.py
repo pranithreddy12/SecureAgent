@@ -89,6 +89,18 @@ TAINT_META = {
         "Escape input before placing it in HTML (or render with an auto-escaping template).",
         False,
     ),
+    "mass_assignment": (
+        "CWE-915",
+        "A04:2021 Insecure Design",
+        "Pick the allowed fields explicitly; never pass the request body straight to a model.",
+        False,
+    ),
+    "sensitive_data_in_log": (
+        "CWE-532",
+        "A09:2021 Security Logging and Monitoring Failures",
+        "Do not log passwords, tokens or secrets; mask or omit them.",
+        False,
+    ),
     "idor": (
         "CWE-639",
         "A01:2021 Broken Access Control",
@@ -108,6 +120,8 @@ SEVERITY = {
     "nosql_injection": "high",
     "reflected_xss": "medium",
     "idor": "high",
+    "mass_assignment": "high",
+    "sensitive_data_in_log": "medium",
 }
 
 
@@ -783,6 +797,11 @@ _JS_DESTRUCTURE = re.compile(
     r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*req(?:uest)?\." + _JS_REQ_PARTS
 )
 _JS_HANDLER_DESTRUCT = re.compile(r"\(\s*\{([^}]*)\}\s*:\s*(?:express\.)?Request\b")
+_JS_ESCAPES = re.compile(r"(?i)\b(?:esc|escape\w*|sanitize\w*|purify|encodeuri\w*)\s*\(|DOMPurify")
+_JS_REDIRECT_CHECK = re.compile(
+    r"\bif\s*\([^)]*\.(?:startsWith|includes|indexOf|match|test)\b|"
+    r"\b(?:allow\w*|whitelist|isRedirectAllowed|isSafe\w*)\b"
+)
 _JS_BUILT = re.compile(r"[`+]|\$\{")
 _JS_SINKS = [
     ("sql_injection", re.compile(r"\.(query|execute)\s*\("), re.compile(r"[`+]|\$\{")),
@@ -893,6 +912,12 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
                 and _js_constant_call(sink_re, line)
             ):
                 continue
+            if m and vuln_type == "reflected_xss" and _JS_ESCAPES.search(line):
+                continue  # res.send("<h1>" + escapeHtml(name) + "</h1>")
+            if m and vuln_type == "open_redirect":
+                prior = "\n".join(lines[max(0, lineno - 9) : lineno])
+                if _JS_REDIRECT_CHECK.search(prior):
+                    continue  # the target was validated just above (startsWith / allow-list)
             if (
                 m
                 and (extra_re is None or extra_re.search(line) or built_here)

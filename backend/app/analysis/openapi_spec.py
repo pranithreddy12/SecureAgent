@@ -41,7 +41,9 @@ class SpecOperation:
 
 
 def looks_like_spec(text: str) -> bool:
-    return "operationId" in text and bool(re.search(r"(?m)^\s*[\"']?(openapi|swagger)[\"']?\s*:", text))
+    return "operationId" in text and bool(
+        re.search(r"(?m)^\s*[\"']?(openapi|swagger)[\"']?\s*:", text)
+    )
 
 
 def parse_spec(relpath: str, text: str) -> list[SpecOperation]:

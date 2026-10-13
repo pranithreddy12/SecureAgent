@@ -160,7 +160,7 @@ _JS_NOSQL_BODYISH = re.compile(
     r"(?:body|payload|input|params|queryParams|filter\w*)\s*[,)]"
 )
 _JS_REQ_ISH = r"(?:req(?:uest)?\.(?:body|query|params)|body|query|queryParams|params|payload)"
-_JS_SQL_CALL = re.compile(r"\.(?:query|execute|raw|run|all|get|prepare)\s*\(")
+_JS_SQL_CALL = re.compile(r"\.(?:query|execute|raw)\s*\(|\bdb\.(?:get|all|run|exec)\s*\(")
 _JS_SQL_WORD = re.compile(
     r"(?i)\b(?:select\s.+\sfrom|insert\s+into|update\s+\w+\s+set|delete\s+from)\b"
 )

@@ -355,11 +355,37 @@ def _builds_sql_string(node: ast.expr, assigns: dict[str, list[ast.expr]], depth
     if not _SQL_WORDS.search(literal):
         return False
     if isinstance(node, ast.JoinedStr):
-        return any(isinstance(v, ast.FormattedValue) for v in node.values)
+        parts = [v.value for v in node.values if isinstance(v, ast.FormattedValue)]
+        return any(not _is_numeric_value(p, assigns) for p in parts)
     if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
-        return any(
-            isinstance(n, ast.Name) or isinstance(n, (ast.Subscript, ast.Attribute, ast.Call))
-            for n in ast.walk(node)
+        leaves: list[ast.expr] = []
+        stack = [node]
+        while stack:
+            n = stack.pop()
+            if isinstance(n, ast.BinOp) and isinstance(n.op, (ast.Mod, ast.Add)):
+                stack += [n.left, n.right]
+            elif isinstance(n, ast.Tuple):
+                stack += list(n.elts)
+            elif not isinstance(n, ast.Constant):
+                leaves.append(n)
+        return any(not _is_numeric_value(p, assigns) for p in leaves)
+    return False
+
+
+def _is_numeric_value(node: ast.expr, assigns: dict[str, list[ast.expr]]) -> bool:
+    """``int(x)``, ``str(int(x))``, ``len(x)`` or a name only ever assigned from those."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        if node.func.id in {"int", "float", "len", "bool"}:
+            return True
+        if node.func.id == "str" and node.args:
+            return _is_numeric_value(node.args[0], assigns)
+    if isinstance(node, ast.Name):
+        values = assigns.get(node.id, [])
+        return bool(values) and all(
+            isinstance(v, ast.Call)
+            and isinstance(v.func, ast.Name)
+            and v.func.id in {"int", "float", "len", "bool"}
+            for v in values
         )
     return False
 
