@@ -137,6 +137,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 028 | Fifth untouched set (Pixi, DVSA, crAPI) |
 | 029 | Sixth untouched set (skf-labs, DVGA, DVRestaurant) |
 | 030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) |
+| 031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap |
 
 ## 10. Document map
 

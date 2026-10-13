@@ -360,3 +360,36 @@ worth generalising: a URL taken from `url.parse(req.url, true).query` instead of
 and an SQL/XSS sink built with a JS template literal (`` `...${x}` ``) that is also a `res.send`/`client.query`
 single-expression return rather than an assignment first. Both are narrow aliasing gaps in the JS taint
 pass, not a new class of miss.
+
+## Eighth untouched set: vuln-nodejs-app, VulnNodeApp (2026-10-14)
+
+19 in-taxonomy planted flaws were committed before scoring (`f48f10b`); the scanner was the post-ADR-030
+version, **unchanged**. Both apps were picked to deliberately test request data that crosses files before
+reaching its sink (route file -> controller file -> model file, or route -> a helper in `utils/`), rather
+than the single-file labs most earlier sets used.
+
+| Application | Planted | Found | Missed |
+|---|---|---|---|
+| vuln-nodejs-app (payatu, Express) | 11 | 6 | a same-file SQL concat into `con.query` (regex miss, not cross-file), an IDOR with no owner check, `md5()` password hashing, a NoSQL `$where` string built from `req.body`, an upload path built from an unsanitised filename |
+| VulnNodeApp (4auvar, Express, MVC-style) | 8 | 2 | three SQL injections and the XXE sit in `models/`/`utils/` files reached only through a route -> controller -> model (or route -> util) call chain; two IDORs sit behind a `route -> local-helper -> controller -> model` chain |
+| **Total** | **19** | **8 (42%)** | |
+
+Eight untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 42%; pooled 166/318 = 52%.** The pooled
+figure barely moved; this set's low score confirms a gap rather than changing the overall picture.
+
+**What this set adds, precisely:** VulnNodeApp's design -- routes hold no logic beyond pulling `req.body`/
+`req.query` and calling a controller method with it, and the controller forwards straight to a model method
+that builds the query -- took its score to 2/8 (25%), far below every earlier set. The scanner's taint
+tracking does not follow a value across a function call into another file; it only matches patterns at the
+request-read site or within the same file (ADR-026's "parameter-fed sinks" gap was single-file; this is the
+same category of gap one level removed -- cross-file -- and it costs more). vuln-nodejs-app, where routes
+call sinks directly with `req.body`/`req.query` in the same file, scored 6/11 (55%), in the normal range.
+
+### Gaps recorded (not fixed here)
+- Cross-file taint through a wrapper call (`routeHandler -> controller.method(req.x) -> model.method(arg)`),
+  the dominant miss in this set.
+- `md5()` on its own call line without an obvious "password" variable name nearby was missed once
+  (`md5(req.body.password)` -- the existing `weak_hash` rule may need the argument itself inspected, not
+  just a adjacent assignment target name).
+- A NoSQL `$where` clause built with string concatenation one level inside a `.find({...})` object literal.
+- An upload path concatenated from an unsanitised `file.name` with no `../` check.

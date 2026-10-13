@@ -109,7 +109,7 @@ Details: [docs/deployment.md](docs/deployment.md).
   sample was 28% precise; after fixes the same sample is ~82% (a holdout ~83%), but a third, untouched set
   measured **48%** before its own fixes. Labels are a model's first pass, not independently verified
   (`docs/evaluation.md`). Against planted flaws in public vulnerable apps the scanner found about half
-  (52%, 49%, 41%, 46%, 58%, 68% and 75% on seven untouched batches; pooled 53%) before any change; after fixes
+  (52%, 49%, 41%, 46%, 58%, 68%, 75% and 42% on eight untouched batches; pooled 52%) before any change; after fixes
   tuned on the earlier sets it finds 80% over all 226, which is not an independent figure. LLM accuracy is unmeasured.
 - Zip upload accepts `.zip` only, with size/file-count limits; triage is per audit (use
   `secureagent suppress` for a rule that applies to future audits).
@@ -132,7 +132,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 |---|---|
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (30 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (31 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

@@ -230,6 +230,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-028 | Fifth untouched set (Pixi, DVSA, crAPI) | Accepted |
 | ADR-029 | Sixth untouched set (skf-labs, DVGA, DVRestaurant) | Accepted |
 | ADR-030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) | Accepted |
+| ADR-031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -502,3 +503,8 @@ APIs into one page with a real folder picker (client-side zip via `jszip`) and s
 "MCP agent mode" option since the in-progress agent files (`app/agents/`, `app/tools/`, `app/workflows/`,
 the two target-management services) are not wired into `app/main.py` and this session was told not to
 read/edit/commit them. No backend change.
+
+**Eighth untouched set (2026-10-14, ADR-031):** 42% (8/19), no detector changed; chosen to stress cross-file
+taint and it did: VulnNodeApp (route->controller->model, different files) 25%, vuln-nodejs-app (same-file)
+55%. Eight untouched: 52/49/41/46/58/68/75/42%, pooled 52%. Confirmed gap: taint tracking is same-file only,
+does not follow a value across a function call into another file.

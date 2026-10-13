@@ -1129,3 +1129,11 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   authorization statement, choose static / +AI review (MCP agent mode shown but disabled -- not wired
   into the app), then hand off to the existing live audit page. No backend change; three existing
   endpoints chained into one flow. `jszip` added to the frontend. Frontend 40 Vitest passing.
+
+## 2026-10-14 (eighth untouched set -- ADR-031)
+
+- Truth frozen (`f48f10b`), scanner unchanged: 8/19 (42%): vuln-nodejs-app 6/11, VulnNodeApp 2/8. Pooled
+  untouched over eight sets 166/318 (52%).
+- Set chosen to stress cross-file request flow: VulnNodeApp (route -> controller -> model, every sink in a
+  different file) scored 25%; vuln-nodejs-app (same-file route -> sink) scored 55%, confirming taint
+  tracking does not follow a value across a function call into another file.
