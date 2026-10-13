@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives).",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -1051,6 +1051,358 @@
           "class": "xml_injection",
           "note": "XML built from input",
           "in_taxonomy": false
+        }
+      ]
+    },
+    "lets-be-bad-guys": {
+      "url": "https://github.com/mpirnat/lets-be-bad-guys",
+      "commit": "7cbf11014bfc6dc9e199dc0b8a64e4597bc2338f",
+      "held_out": "fourth",
+      "known": [
+        {
+          "file": "badguys/vulnerable/views.py",
+          "line": 42,
+          "class": "path_traversal",
+          "note": "open(join(base, ?p=))"
+        },
+        {
+          "file": "badguys/vulnerable/views.py",
+          "line": 72,
+          "class": "code_injection",
+          "note": "exec(base64 of POST first_name)"
+        },
+        {
+          "file": "badguys/vulnerable/views.py",
+          "line": 178,
+          "class": "open_redirect",
+          "note": "redirect(?url=)"
+        },
+        {
+          "file": "badguys/vulnerable/views.py",
+          "line": 130,
+          "class": "idor",
+          "note": "users.get(userid) and update"
+        },
+        {
+          "file": "badguys/settings.py",
+          "line": 90,
+          "class": "secret",
+          "note": "SECRET_KEY literal"
+        },
+        {
+          "file": "badguys/settings.py",
+          "line": 10,
+          "class": "debug",
+          "note": "DEBUG = True"
+        },
+        {
+          "file": "badguys/vulnerable/views.py",
+          "line": 106,
+          "class": "reflected_xss",
+          "note": "qs reflected (template)"
+        },
+        {
+          "file": "badguys/vulnerable/views.py",
+          "line": 110,
+          "class": "reflected_xss",
+          "note": "qs reflected (template)"
+        }
+      ]
+    },
+    "django.nV": {
+      "url": "https://github.com/nVisium/django.nV",
+      "commit": "a48901f106da4888417339b7b44b8ed56b64c63f",
+      "held_out": "fourth",
+      "known": [
+        {
+          "file": "taskManager/views.py",
+          "line": 183,
+          "class": "sql_injection",
+          "note": "INSERT built with % formatting"
+        },
+        {
+          "file": "taskManager/misc.py",
+          "line": 33,
+          "class": "command_injection",
+          "note": "os.system('mv ' + path + title)"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 387,
+          "class": "open_redirect",
+          "note": "redirect(?redirect=)"
+        },
+        {
+          "file": "taskManager/settings.py",
+          "line": 24,
+          "class": "secret",
+          "note": "SECRET_KEY literal"
+        },
+        {
+          "file": "taskManager/settings.py",
+          "line": 28,
+          "class": "debug",
+          "note": "DEBUG = True"
+        },
+        {
+          "file": "taskManager/settings.py",
+          "line": 101,
+          "class": "weak_hash",
+          "note": "MD5PasswordHasher"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 208,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 244,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 275,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 300,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 312,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 352,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 378,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 533,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 556,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 582,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        },
+        {
+          "file": "taskManager/views.py",
+          "line": 712,
+          "class": "idor",
+          "note": "annotated A4 IDOR: object fetched by id, no owner check"
+        }
+      ]
+    },
+    "Tiredful-API": {
+      "url": "https://github.com/payatu/Tiredful-API",
+      "commit": "0134124496b3c4f1b969e51a24fd8a059104fb98",
+      "held_out": "fourth",
+      "known": [
+        {
+          "file": "Tiredful-API/health/views.py",
+          "line": 46,
+          "class": "sql_injection",
+          "note": "objects.raw with % formatting"
+        },
+        {
+          "file": "Tiredful-API/health/views.py",
+          "line": 57,
+          "class": "sql_injection",
+          "note": "cursor.execute with % formatting"
+        },
+        {
+          "file": "Tiredful-API/exams/views.py",
+          "line": 49,
+          "class": "idor",
+          "note": "score card by base64 id, no owner check"
+        },
+        {
+          "file": "Tiredful-API/Tiredful_API/settings.py",
+          "line": 33,
+          "class": "secret",
+          "note": "SECRET_KEY literal"
+        },
+        {
+          "file": "Tiredful-API/Tiredful_API/settings.py",
+          "line": 36,
+          "class": "debug",
+          "note": "DEBUG = True"
+        }
+      ]
+    },
+    "vulnpy": {
+      "url": "https://github.com/Contrast-Security-OSS/vulnpy",
+      "commit": "b81885e58283a3449b578d20c20557aff637e5ea",
+      "held_out": "fourth",
+      "known": [
+        {
+          "file": "src/vulnpy/trigger/cmdi.py",
+          "line": 6,
+          "class": "command_injection",
+          "note": "os.system(command)"
+        },
+        {
+          "file": "src/vulnpy/trigger/cmdi.py",
+          "line": 10,
+          "class": "command_injection",
+          "note": "Popen(shell=True)"
+        },
+        {
+          "file": "src/vulnpy/trigger/deserialization.py",
+          "line": 8,
+          "class": "deserialization",
+          "note": "pickle.load"
+        },
+        {
+          "file": "src/vulnpy/trigger/deserialization.py",
+          "line": 12,
+          "class": "deserialization",
+          "note": "pickle.loads"
+        },
+        {
+          "file": "src/vulnpy/trigger/deserialization.py",
+          "line": 17,
+          "class": "deserialization",
+          "note": "yaml.load UnsafeLoader"
+        },
+        {
+          "file": "src/vulnpy/trigger/deserialization.py",
+          "line": 23,
+          "class": "deserialization",
+          "note": "yaml.load_all UnsafeLoader"
+        },
+        {
+          "file": "src/vulnpy/trigger/hash.py",
+          "line": 19,
+          "class": "weak_hash",
+          "note": "hashlib.md5"
+        },
+        {
+          "file": "src/vulnpy/trigger/hash.py",
+          "line": 24,
+          "class": "weak_hash",
+          "note": "hashlib.sha1"
+        },
+        {
+          "file": "src/vulnpy/trigger/hash.py",
+          "line": 29,
+          "class": "weak_hash",
+          "note": "hashlib.new('SHA1')"
+        },
+        {
+          "file": "src/vulnpy/trigger/pt.py",
+          "line": 8,
+          "class": "path_traversal",
+          "note": "tarfile.open(user_input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/pt.py",
+          "line": 48,
+          "class": "path_traversal",
+          "note": "io.open(user_input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/pt.py",
+          "line": 57,
+          "class": "path_traversal",
+          "note": "open(user_input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/sqli.py",
+          "line": 37,
+          "class": "sql_injection",
+          "note": "execute(sql formatted from input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/sqli.py",
+          "line": 48,
+          "class": "sql_injection",
+          "note": "executemany(sql formatted from input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/sqli.py",
+          "line": 59,
+          "class": "sql_injection",
+          "note": "executescript(sql formatted from input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/unsafe_code_exec.py",
+          "line": 2,
+          "class": "code_injection",
+          "note": "exec(code)"
+        },
+        {
+          "file": "src/vulnpy/trigger/unsafe_code_exec.py",
+          "line": 6,
+          "class": "code_injection",
+          "note": "eval(code)"
+        },
+        {
+          "file": "src/vulnpy/trigger/unsafe_code_exec.py",
+          "line": 10,
+          "class": "code_injection",
+          "note": "compile(code)"
+        },
+        {
+          "file": "src/vulnpy/trigger/xpath.py",
+          "line": 25,
+          "class": "xpath_injection",
+          "note": "findall(user_input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/xpath.py",
+          "line": 29,
+          "class": "xpath_injection",
+          "note": "findtext(user_input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/xpath.py",
+          "line": 34,
+          "class": "xpath_injection",
+          "note": "findall(user_input)"
+        },
+        {
+          "file": "src/vulnpy/trigger/xxe.py",
+          "line": 8,
+          "class": "xxe",
+          "note": "lxml etree.fromstring"
+        },
+        {
+          "file": "src/vulnpy/trigger/xxe.py",
+          "line": 12,
+          "class": "xxe",
+          "note": "pulldom.parseString"
+        },
+        {
+          "file": "src/vulnpy/trigger/xxe.py",
+          "line": 16,
+          "class": "xxe",
+          "note": "sax.parseString"
         }
       ]
     }
