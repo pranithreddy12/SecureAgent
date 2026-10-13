@@ -288,6 +288,15 @@ class _SinkVisitor(ast.NodeVisitor):
         if name.endswith("tempfile.mktemp") or (last == "mktemp" and "tempfile" in name):
             self._add("insecure_temp_file", name, node.lineno)
 
+        # xml.sax: parser.setFeature(feature_external_ges, True) turns external entities on
+        if (
+            last == "setFeature"
+            and len(node.args) >= 2
+            and re.search(r"external_(?:ges|pes)", _dotted(node.args[0]) or "")
+            and _is_true(node.args[1])
+        ):
+            self._add("xxe", "xml.sax setFeature(external entities, True)", node.lineno)
+
         # XXE-prone XML parsing
         if last in {"parse", "fromstring", "parseString"} and re.search(
             r"(?:etree|ElementTree|minidom|expat|sax|lxml)", name
@@ -437,9 +446,14 @@ _JS_RULES = [
         # node-serialize's unserialize() executes functions embedded in the payload
         re.compile(r"\b(yaml|jsYaml)\.load\s*\(|\bserialize\.unserialize\s*\(|\bunserialize\s*\("),
     ),
-    ("xss_sink", re.compile(r"\.innerHTML\s*=")),
+    ("xss_sink", re.compile(r"\.innerHTML\s*=(?!=)")),
     # libxmljs: parseXml(String)(data, {noent: true}) resolves external entities
     ("xxe", re.compile(r"\bparseXml(?:String)?\s*\(.*\bnoent\s*:\s*true")),
+    # libxml2 bindings: the NOENT parse option substitutes external entities
+    ("xxe", re.compile(r"\bXML_PARSE_NOENT\b")),
+    ("weak_hash", re.compile(r"\bcreateHash\(\s*['\"](?:md5|sha1)['\"]\s*\)")),
+    # Angular: an explicit opt-out of the HTML sanitizer
+    ("xss_sink", re.compile(r"\bbypassSecurityTrust(?:Html|Script|Style|Url|ResourceUrl)\s*\(")),
     (
         "disabled_tls_verification",
         re.compile(r"rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED"),
@@ -520,6 +534,9 @@ def _xss_class(text: str, end: int, const_names: set[str]) -> str:
     return "dynamic"
 
 
+_LITERAL_CALL_ARG = re.compile(r"""\(\s*(['"`])[^'"`$\\]*\1\s*[,)]""")
+
+
 def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:
     findings: list[SinkFinding] = []
     uses_child_process = "child_process" in text
@@ -545,8 +562,19 @@ def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:
                 xss = "opaque"  # this file reads no input/network: the data arrives from elsewhere
             if xss == "skip":
                 continue
+            if (
+                m
+                and category in {"command_injection", "code_injection"}
+                and not m.group(0).startswith("vm.")  # vm code strings reach sandbox variables
+                and _LITERAL_CALL_ARG.match(line[m.end() - 1 :])
+            ):
+                continue  # execSync('npm root -g'), new Function('return 1'): a literal, not input
             if m:
                 sev, conf, _ = CATEGORY_RISK[category]
+                if category == "insecure_deserialization" and m.group(0).startswith(
+                    ("yaml", "jsYaml")
+                ):
+                    sev, conf = "low", 0.3  # js-yaml >= 4 load() is safe; version not visible
                 if xss == "opaque":  # value built by a call we cannot see into
                     sev, conf = "low", 0.25
                 findings.append(

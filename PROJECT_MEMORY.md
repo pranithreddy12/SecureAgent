@@ -223,6 +223,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-021 | Real-project evaluation harness and the fixes it drove | Accepted |
 | ADR-022 | Recall scoring against planted vulnerabilities | Accepted |
 | ADR-023 | Detector classes for planted flaws that had none | Accepted |
+| ADR-024 | Held-out vulnerable applications (pygoat, Juice Shop) | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -460,3 +461,8 @@ design, plaintext passwords) -- candidates for new detector classes. Truth file:
 **New detector classes (2026-10-13, ADR-023):** template/XPath/NoSQL injection, reflected XSS, unsigned session
 cookie, plaintext password, JS IDOR. Recall over all 42 planted flaws 52% (untouched) -> 79% -> 95% (tuned-on).
 They report nothing on 22 real projects: no FP cost, but also no real-world TP evidence yet.
+
+**Held-out apps (2026-10-13, ADR-024):** pygoat + Juice Shop scored with frozen truth lists: 49% untouched
+recall (23/47); 51% untouched over all 89 planted flaws in 7 apps; 94% after generic fixes (tuned-on). Use
+~50% as the honest planted-flaw recall for code the scanner has not been tuned on. Template-level flaws are
+invisible; Juice Shop yields 337 findings, mostly teaching/third-party code.

@@ -216,6 +216,16 @@ _FALLBACK = re.compile(
 )
 
 
+# A literal passed as the key to a signing / MAC call:
+#   crypto.createHmac('sha256', 'literal')   jwt.sign(payload, 'literal')   jwt.verify(t, "literal")
+_CRYPTO_LITERAL_KEY = re.compile(
+    r"""(?x)
+    (?:createHmac\(\s*['"][\w-]+['"]\s*,\s*['"](?P<k1>[^'"\s]{8,})['"]
+      |\b(?:jwt|jsonwebtoken|jws)\.(?:sign|verify|encode|decode)\([^,()]+,\s*['"](?P<k2>[^'"\s]{8,})['"])
+    """
+)
+
+
 def scan_text(relpath: str, text: str) -> list[SecretFinding]:
     """Return secret findings for one file's text. Pure; no I/O."""
     findings: list[SecretFinding] = []
@@ -248,6 +258,20 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
         provider_fps = {
             _fingerprint(m.group(0)) for rule in PROVIDER_RULES for m in rule.pattern.finditer(line)
         }
+
+        for m in _CRYPTO_LITERAL_KEY.finditer(line):
+            val = m.group("k1") or m.group("k2")
+            if val and not _is_placeholder(val) and _fingerprint(val) not in provider_fps:
+                _add(
+                    findings,
+                    seen,
+                    "Hardcoded key passed to a signing/MAC call",
+                    "medium",
+                    0.7,
+                    relpath,
+                    lineno,
+                    val,
+                )
 
         # Fallback literal for a secret-named environment variable: deployed without the variable,
         # the application silently runs with a public, guessable secret.

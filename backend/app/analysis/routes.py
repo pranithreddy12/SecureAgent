@@ -235,6 +235,7 @@ def _django_cbv_routes(cls: ast.ClassDef, relpath: str):
         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
             method = _CBV_METHOD_MAP.get(item.name.lower())
             if method:
+                in_body = None if protected else _body_guard(item)
                 routes.append(
                     Route(
                         method,
@@ -243,8 +244,8 @@ def _django_cbv_routes(cls: ast.ClassDef, relpath: str):
                         relpath,
                         item.lineno,
                         f"{cls.name}.{item.name}",
-                        protected,
-                        guard,
+                        protected or in_body is not None,
+                        guard or in_body,
                     )
                 )
     return routes
@@ -355,6 +356,12 @@ def _body_guard(func: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
             for side in [node.left, *node.comparators]:
                 if isinstance(side, ast.Attribute) and side.attr in _OWNER_ATTRS:
                     return f"in-handler check: compares .{side.attr}"
+        elif isinstance(node, ast.Attribute) and node.attr in {
+            "is_authenticated",
+            "is_staff",
+            "is_superuser",
+        }:
+            return f"in-handler check: .{node.attr}"  # Django: if request.user.is_authenticated
     return None
 
 

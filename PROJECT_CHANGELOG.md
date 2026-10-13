@@ -1066,3 +1066,20 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Recall over all 42 planted flaws: **52%** before any change, 79% before these detectors, **95%** after
   (tuned-on). 0 new findings on 22 real projects.
 - Backend 543 passed, 2 skipped; benchmark unchanged (97% / 95%).
+
+## 2026-10-13 (held-out vulnerable apps: pygoat and Juice Shop -- ADR-024)
+
+### Measured
+- Planted-flaw lists written and committed before scoring (`95d4163`).
+- Untouched held-out recall **23/47 (49%)**: pygoat 16/22, Juice Shop 7/25. All seven applications, 89
+  planted flaws: 45/89 (51%) untouched, 84/89 (94%) after fixes (tuned-on).
+- Precision on a 103-finding labelled sample: 73% -> 77% (53 real findings kept; 30 unsure).
+
+### Fixed
+- JS/TS taint: type annotations, request aliases, derived variables, handler destructuring; `vm.run*`;
+  constant-literal calls; `yaml.load` low; `createHash('md5')`; libxml2 `NOENT`; `bypassSecurityTrust*`;
+  hardcoded key literals in `createHmac` / `jwt.*`; multi-line Mongo filter fields.
+- Python: `X.eval(input)`, `xml.sax` external entities, bare `cookie` session cookie with `user|expiry`,
+  `create_user` hashes, `request.user.is_authenticated` guard (also in class-based views).
+- Two more backspace characters from shell-escaped `\b` were found and fixed.
+- Backend 555 passed, 2 skipped; benchmark unchanged (97% / 95%).

@@ -152,6 +152,12 @@ _JS_NOSQL_WHOLE = re.compile(
     r"\.(?:find|findOne|update|updateOne|updateMany|deleteOne|deleteMany|remove)\s*\(\s*"
     r"req(?:uest)?\.(?:body|query|params)\s*[,)]"
 )
+# a Mongo filter field taking a raw request value: {"_id": req.body.id} accepts {"$ne": null}
+_JS_NOSQL_FIELD = re.compile(
+    r"\.(?:find|findOne|update|updateOne|updateMany|deleteOne|deleteMany|remove)\s*\(\s*"
+    r"(?://[^\n]*\n\s*)?\{[^}]*:\s*"
+    r"(?:req(?:uest)?\.(?:body|query|params)|body|query)\.\w+"
+)
 _JS_TEMPLATE = re.compile(
     r"\b(?:ejs\.render|ejs\.compile|pug\.render|pug\.compile|handlebars\.compile|"
     r"Handlebars\.compile|nunjucks\.renderString|_\.template|doT\.template)\s*\("
@@ -176,6 +182,10 @@ def js_findings(lines: list[str], tainted_vars: set[str]) -> list[tuple[str, int
             out.append(("nosql_injection", lineno, "$where", snippet))
         elif _JS_NOSQL_WHOLE.search(line):
             out.append(("nosql_injection", lineno, "find(req.body)", snippet))
+        elif re.search(r"(?i)collection|mongo|db\.", line) and _JS_NOSQL_FIELD.search(
+            "\n".join(lines[i : i + 3])
+        ):
+            out.append(("nosql_injection", lineno, "filter field from request", snippet))
         m = _JS_TEMPLATE.search(line)
         if m and tainted_line(line):
             out.append(("template_injection", lineno, m.group(0).strip("( "), snippet))
@@ -197,7 +207,7 @@ def js_findings(lines: list[str], tainted_vars: set[str]) -> list[tuple[str, int
 
 # ------------------------------------------------------------ session cookie / passwords
 
-_SESSION_COOKIE_NAME = re.compile(r"(?i)sess|sid\b|auth|login|user|token|account")
+_SESSION_COOKIE_NAME = re.compile(r"(?i)sess|sid\b|auth|login|user|token|account|^cookie$")
 _WEAK_ENCODING = re.compile(r"(?i)b64encode|urlsafe_b64encode|json\.dumps|\bstr\(|\.encode\(")
 _SIGNED = re.compile(
     r"(?i)sign|serializer|itsdangerous|jwt|encrypt|hmac|secrets\.|token_(?:hex|urlsafe|bytes)|"
@@ -229,7 +239,16 @@ def insecure_session_cookie(call: ast.Call, assigns: dict[str, list[ast.expr]]) 
     if not exprs:
         return None
     text = " ".join(ast.unparse(e) for e in exprs)
-    if _SIGNED.search(text) or not _WEAK_ENCODING.search(text):
+    identity_fstring = any(
+        isinstance(e, ast.JoinedStr)
+        and any(
+            isinstance(v, ast.FormattedValue)
+            and re.search(r"(?i)user|name|email|admin|role|uid|\bid\b", ast.unparse(v.value))
+            for v in e.values
+        )
+        for e in exprs
+    )
+    if _SIGNED.search(text) or not (_WEAK_ENCODING.search(text) or identity_fstring):
         return None
     return f"session cookie '{key.value}' is an unsigned, client-writable value"
 
@@ -238,7 +257,7 @@ _PASSWORD_NAME = re.compile(r"(?i)^(?:new_|old_|raw_|plain_|user_)?(?:pass(?:wor
 _PASSWORD_ATTR = re.compile(r"(?i)^(?:pass(?:word|wd)?|pwd)$")
 _HASH_CALL = re.compile(
     r"(?i)hash|bcrypt|argon|pbkdf2|scrypt|crypt|make_password|passlib|digest|sha\d+|md5|"
-    r"hexdigest|set_password|generate_password"
+    r"hexdigest|set_password|generate_password|create_user|create_superuser"
 )
 _MODEL_CALLEE = re.compile(
     r"^[A-Z]\w*$|(?i:create_?user|add_?user|new_?user|register|signup|insert|save|store)"

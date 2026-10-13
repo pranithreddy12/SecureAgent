@@ -153,3 +153,49 @@ plaintext password, and JavaScript IDOR -- and all eight flaws were moved into t
 - **Cost on real code:** the new detectors report **nothing** on the 22 real projects used in the
   precision samples (0 new findings), so they did not add false positives there -- and, equally, there is
   no evidence yet that they find anything in real code.
+
+## Held-out vulnerable applications: pygoat and juice-shop (2026-10-13)
+
+No detector had been designed against these two. Their planted-flaw lists (47 flaws: 22 in pygoat, 25
+in Juice Shop, the latter largely from the project's own `vuln-code-snippet vuln-line` annotations) were
+written **and committed before the scanner was run on them** (git history shows the order).
+
+| | Planted | Found, scanner as it was | Recall |
+|---|---|---|---|
+| pygoat (Django) | 22 | 16 | 73% |
+| juice-shop (TypeScript / Express / Angular) | 25 | 7 | **28%** |
+| **Held-out total** | **47** | **23** | **49%** |
+
+**49% is the untouched held-out recall.** It matches the 52% measured on the first five applications
+before anything was tuned (22/42), so the two untouched figures agree: *roughly half of planted flaws were
+found by a scanner nobody had tuned on that application.*
+
+What Juice Shop exposed: TypeScript type annotations (`let criteria: any = req.query.q`) broke the
+JavaScript taint seed; `const query = req.query` aliases and `({ params, query }: Request)` handler
+destructuring were not input; `vm.runInContext`, `createHash('md5')`, `createHmac('sha256', 'literal')`,
+`jwt.sign(x, 'literal')`, `bypassSecurityTrustHtml`, libxml2 `XML_PARSE_NOENT` and multi-line Mongo
+updates were not recognised. What pygoat exposed: `ImageMath.eval`, `xml.sax` external entities, a
+session cookie named just `cookie` holding `user|expiry`.
+
+After fixing those generically: **44/47 (94%)** -- tuned-on, so not independent. Overall across all seven
+applications and 89 planted flaws: **51% untouched (45/89), 94% after (84/89).**
+
+### Precision on the same applications
+
+103 findings (5 per type per app) were labelled: 53 real, 20 false, 30 unsure (mostly Juice Shop's
+`data/static/codefixes` teaching snippets and `csrf_exempt` API endpoints). Precision over labelled
+items was 73%, and 77% after a second round of fixes (Django `is_authenticated` as a guard, `create_user`
+hashes, `innerHTML ===` is not an assignment, constant arguments to `execSync` / `new Function`, js-yaml
+`load` reported only as low). The same 53 real findings were kept.
+
+### Still missed
+- pygoat: a user blog written into a template file; two reflected-XSS labs whose flaw lives in the HTML
+  template, not the view.
+- DSVW: reflected XSS written into a buffer. Vulnerable-Flask-App: SSTI through an exception message.
+
+### Limits
+- Labels again by one model; the planted lists for pygoat/juice-shop are partly the projects' own markers
+  and partly my reading.
+- 30 of 103 sampled findings were "unsure" and are excluded from precision.
+- Juice Shop produces 337 findings; most are third-party or teaching code. A real triage would suppress
+  `data/static/codefixes` and vendored assets.

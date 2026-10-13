@@ -650,6 +650,13 @@ def _check_sink(
     if name in {"eval", "exec", "builtins.eval", "builtins.exec"} and _tainted(a0, tainted, ctx):
         return "code_injection", name
     if (
+        last == "eval"
+        and "." in name
+        and not name.startswith(("ast.", "self.", "model.", "torch."))
+        and _tainted(a0, tainted, ctx)
+    ):
+        return "code_injection", name  # ImageMath.eval, mathjs-style evaluators
+    if (
         last
         in {"redirect", "RedirectResponse", "HttpResponseRedirect", "HttpResponsePermanentRedirect"}
         and a0 is not None
@@ -761,15 +768,32 @@ def _is_http_call(name: str, last: str) -> bool:
 
 _JS_REQ_PARTS = r"(?:query|params|body|cookies|headers|files|file)"
 _JS_SOURCE = re.compile(r"\breq(?:uest)?\." + _JS_REQ_PARTS + r"\b")
-_JS_ASSIGN = re.compile(r"(?:const|let|var)\s+(\w+)\s*=\s*[^;]*req(?:uest)?\." + _JS_REQ_PARTS)
+_JS_ASSIGN = re.compile(
+    r"(?:const|let|var)\s+(\w+)(?:\s*:\s*[\w<>\[\]|. ]+)?\s*=\s*[^;]*req(?:uest)?\." + _JS_REQ_PARTS
+)
+# any declaration (with an optional TypeScript annotation); the right-hand side decides taint
+_JS_DECL = re.compile(r"(?:const|let|var)\s+(\w+)(?:\s*:\s*[\w<>\[\]|. ]+)?\s*=\s*([^;]*)")
+_JS_REQ_ALIAS = re.compile(
+    r"(?:const|let|var)\s+(\w+)(?:\s*:\s*[\w<>\[\]|. ]+)?\s*=\s*req(?:uest)?\."
+    + _JS_REQ_PARTS
+    + r"\s*(?:as\s+\w+)?\s*;?\s*$"
+)
 _JS_DESTRUCTURE = re.compile(
     r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*req(?:uest)?\." + _JS_REQ_PARTS
 )
+_JS_HANDLER_DESTRUCT = re.compile(r"\(\s*\{([^}]*)\}\s*:\s*(?:express\.)?Request\b")
 _JS_BUILT = re.compile(r"[`+]|\$\{")
 _JS_SINKS = [
     ("sql_injection", re.compile(r"\.(query|execute)\s*\("), re.compile(r"[`+]|\$\{")),
     ("command_injection", re.compile(r"\b(?:child_process\.)?(?:exec|execSync)\s*\("), None),
-    ("code_injection", re.compile(r"\beval\s*\(|\bnew\s+Function\s*\("), None),
+    (
+        "code_injection",
+        re.compile(
+            r"\beval\s*\(|\bnew\s+Function\s*\(|"
+            r"\bvm\.(?:runInContext|runInNewContext|runInThisContext|Script)\s*\("
+        ),
+        None,
+    ),
     (
         "ssrf",
         re.compile(
@@ -789,6 +813,18 @@ _JS_SINKS = [
 ]
 
 
+_JS_LITERAL_ARG = re.compile(r"""\(\s*(['"`])[^'"`$\\]*\1\s*[,)]""")
+
+
+def _js_constant_call(sink_re: re.Pattern[str], line: str) -> bool:
+    """``execSync('npm root -g')`` / ``new Function('return 1')``: the first argument is a
+    literal."""
+    m = sink_re.search(line)
+    if not m or m.group(0).startswith("vm."):  # vm code strings reach sandbox variables
+        return False
+    return bool(_JS_LITERAL_ARG.match(line[m.end() - 1 :]))
+
+
 def _js_extra(relpath: str, lines: list[str], tainted: set[str]) -> list[TaintFinding]:
     return [
         TaintFinding(vuln, SEVERITY[vuln], 0.5, relpath, lineno, sink, snippet)
@@ -805,8 +841,31 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
             tainted.add(m.group(1))
             if _JS_BUILT.search(line):
                 built.add(m.group(1))
+        for m in _JS_REQ_ALIAS.finditer(line):  # const query = req.query
+            tainted.add(m.group(1))
+        for m in _JS_HANDLER_DESTRUCT.finditer(line):  # ({ params, query }: Request, res) =>
+            tainted.update(
+                n.strip()
+                for n in m.group(1).split(",")
+                if n.strip() in {"params", "query", "body", "headers", "cookies", "files"}
+            )
         for m in _JS_DESTRUCTURE.finditer(line):
             tainted.update(re.findall(r"\w+", m.group(1)))
+    for _ in range(3):  # `const to = query.to as string`: derived from a tainted variable
+        before = len(tainted)
+        for line in lines:
+            for m in _JS_DECL.finditer(line):
+                name, rhs = m.group(1), m.group(2)
+                if name in tainted:
+                    continue
+                if _JS_SOURCE.search(rhs) or any(
+                    re.search(r"\b" + re.escape(v) + r"\b", rhs) for v in tainted
+                ):
+                    tainted.add(name)
+                    if _JS_BUILT.search(rhs):
+                        built.add(name)
+        if len(tainted) == before:
+            break
 
     var_res = [re.compile(r"\b" + re.escape(v) + r"\b") for v in tainted]
     findings: list[TaintFinding] = []
@@ -819,6 +878,12 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
         for vuln_type, sink_re, extra_re in _JS_SINKS:
             m = sink_re.search(line)
             built_here = any(re.search(r"\b" + re.escape(v) + r"\b", line) for v in built)
+            if (
+                m
+                and vuln_type in {"command_injection", "code_injection"}
+                and _js_constant_call(sink_re, line)
+            ):
+                continue
             if (
                 m
                 and (extra_re is None or extra_re.search(line) or built_here)
