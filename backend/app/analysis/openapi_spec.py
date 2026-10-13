@@ -1,10 +1,10 @@
 """Spec-first frameworks (connexion, FastAPI-less OpenAPI): handlers named by ``operationId``.
 
-In ``connexion`` / ``flask-restx`` style projects the route table lives in an OpenAPI document and the
-Python functions carry no decorator, so decorator-based route detection sees nothing. This module reads
-the spec (stdlib only: a small YAML-subset line parser, or ``json``) and returns the operations, from
-which the scanner derives (a) the set of handler function names and (b) routes with their
-authentication state.
+In ``connexion`` / ``flask-restx`` style projects the route table lives in an OpenAPI document and
+the Python functions carry no decorator, so decorator-based route detection sees nothing. This
+module reads the spec (stdlib only: a small YAML-subset line parser, or ``json``) and returns the
+operations, from which the scanner derives (a) the set of handler function names and (b) routes
+with their authentication state. Django ``urls.py`` view functions are collected the same way.
 
 A route is *protected* when its operation, or the document, declares ``security`` with at least one
 requirement; an empty list (``security: []``) means explicitly public.
@@ -146,3 +146,32 @@ def locate_handler(op: SpecOperation, sources: list[tuple[str, str]]) -> tuple[s
         if m:
             candidates.append((relpath, text.count("\n", 0, m.start()) + 1))
     return candidates[0] if len(candidates) >= 1 else None
+
+
+# ----------------------------------------------------------------------------- Django urls.py
+
+_URL_CALL = re.compile(
+    r"\b(?:url|path|re_path)\s*\("
+    r"\s*(?:r?(?:'[^']*'|\"[^\"]*\"))\s*,\s*"
+    r"(?P<view>[A-Za-z_][A-Za-z0-9_.]*|'[A-Za-z0-9_.]+'|\"[A-Za-z0-9_.]+\")"
+)
+_NOT_VIEWS = {"as_view", "include", "admin", "site", "urls"}
+
+
+def parse_django_urls(text: str) -> set[str]:
+    """Function names that a ``urls.py`` wires up as views (``url(r'^x/$', views.func)``).
+
+    Plain function views carry no decorator, so without this the analysers never treat them as
+    request handlers. Class-based views are handled elsewhere; ``include(...)`` is skipped."""
+    if "urlpatterns" not in text and "patterns(" not in text:
+        return set()
+    out: set[str] = set()
+    for m in _URL_CALL.finditer(text):
+        ref = m.group("view").strip("'\"")
+        tail = text[m.end() : m.end() + 12]
+        if tail.lstrip().startswith("("):  # include(...), TemplateView.as_view(...)
+            continue
+        name = ref.rsplit(".", 1)[-1]
+        if name and name not in _NOT_VIEWS and not name[0].isupper():
+            out.add(name)
+    return out

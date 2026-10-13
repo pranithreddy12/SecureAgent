@@ -33,6 +33,7 @@ from app.analysis.openapi_spec import (
     SPEC_OPERATIONS,
     SpecOperation,
     locate_handler,
+    parse_django_urls,
     parse_spec,
 )
 from app.analysis.osv import OsvClient, OsvError, Vuln
@@ -222,13 +223,19 @@ def scan_repo(
     analyser; the discovered names live in a context variable for the duration of the scan only."""
     ops: list[SpecOperation] = []
     probe_kwargs: dict = {"stats": IngestStats(), "exclude": [*load_ignore_file(root), *exclude]}
+    url_views: set[str] = set()
     for f in iter_source_files(root, **probe_kwargs):
-        if f.relpath.lower().endswith((".yml", ".yaml", ".json")) and f.size <= 2_000_000:
-            try:
+        low = f.relpath.lower()
+        if f.size > 2_000_000:
+            continue
+        try:
+            if low.endswith((".yml", ".yaml", ".json")):
                 ops.extend(parse_spec(f.relpath, read_text(f)))
-            except OSError:
-                continue
-    handlers = SPEC_HANDLERS.set(frozenset(o.function for o in ops))
+            elif low.endswith("urls.py"):
+                url_views |= parse_django_urls(read_text(f))
+        except OSError:
+            continue
+    handlers = SPEC_HANDLERS.set(frozenset({o.function for o in ops} | url_views))
     operations = SPEC_OPERATIONS.set(tuple(ops))
     try:
         return _scan_repo(

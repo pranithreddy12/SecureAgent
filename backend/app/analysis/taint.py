@@ -676,6 +676,7 @@ def _check_sink(
         in {"redirect", "RedirectResponse", "HttpResponseRedirect", "HttpResponsePermanentRedirect"}
         and a0 is not None
         and not (isinstance(a0, ast.Call) and (_dotted(a0.func) or "").endswith("url_for"))
+        and not _fixed_site_path(a0)
         and _tainted(a0, tainted, ctx)
     ):
         return "open_redirect", name
@@ -688,6 +689,23 @@ def _check_sink(
     ) and _tainted(a0, tainted, ctx):
         return "path_traversal", name
     return xd.taint_sink(call, lambda n: n is not None and _tainted(n, tainted, ctx))
+
+
+def _fixed_site_path(node: ast.expr | None) -> bool:
+    """``redirect('/app/' + project_id + '/')``: a literal same-site path prefix fixes the host, so
+    the user part cannot send the browser elsewhere (``//host`` and a backslash-host form are
+    excluded)."""
+    first: ast.expr | None = None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
+        first = node.left
+        while isinstance(first, ast.BinOp):
+            first = first.left
+    elif isinstance(node, ast.JoinedStr) and node.values:
+        first = node.values[0]
+    if not (isinstance(first, ast.Constant) and isinstance(first.value, str)):
+        return False
+    text = first.value
+    return len(text) > 1 and text.startswith("/") and text[1] not in "/\\"
 
 
 _ORM_ROOTS = {"select", "insert", "update", "delete", "exists", "union", "union_all"}

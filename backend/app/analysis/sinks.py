@@ -331,7 +331,8 @@ _SQL_WORDS = re.compile(
 def _builds_sql_string(node: ast.expr, assigns: dict[str, list[ast.expr]], depth: int = 0) -> bool:
     """An SQL string that is assembled from non-literal parts (f-string, ``%``, ``+``, ``.format``).
 
-    ``execute(text(q))`` and ``execute(q)`` with ``q`` assigned from such an expression count too."""
+    ``execute(text(q))`` and ``execute(q)`` with ``q`` assigned from such an expression count
+    too."""
     if depth > 2:
         return False
     if isinstance(node, ast.Call):

@@ -1098,3 +1098,9 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   Tiredful-API 5/5, vulnpy 10/24. Pooled untouched recall over four sets: 96/207 (46%).
 - Largest gap found: Django function views wired through `urls.py` are not treated as handlers (0 of 11
   IDORs); second: parameter-fed sinks in helper functions.
+
+## 2026-10-13 (Django urls.py handlers -- ADR-027)
+
+- `urls.py` view functions are handlers; same-site path-prefix redirects are not open redirects.
+- django.nV 5/17 -> 15/17; all 207 planted flaws 170 (82%, tuned-on); the untouched fourth-set 46% is
+  unchanged. Backend 567 passed, 2 skipped; benchmark 97% / 97%.

@@ -277,3 +277,21 @@ all 207 planted flaws (not independent).
 ### Limits
 Same as earlier sets: truth lists are one reader's, partly the projects' own `# A4:` markers. vulnpy is a
 sink library, so its density and structure are unlike application code.
+
+### Follow-up: Django `urls.py` handlers (ADR-027)
+
+The one systematic gap the fourth set exposed was fixed: `urls.py` entries (`url(...)`, `path(...)`,
+`re_path(...)`, string views) now name the plain function views that analysers treat as handlers
+(`include(...)` and `.as_view()` are skipped). A literal same-site path prefix (`redirect('/app/' + id)`)
+is no longer reported as an open redirect.
+
+| | Before | After |
+|---|---|---|
+| django.nV planted flaws found | 5 / 17 | **15 / 17** (10 of 11 IDORs) |
+| django.nV findings reported | 18 | 36 |
+| All 207 planted flaws | 160 (77%) | 170 (82%) |
+
+Honest reading: **the 46% fourth-set number is unchanged** (it was measured before this fix); 82% over
+all 207 is tuned-on. The fix is general to Django projects that wire function views through `urls.py`,
+so it should help unseen Django code, but that is not yet measured -- a fifth untouched set is needed.
+Missed: `MD5PasswordHasher` in settings and one IDOR whose lookup is split from the view.
