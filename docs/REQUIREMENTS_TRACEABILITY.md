@@ -88,6 +88,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R81 | Third held-out set; OpenAPI spec-first handlers; structural SQL/NoSQL rules | ADR-025 | analysis/openapi_spec.py, sinks.py, extra_detectors.py, taint.py, tests/test_third_set_fixes.py | Implemented + Tested; 41% untouched, 81% after (tuned-on) |
 | R82 | Fourth untouched set measured without changing detectors | ADR-026 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 46% (25/54); pooled untouched 46% (96/207) |
 | R83 | Django urls.py view functions treated as handlers; same-site redirect prefix | ADR-027 | analysis/openapi_spec.py (`parse_django_urls`), scanner.py, taint.py, tests/test_django_urls.py | Implemented + Tested; django.nV 5/17 -> 15/17 (tuned-on) |
+| R84 | Fifth untouched set measured without changing detectors | ADR-028 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 58% (11/19); pooled untouched 47% (107/226) |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.

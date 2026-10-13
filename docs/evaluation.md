@@ -295,3 +295,25 @@ Honest reading: **the 46% fourth-set number is unchanged** (it was measured befo
 all 207 is tuned-on. The fix is general to Django projects that wire function views through `urls.py`,
 so it should help unseen Django code, but that is not yet measured -- a fifth untouched set is needed.
 Missed: `MD5PasswordHasher` in settings and one IDOR whose lookup is split from the view.
+
+## Fifth untouched set: Pixi, DVSA, crAPI (2026-10-13)
+
+Lists of 19 in-taxonomy planted flaws were committed before scoring (`784f091`); the scanner was the
+post-ADR-027 version, **unchanged for this set**. The set is small and was chosen to test the earlier
+fixes on unseen code (Express API, serverless Node/Python, Django REST).
+
+| Application | Planted | Found | Missed |
+|---|---|---|---|
+| Pixi (Express + Mongo) | 8 | 4 | Mongo operator injection in login, two `is_admin` mass assignments, a log line with the password |
+| DVSA (serverless) | 7 | 5 | the `eval`s in the Python lambda and a `/tmp/` + file path |
+| crAPI workshop (Django REST) | 4 | 2 | status mass assignment, mechanic-report BOLA (class-based views) |
+| **Total** | **19** | **11 (58%)** | |
+
+Five untouched measurements: **52%, 49%, 41%, 46%, 58%; pooled 107/226 = 47%.** Every untouched set
+lands between 41% and 58%; the best prediction for an unseen vulnerable application remains "about
+half".
+
+Noise to know about: Pixi reports 108 findings (71 in a single proxy `server.js`, mostly
+"unguarded route" and structural NoSQL), crAPI 132 (58 are `sensitive_data_in_log` in a chatbot service).
+The new structural rules and the volume of "unguarded" reports make the *count* of findings a poor
+proxy for risk on API-heavy projects; triage by type and severity.

@@ -227,6 +227,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-025 | Third held-out set and structural rules | Accepted |
 | ADR-026 | Fourth untouched set, measured without changing detectors | Accepted |
 | ADR-027 | Django urls.py view functions are handlers | Accepted |
+| ADR-028 | Fifth untouched set (Pixi, DVSA, crAPI) | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -481,3 +482,7 @@ handlers (django.nV 0/11 IDOR); parameter-fed sinks (`open(param)`, `yaml.load(U
 **Django urls.py handlers (2026-10-13, ADR-027):** django.nV 5/17 -> 15/17; 170/207 overall (tuned-on).
 Fourth-set untouched 46% unchanged. Remaining ideas: parameter-fed sinks (vulnpy), settings-only flaws,
 a fifth untouched set to test the Django fix on unseen code.
+
+**Fifth untouched set (2026-10-13, ADR-028):** 58% (11/19), no detector changed. Five untouched
+measurements 52/49/41/46/58%, pooled 47%. Quote "about half" for unseen vulnerable apps; counts of
+findings are noisy on API-heavy projects (Pixi 108, crAPI 132).

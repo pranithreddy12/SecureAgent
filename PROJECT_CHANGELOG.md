@@ -1104,3 +1104,8 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - `urls.py` view functions are handlers; same-site path-prefix redirects are not open redirects.
 - django.nV 5/17 -> 15/17; all 207 planted flaws 170 (82%, tuned-on); the untouched fourth-set 46% is
   unchanged. Backend 567 passed, 2 skipped; benchmark 97% / 97%.
+
+## 2026-10-13 (fifth untouched set -- ADR-028)
+
+- Truth frozen (`784f091`), scanner unchanged: 11/19 (58%): Pixi 4/8, DVSA 5/7, crAPI 2/4. Pooled
+  untouched recall over five sets 107/226 (47%); overall incl. tuned-on 181/226 (80%).
