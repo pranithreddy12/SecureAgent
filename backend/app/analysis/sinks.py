@@ -15,6 +15,8 @@ import ast
 import re
 from dataclasses import dataclass
 
+from app.analysis import extra_detectors as xd
+
 # category -> (cwe, owasp, remediation)
 CATEGORY_META = {
     "insecure_deserialization": (
@@ -57,6 +59,17 @@ CATEGORY_META = {
         "A03:2021 Injection",
         "Do not assign untrusted data to innerHTML; use textContent or sanitize.",
     ),
+    "insecure_session_cookie": (
+        "CWE-565",
+        "A07:2021 Identification and Authentication Failures",
+        "Store a random session id server-side, or sign/encrypt the cookie (itsdangerous, JWT with "
+        "a secret, framework sessions); never trust a client-writable cookie as identity.",
+    ),
+    "plaintext_password": (
+        "CWE-256",
+        "A02:2021 Cryptographic Failures",
+        "Hash passwords with Argon2/bcrypt/scrypt before storing or comparing them.",
+    ),
     "xml_entity_expansion": (
         "CWE-776",
         "A05:2021 Security Misconfiguration",
@@ -77,6 +90,8 @@ CATEGORY_RISK = {
     "insecure_temp_file": ("low", 0.6, True),
     "xxe": ("medium", 0.5, False),
     "xml_entity_expansion": ("low", 0.4, False),
+    "insecure_session_cookie": ("medium", 0.5, False),
+    "plaintext_password": ("medium", 0.5, False),
     "xss_sink": ("medium", 0.4, False),
 }
 
@@ -194,13 +209,18 @@ class _SinkVisitor(ast.NodeVisitor):
         self.aliases = aliases
         self.quoted: set[str] = set()
         self.const_strings: set[str] = set()  # module-level NAME = "literal"
+        self.assigns: dict[str, list[ast.expr]] = {}  # current function: name -> assigned values
         self.findings: list[SinkFinding] = []
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802 (ast API)
-        outer = self.quoted
+        outer, outer_assigns = self.quoted, self.assigns
         self.quoted = _quoted_names(node)  # scoped: another function may reuse the name
+        self.assigns = _assignments(node)
+        found = xd.plaintext_password(node)
+        if found is not None:
+            self._add("plaintext_password", found[1], found[0])
         self.generic_visit(node)
-        self.quoted = outer
+        self.quoted, self.assigns = outer, outer_assigns
 
     visit_AsyncFunctionDef = visit_FunctionDef  # noqa: N815
 
@@ -259,6 +279,11 @@ class _SinkVisitor(ast.NodeVisitor):
         ):
             self._add("weak_hash", name, node.lineno)
 
+        # Session cookie that is just an encoded, unsigned value
+        cookie = xd.insecure_session_cookie(node, self.assigns)
+        if cookie:
+            self._add("insecure_session_cookie", cookie, node.lineno)
+
         # Insecure temp file
         if name.endswith("tempfile.mktemp") or (last == "mktemp" and "tempfile" in name):
             self._add("insecure_temp_file", name, node.lineno)
@@ -276,6 +301,17 @@ class _SinkVisitor(ast.NodeVisitor):
                 )
 
         self.generic_visit(node)
+
+
+def _assignments(func: ast.AST) -> dict[str, list[ast.expr]]:
+    """name -> every expression assigned to it inside ``func``."""
+    out: dict[str, list[ast.expr]] = {}
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    out.setdefault(t.id, []).append(node.value)
+    return out
 
 
 def _module_string_constants(tree: ast.AST) -> set[str]:

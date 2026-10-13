@@ -139,6 +139,12 @@ CLASS_FAMILY: dict[str, frozenset[str]] = {
     "weak_hash": frozenset({"weak_hash"}),
     "jwt": frozenset({"jwt_verification_disabled", "disabled_tls_verification"}),
     "debug": frozenset({"debug_enabled"}),
+    "template_injection": frozenset({"template_injection"}),
+    "xpath_injection": frozenset({"xpath_injection"}),
+    "nosql_injection": frozenset({"nosql_injection"}),
+    "insecure_session": frozenset({"insecure_session_cookie"}),
+    "plaintext_password": frozenset({"plaintext_password"}),
+    "reflected_xss": frozenset({"reflected_xss", "xss_sink"}),
 }
 LINE_TOLERANCE = 3
 

@@ -1053,3 +1053,16 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Policy change: the benchmark corpus's "safe" `SECRET_KEY = "load-me-from-the-environment"` now expects a
   low finding (corpus 36/37 TP, 97% precision, 95% recall); the demo test was rewritten.
 - Backend 533 passed, 2 skipped.
+
+## 2026-10-13 (missing detector classes -- ADR-023)
+
+### Added
+- Detectors: `template_injection`, `xpath_injection`, `nosql_injection`, `reflected_xss`,
+  `insecure_session_cookie`, `plaintext_password`, and JavaScript `idor`
+  (`backend/app/analysis/extra_detectors.py`), each with guidance text and review eligibility.
+- All 8 planted flaws that were "outside the taxonomy" are now scored.
+
+### Results
+- Recall over all 42 planted flaws: **52%** before any change, 79% before these detectors, **95%** after
+  (tuned-on). 0 new findings on 22 real projects.
+- Backend 543 passed, 2 skipped; benchmark unchanged (97% / 95%).

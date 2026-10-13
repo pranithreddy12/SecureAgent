@@ -85,13 +85,13 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 533 passed, 2 skipped (PDF locally, Windows symlink) |
+| Backend tests | 543 passed, 2 skipped (PDF locally, Windows symlink) |
 | Frontend | 39 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
 | Benchmark | 35 TP / 1 FP / 2 FN = 97% precision, 95% recall on an **author-written** corpus (a regression guard, not a real-world rate) |
 | Independent signal | 28% precision on a stratified sample of eight real projects (before fixes), ~82% on the same items after, ~83% on a 14-project holdout; **48%** on a third untouched set before its fixes; labelled by a model, not verified by a human -- see `docs/evaluation.md` |
-| Recall | 65% (22/34) of planted, in-taxonomy flaws in five public vulnerable apps before fixes; 97% after fixes tuned on the same apps; 8 more flaws have no detector -- `docs/evaluation.md` |
+| Recall | 52% (22/42) of all planted flaws in five public vulnerable apps before any change (the untouched figure); 95% (40/42) after fixes and new detectors, both tuned on the same apps -- `docs/evaluation.md` |
 | Self-scan | clean apart from one accepted dev-only advisory (`braces`) |
 
 ## 8. What does **not** exist
@@ -129,6 +129,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 020 | MCP trust layer, opt-in verdict recording, detector gaps |
 | 021 | Real-project evaluation harness and the fixes it drove |
 | 022 | Recall scoring against planted vulnerabilities |
+| 023 | Detector classes for planted flaws that had none |
 
 ## 10. Document map
 

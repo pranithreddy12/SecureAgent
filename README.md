@@ -43,7 +43,8 @@ never `confirmed`, and CVE/CVSS appear only from real advisory data.
 | Access control | IDOR, unguarded routes (FastAPI, Flask, Express, Django/DRF, NestJS), inconsistent guards, **authorization matrix** |
 | Business logic | mass assignment, client-trusted prices/roles, workflow-order gaps, your own rules via an **intent spec** |
 | Correlation | **attack chains**: an unguarded route that reaches an injection, credentialed CORS + CSRF off |
-| Misconfiguration | debug mode, CORS, JWT verification, CSRF, cookies; secrets in logs, swallowed exceptions |
+| Misconfiguration | debug mode, CORS, JWT verification, CSRF, cookies; secrets in logs, swallowed exceptions; root containers, CSP `unsafe-inline`, unbounded exports |
+| More classes | template / XPath / NoSQL injection, reflected XSS, unsigned session cookies, plaintext passwords, JavaScript IDOR (heuristic, see `docs/evaluation.md`) |
 
 ## The commands
 
@@ -107,9 +108,9 @@ Details: [docs/deployment.md](docs/deployment.md).
 - Detector accuracy is measured on an **author-written** corpus (97% / 95%). On real projects the first
   sample was 28% precise; after fixes the same sample is ~82% (a holdout ~83%), but a third, untouched set
   measured **48%** before its own fixes. Labels are a model's first pass, not independently verified
-  (`docs/evaluation.md`). On five public vulnerable apps the scanner found 65% of planted, in-taxonomy
-  flaws before fixes made on those same apps (97% after); eight planted classes have no detector. LLM
-  accuracy is unmeasured.
+  (`docs/evaluation.md`). On five public vulnerable apps the scanner found 52% of all planted flaws
+  before any change (95% after fixes and new detectors, tuned on those same apps). LLM accuracy is
+  unmeasured.
 - Zip upload accepts `.zip` only, with size/file-count limits; triage is per audit (use
   `secureagent suppress` for a rule that applies to future audits).
 - Login throttling and the interrupted-audit sweep assume a single API replica.
@@ -118,7 +119,7 @@ Details: [docs/deployment.md](docs/deployment.md).
 
 ```bash
 make testdb                              # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q        # 533 passed, 2 skipped
+cd backend && python -m pytest -q        # 543 passed, 2 skipped
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 39 unit tests
 cd frontend && npm run e2e               # 7 Playwright tests against the Docker stack
 ```
@@ -131,7 +132,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 |---|---|
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (22 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (23 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

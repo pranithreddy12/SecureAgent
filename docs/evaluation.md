@@ -132,3 +132,24 @@ public reads).
   counted either way.
 - Intentionally vulnerable applications are denser in flaws and simpler in structure than production
   code. Do not read 97% as a real-world recall.
+
+### After adding the missing detector classes (ADR-023)
+
+Eight planted flaws had no detector. Seven new detector classes were added -- template injection, XPath
+injection, NoSQL injection, reflected XSS in a returned HTML string, an unsigned session cookie, a
+plaintext password, and JavaScript IDOR -- and all eight flaws were moved into the taxonomy and scored.
+
+| Counting | Found | Of | Recall |
+|---|---|---|---|
+| In-taxonomy planted flaws before the new detectors | 33 | 34 | 97% (tuned-on) |
+| **All** planted flaws, before the new detectors (outside-taxonomy ones count as misses) | 33 | 42 | **79%** |
+| All planted flaws, after the new detectors | 40 | 42 | 95% (tuned-on) |
+| All planted flaws, before *any* change for these apps | 22 | 42 | **52%** |
+
+- **52% is the only untouched figure** (all planted flaws, scanner as it was before this evaluation).
+  Everything later was fixed against these same five applications.
+- Still missed: DSVW's reflected XSS built by a regex substitution into a buffer (not a `return`), and
+  Vulnerable-Flask-App's template injection through an exception message (no request input is visible).
+- **Cost on real code:** the new detectors report **nothing** on the 22 real projects used in the
+  precision samples (0 new findings), so they did not add false positives there -- and, equally, there is
+  no evidence yet that they find anything in real code.

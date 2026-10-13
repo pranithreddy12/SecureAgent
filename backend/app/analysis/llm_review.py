@@ -50,6 +50,8 @@ REVIEWABLE = {
     "intent_violation", "mass_assignment", "client_trusted_privilege", "client_trusted_value",
     "workflow_order", "insecure_deserialization", "xss_sink", "xxe", "xml_entity_expansion",
     "permissive_cors", "jwt_verification_disabled", "debug_enabled", "csrf_disabled",
+    "template_injection", "xpath_injection", "nosql_injection", "reflected_xss",
+    "insecure_session_cookie", "plaintext_password",
 }  # fmt: skip
 
 Transport = Callable[[dict, dict[str, str]], dict]

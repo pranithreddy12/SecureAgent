@@ -188,6 +188,39 @@ GUIDANCE: dict[str, Guidance] = {
         "That the application calls the vulnerable function.",
         "Is the vulnerable API/feature used? Is a fixed version available and compatible?",
     ),
+    "template_injection": _g(
+        "Code execution in the template engine (Jinja2/Mako and similar can reach Python objects).",
+        _INJECTION_NOT,
+        "Is the template STRING built from input, or is input only passed as a template variable?",
+        "Is the template engine sandboxed, and does it have access to dangerous globals?",
+    ),
+    "xpath_injection": _g(
+        "Reading XML nodes the query was not meant to expose; authentication bypass on XML user stores.",
+        _INJECTION_NOT,
+        "Is the input placed inside the XPath expression, or bound as an XPath variable?",
+        "What data does the XML document hold that the query must not reveal?",
+    ),
+    "nosql_injection": _g(
+        "Reading or modifying documents beyond the intended filter; JavaScript execution via $where.",
+        _INJECTION_NOT,
+        "Is the filter object taken whole from the request, or built from validated scalar fields?",
+        "Is a $where string built from input, or are operators fixed in code?",
+    ),
+    "reflected_xss": _g(
+        "Script execution in the visitor's browser, when the response is served as HTML.",
+        "That the response is HTML to a browser, or that input is unescaped by a template layer.",
+        "Is the response Content-Type text/html, and is the value escaped before it is concatenated?",
+    ),
+    "insecure_session_cookie": _g(
+        "Anyone can forge a session for any user by writing the cookie.",
+        "That the cookie is the only thing identifying the user, or that the server trusts it.",
+        "Does the server verify a signature or look the value up server-side, or trust its contents?",
+    ),
+    "plaintext_password": _g(
+        "A database leak or insider read exposes every user's password (and reuse elsewhere).",
+        "That the value reaches storage; it may be hashed by a layer not visible in this function.",
+        "Is the password hashed (bcrypt/Argon2/scrypt) before it is written or compared, perhaps in a model?",
+    ),
     "container_runs_as_root": _g(
         "A process compromise is root inside the container (and a stepping stone to escape).",
         "That the container can be escaped, or that it is reachable.",

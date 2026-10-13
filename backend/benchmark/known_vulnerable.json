@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy' is false where SecureAgent has no detector class (e.g. SSTI, NoSQL injection, XPath injection, insecure session design); those are listed so recall is not inflated by omission. Clone each repository at the pinned commit; never run the code.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -15,9 +15,9 @@
         {"file": "dsvw.py", "line": 33, "class": "xxe", "note": "lxml parser with entities and DTD enabled"},
         {"file": "dsvw.py", "line": 49, "class": "code_injection", "note": "exec of ?include= content"},
         {"file": "dsvw.py", "line": 70, "class": "open_redirect", "note": "Location header from ?redir="},
-        {"file": "dsvw.py", "line": 35, "class": "xpath_injection", "in_taxonomy": false},
-        {"file": "dsvw.py", "line": 55, "class": "template_injection", "in_taxonomy": false},
-        {"file": "dsvw.py", "line": 25, "class": "reflected_xss", "in_taxonomy": false}
+        {"file": "dsvw.py", "line": 35, "class": "xpath_injection"},
+        {"file": "dsvw.py", "line": 55, "class": "template_injection"},
+        {"file": "dsvw.py", "line": 25, "class": "reflected_xss"}
       ]
     },
     "Vulnerable-Flask-App": {
@@ -31,8 +31,8 @@
         {"file": "app/app.py", "line": 265, "class": "sql_injection", "note": "raw query built from search term"},
         {"file": "app/app.py", "line": 329, "class": "deserialization", "note": "yaml.load"},
         {"file": "app/app.py", "line": 63, "class": "secret", "note": "admin/admin123 seed credential"},
-        {"file": "app/app.py", "line": 114, "class": "template_injection", "in_taxonomy": false},
-        {"file": "app/app.py", "line": 281, "class": "template_injection", "in_taxonomy": false}
+        {"file": "app/app.py", "line": 114, "class": "template_injection"},
+        {"file": "app/app.py", "line": 281, "class": "template_injection"}
       ]
     },
     "vulpy": {
@@ -43,8 +43,8 @@
         {"file": "bad/libuser.py", "line": 25, "class": "sql_injection", "note": "create"},
         {"file": "bad/libuser.py", "line": 53, "class": "sql_injection", "note": "password_change"},
         {"file": "bad/vulpy.py", "line": 55, "class": "debug", "note": "app.run(debug=True)"},
-        {"file": "bad/libsession.py", "line": 6, "class": "insecure_session", "in_taxonomy": false},
-        {"file": "bad/libuser.py", "line": 25, "class": "plaintext_password", "in_taxonomy": false}
+        {"file": "bad/libsession.py", "line": 6, "class": "insecure_session"},
+        {"file": "bad/libuser.py", "line": 25, "class": "plaintext_password"}
       ],
       "fixed_dirs": ["good/"]
     },
@@ -72,7 +72,7 @@
         {"file": "app/routes/research.js", "line": 16, "class": "ssrf", "note": "needle.get(req.query.url + symbol)"},
         {"file": "config/env/all.js", "line": 8, "class": "secret", "note": "cookieSecret"},
         {"file": "config/env/development.js", "line": 6, "class": "secret", "note": "zapApiKey"},
-        {"file": "app/data/allocations-dao.js", "line": 73, "class": "nosql_injection", "in_taxonomy": false}
+        {"file": "app/data/allocations-dao.js", "line": 73, "class": "nosql_injection"}
       ]
     }
   }

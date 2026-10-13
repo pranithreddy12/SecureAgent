@@ -17,6 +17,7 @@ import ast
 import re
 from dataclasses import dataclass
 
+from app.analysis import extra_detectors as xd
 from app.analysis.routes import _CBV_BASE_HINTS, _CBV_METHOD_MAP, HTTP_METHODS
 
 SOURCE_ROOTS = {"request", "req"}
@@ -61,6 +62,38 @@ TAINT_META = {
         "Allowlist redirect targets; do not redirect to a raw user-supplied URL.",
         False,
     ),
+    "template_injection": (
+        "CWE-1336",
+        "A03:2021 Injection",
+        "Never build a template from input; pass input as template variables and render a fixed "
+        "template.",
+        False,
+    ),
+    "xpath_injection": (
+        "CWE-643",
+        "A03:2021 Injection",
+        "Use parameterised XPath (variables) instead of formatting input into the expression.",
+        False,
+    ),
+    "nosql_injection": (
+        "CWE-943",
+        "A03:2021 Injection",
+        "Do not pass request objects as query filters or build $where strings; validate types and "
+        "use fixed operators.",
+        False,
+    ),
+    "reflected_xss": (
+        "CWE-79",
+        "A03:2021 Injection",
+        "Escape input before placing it in HTML (or render with an auto-escaping template).",
+        False,
+    ),
+    "idor": (
+        "CWE-639",
+        "A01:2021 Broken Access Control",
+        "Scope the lookup to the authenticated user (owner / tenant) as well as the id.",
+        False,
+    ),
 }
 SEVERITY = {
     "sql_injection": "high",
@@ -69,6 +102,11 @@ SEVERITY = {
     "ssrf": "high",
     "path_traversal": "high",
     "open_redirect": "medium",
+    "template_injection": "high",
+    "xpath_injection": "high",
+    "nosql_injection": "high",
+    "reflected_xss": "medium",
+    "idor": "high",
 }
 
 
@@ -514,7 +552,25 @@ def _sinks_in_function(
 ) -> list[TaintFinding]:
     out: list[TaintFinding] = []
     seen: set[tuple[str, int]] = set()
+    handler = _is_handler(func)
     for call in ast.walk(func):
+        if (
+            handler
+            and isinstance(call, ast.Return)
+            and xd.return_xss(call, lambda n: n is not None and _tainted(n, tainted, ctx))
+        ):
+            out.append(
+                TaintFinding(
+                    "reflected_xss",
+                    SEVERITY["reflected_xss"],
+                    0.6,
+                    relpath,
+                    call.lineno,
+                    "return",
+                    lines[call.lineno - 1].strip()[:160] if 0 < call.lineno <= len(lines) else "",
+                )
+            )
+            continue
         if not isinstance(call, ast.Call):
             continue
         hit = _check_sink(call, tainted, ctx)
@@ -609,7 +665,7 @@ def _check_sink(
         name == "open" or last in {"send_file", "send_from_directory", "FileResponse"}
     ) and _tainted(a0, tainted, ctx):
         return "path_traversal", name
-    return None
+    return xd.taint_sink(call, lambda n: n is not None and _tainted(n, tainted, ctx))
 
 
 _ORM_ROOTS = {"select", "insert", "update", "delete", "exists", "union", "union_all"}
@@ -733,6 +789,13 @@ _JS_SINKS = [
 ]
 
 
+def _js_extra(relpath: str, lines: list[str], tainted: set[str]) -> list[TaintFinding]:
+    return [
+        TaintFinding(vuln, SEVERITY[vuln], 0.5, relpath, lineno, sink, snippet)
+        for vuln, lineno, sink, snippet in xd.js_findings(lines, tainted)
+    ]
+
+
 def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
     lines = text.splitlines()
     tainted: set[str] = set()
@@ -773,6 +836,10 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
                         line.strip()[:160],
                     )
                 )
+    have = {(f.vuln_type, f.line) for f in findings}
+    findings.extend(
+        f for f in _js_extra(relpath, lines, tainted) if (f.vuln_type, f.line) not in have
+    )
     return findings
 
 
@@ -969,7 +1036,7 @@ def _tainted(node: ast.expr | None, tainted: set[str], ctx: _Ctx | None = None) 
 # neutralise; quoting/basename helpers are accepted globally too (taint here is not tracked per
 # vulnerability kind), so a value shell-quoted and then reused in SQL would be missed -- rare, and
 # documented in docs/static-analysis.md.
-_SANITIZER_NAMES = {"int", "float", "bool", "Decimal", "UUID", "len", "ord"}
+_SANITIZER_NAMES = {"int", "float", "bool", "Decimal", "UUID", "len", "ord", "escape"}
 _SANITIZER_DOTTED = (
     "shlex.quote",
     "pipes.quote",
@@ -979,6 +1046,7 @@ _SANITIZER_DOTTED = (
     "ntpath.basename",
     "html.escape",
     "markupsafe.escape",
+    "bleach.clean",
 )
 
 
