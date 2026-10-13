@@ -393,3 +393,30 @@ call sinks directly with `req.body`/`req.query` in the same file, scored 6/11 (5
   just a adjacent assignment target name).
 - A NoSQL `$where` clause built with string concatenation one level inside a `.find({...})` object literal.
 - An upload path concatenated from an unsanitised `file.name` with no `../` check.
+
+## Ninth untouched set: Vulnerable-API, Expense-Reimbursement-API, vulnerable-api (jorritfolmer) (2026-10-14)
+
+14 in-taxonomy planted flaws were committed before scoring (`bd84e4b`); the scanner was the post-ADR-031
+version, **unchanged**. One app (jorritfolmer's `vAPI.py`) was picked to deliberately mix two forms of the
+same connexion idiom: a value arriving as a handler function argument (already supported, ADR-025), and a
+value read with `connexion.request.get_json()`/`.headers` inside the function body.
+
+| Application | Planted | Found | Missed |
+|---|---|---|---|
+| Vulnerable-API (michealkeines, connexion) | 4 | 4 | none |
+| Expense-Reimbursement-API (devopslifter, Flask) | 2 | 2 | none |
+| vulnerable-api (jorritfolmer, connexion) | 8 | 5 | a command string assigned in one branch of an `if/else` (not a ternary); the same `if/else`-assigned
+  pattern for a SQL string; a nested-quantifier ReDoS regex |
+| **Total** | **14** | **11 (79%)** | |
+
+Nine untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 42%, 79%; pooled 177/332 = 53%.**
+
+**What this set adds:** `connexion.request.get_json()` turned out not to be the blind spot I expected --
+two call sites using it were found (one through a ternary-assigned variable, one directly inside a
+structural XXE check), so that attribute-qualified alias is handled somewhere already. The two misses that
+share a shape are both a variable assigned inside one branch of a plain `if`/`else` statement and used
+after it (`if content_type == "application/xml": ... else: data = connexion.request.get_json()`; `if flag:
+command = "uptime -" + flag else: command = "uptime"`) -- as opposed to the ternary form
+(`data = x if cond else y`), which this same file shows working two lines away. The ReDoS miss is a
+detector-vocabulary gap (the regex `([a-z]+)*[0-9]` is a textbook catastrophic-backtracking shape, but not
+one the `redos` rule's patterns recognise), unrelated to taint tracking.

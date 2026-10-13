@@ -94,6 +94,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R87 | Eighth untouched set measured without changing detectors | ADR-031 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 42% (8/19); pooled untouched 52% (166/318); cross-file taint gap confirmed |
 | R88 | Single page to pick a project, choose how to analyse it and launch an audit | ADR-032 | frontend/app/(app)/run/page.tsx, frontend/lib/zipFolder.ts | Implemented + Tested (existing-project path); folder-zip path manual only |
 | R89 | A second, selectable LLM provider (Mistral) for the opt-in AI review/narrative layer | ADR-033 | analysis/llm_review.py (PROVIDERS), pipeline/stages.py, cli.py, tests/test_llm_review.py | Implemented + Tested (fake transport); no live Mistral call made |
+| R88 | Ninth untouched set measured without changing detectors | ADR-034 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 79% (11/14); pooled untouched 53% (177/332) |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.

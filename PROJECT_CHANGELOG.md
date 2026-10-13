@@ -1145,3 +1145,10 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   `settings.llm_provider` into the pipeline's `ai_validator`/`ai_narrative` stages and added
   `secureagent review --provider`. `LLM_PROVIDER=mistral` + `MISTRAL_API_KEY` switches the whole
   opt-in AI layer. 3 new tests (570 passed, 2 skipped total); no live Mistral call made yet.
+
+## 2026-10-14 (ninth untouched set -- ADR-034)
+
+- Truth frozen (`bd84e4b`), scanner unchanged: 11/14 (79%): Vulnerable-API 4/4, Expense-Reimbursement-API
+  2/2, vulnerable-api (jorritfolmer) 5/8. Pooled untouched over nine sets 177/332 (53%).
+- `connexion.request.get_json()` is not uniformly missed (2 of 3 sites found); the real pattern in the
+  misses is a variable assigned inside one branch of a plain `if`/`else` (not a ternary).

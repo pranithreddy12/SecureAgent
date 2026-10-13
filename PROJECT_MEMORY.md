@@ -231,6 +231,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-029 | Sixth untouched set (skf-labs, DVGA, DVRestaurant) | Accepted |
 | ADR-030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) | Accepted |
 | ADR-031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap | Accepted |
+| ADR-034 | Ninth untouched set; narrowed to an if/else assignment gap | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 
@@ -515,3 +516,8 @@ does not follow a value across a function call into another file.
 mistral); `LLM_PROVIDER=mistral` + `MISTRAL_API_KEY` (+ optional `LLM_MODEL`) switches the opt-in AI
 review/narrative stages and `secureagent review --provider mistral`. Unit-tested with a fake
 transport only; not run against the live Mistral API.
+
+**Ninth untouched set (2026-10-14, ADR-034):** 79% (11/14), no detector changed. Nine untouched:
+52/49/41/46/58/68/75/42/79%, pooled 53%. Narrowed the earlier "connexion.request" hypothesis: that alias is
+often recognised; the real miss pattern is a value assigned inside one branch of a plain `if`/`else` (not
+a ternary) and used afterwards. Also: `redos` rule misses `([a-z]+)*[0-9]`-style nested quantifiers.
