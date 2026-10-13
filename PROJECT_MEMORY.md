@@ -225,6 +225,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-023 | Detector classes for planted flaws that had none | Accepted |
 | ADR-024 | Held-out vulnerable applications (pygoat, Juice Shop) | Accepted |
 | ADR-025 | Third held-out set and structural rules | Accepted |
+| ADR-026 | Fourth untouched set, measured without changing detectors | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -471,3 +472,7 @@ invisible; Juice Shop yields 337 findings, mostly teaching/third-party code.
 **Third held-out set (2026-10-13, ADR-025):** untouched recall 41% (26/64) -> 81% after tuned-on fixes. Three
 untouched measurements (52%, 49%, 41%) agree: expect roughly 40-50% planted-flaw recall on unseen apps.
 Structural rules raise volume; precision of the new rules was only spot-checked (3 of 11 unlisted look false).
+
+**Fourth untouched set (2026-10-13, ADR-026):** 46% (25/54), no detector changed. Four untouched
+measurements: 52 / 49 / 41 / 46% (pooled 46%). Next systematic fix candidates: Django `urls.py` -> view
+handlers (django.nV 0/11 IDOR); parameter-fed sinks (`open(param)`, `yaml.load(UnsafeLoader)`, `compile`).

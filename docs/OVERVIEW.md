@@ -132,6 +132,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 023 | Detector classes for planted flaws that had none |
 | 024 | Held-out vulnerable applications (pygoat, Juice Shop) |
 | 025 | Third held-out set and structural rules |
+| 026 | Fourth untouched set, measured without changing detectors |
 
 ## 10. Document map
 

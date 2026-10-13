@@ -243,3 +243,37 @@ question for its type, and Real / Not real / Unsure buttons plus a note. Choices
 **Download labels.json** writes a file that `python -m app.evaluation score` accepts, with `labelled_by`
 set to the reviewer's name. A 49-finding sample (at most 3 per type, shuffled) was prepared from the five
 third-set applications for this purpose.
+
+## Fourth untouched set: lets-be-bad-guys, django.nV, Tiredful-API, vulnpy (2026-10-13)
+
+Lists of 54 in-taxonomy planted flaws were written and committed before scoring (`48db15c`). **No detector
+was changed for this set**: this is a pure measurement of the scanner after ADR-025.
+
+| Application | Planted | Found | Notes |
+|---|---|---|---|
+| lets-be-bad-guys (Django) | 8 | 5 | missed: dict-backed IDOR, two template-level XSS |
+| django.nV (Django) | 17 | 5 | **0 of 11 IDORs**; `MD5PasswordHasher` setting |
+| Tiredful-API (DRF) | 5 | 5 | all found |
+| vulnpy (sink library) | 24 | 10 | sinks fed by function parameters |
+| **Total** | **54** | **25 (46%)** | untouched |
+
+Four untouched measurements of planted-flaw recall: **52%, 49%, 41%, 46%** (pooled 96/207 = 46%). The
+repeated result is the headline: *an application the scanner has not been tuned on yields roughly 45%
+of its planted flaws.* After fixes tuned on the earlier sets, the same scanner reaches 160/207 (77%) over
+all 207 planted flaws (not independent).
+
+### Why the two weakest apps were missed
+- **Django function views are not handlers.** django.nV's views are plain `def view(request, ...)` wired
+  in `urls.py`; no decorator marks them, so the access-control and taint analysers never treat them as
+  request handlers and report none of 11 annotated IDORs. This is the same class of gap the OpenAPI work
+  closed for connexion, and it is the single largest systematic miss left.
+- **Sinks fed by parameters, not requests.** vulnpy's flaws sit in helper functions (`def
+  do_open(user_input): open(user_input)`); with no request source in the file only the structural rules
+  fire. Not covered: `open(param)`, `tarfile.open(param)`, `yaml.load(x, Loader=UnsafeLoader)`,
+  `compile(code)`, `hashlib.new("SHA1")`, `pulldom.parseString`, `findall(param)`, and
+  `SQL = FMT.format(param)` with the format string defined at module level.
+- Settings-only flaws (`MD5PasswordHasher`) and template-level XSS (`|safe`) are invisible.
+
+### Limits
+Same as earlier sets: truth lists are one reader's, partly the projects' own `# A4:` markers. vulnpy is a
+sink library, so its density and structure are unlike application code.

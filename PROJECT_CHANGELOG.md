@@ -1091,3 +1091,10 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Added OpenAPI spec-first handlers/routes, structural SQL (Python and JS), JS NoSQL/mass-assignment/log
   rules, generalised debug/autoescape keywords, validated-redirect and escaped-output exemptions.
 - Backend 562 passed, 2 skipped; benchmark 97% / 97%.
+
+## 2026-10-13 (fourth untouched set -- ADR-026)
+
+- Truth frozen (`48db15c`); scanner unchanged. 25/54 (46%): lets-be-bad-guys 5/8, django.nV 5/17,
+  Tiredful-API 5/5, vulnpy 10/24. Pooled untouched recall over four sets: 96/207 (46%).
+- Largest gap found: Django function views wired through `urls.py` are not treated as handlers (0 of 11
+  IDORs); second: parameter-fed sinks in helper functions.
