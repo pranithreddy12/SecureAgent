@@ -2034,7 +2034,7 @@
         },
         {
           "file": "controllers/vuln_controller.js",
-          "line": 79,
+          "line": 83,
           "class": "sql_injection",
           "note": "string-concat SELECT, mysql2 con.query"
         },
@@ -2125,7 +2125,7 @@
         },
         {
           "file": "utils/utility.js",
-          "line": 127,
+          "line": 122,
           "class": "xxe",
           "note": "libxmljs.parseXmlString(xmlInput, {noent: true})"
         },
@@ -2212,7 +2212,7 @@
         },
         {
           "file": "vAPI.py",
-          "line": 305,
+          "line": 316,
           "class": "command_injection",
           "note": "'uptime -' + flag, flag is a connexion path param"
         },
@@ -2230,7 +2230,7 @@
         },
         {
           "file": "vAPI.py",
-          "line": 73,
+          "line": 77,
           "class": "sql_injection",
           "note": "username/password read via connexion.request.get_json(), not flask's request -- source not recognised"
         },
@@ -2322,7 +2322,7 @@
         },
         {
           "file": "level4/app.py",
-          "line": 29,
+          "line": 19,
           "class": "command_injection",
           "note": "f'host {user_in}' passed to a same-file helper get_output(cmd), shell=True"
         },

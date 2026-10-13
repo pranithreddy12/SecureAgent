@@ -138,8 +138,9 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 029 | Sixth untouched set (skf-labs, DVGA, DVRestaurant) |
 | 030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) |
 | 031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap |
-| 034 | Ninth untouched set; narrowed to an if/else assignment gap |
-| 035 | Tenth untouched set; confirmed if/else gap, structural-rule asymmetry |
+| 034 | Ninth untouched set (corrected by ADR-036) |
+| 035 | Tenth untouched set (corrected by ADR-036) |
+| 036 | Retracted the if/else taint gap; fixed five truth-list line errors |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 

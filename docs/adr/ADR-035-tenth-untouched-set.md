@@ -13,7 +13,13 @@ ADR-031 (cross-file sink) and ADR-034 (if/else-branch-assignment) hypotheses rat
 
 6/12 (50%). Pooled untouched recall over ten sets 183/344 (53%).
 
-## Consequence
+**Correction (2026-10-14, ADR-036):** "ADR-034's hypothesis holds" below is retracted -- it does not
+hold; I had not actually reproduced it in isolation before writing this ADR, and when I did (to fix it),
+it didn't reproduce. `testing-sites/level4:29` was a truth-list line-pointing error (genuinely `found`,
+10 lines inside the callee); `level1/app.py:15` misses for an unrelated reason, a sink-detection
+requirement, not a control-flow one. Corrected: 7/12 (58%). See ADR-036.
+
+## Consequence (superseded by ADR-036 -- kept for the record)
 
 - ADR-034's hypothesis holds: a value assigned in one branch of a plain `if`/`else` and used *after* the
   statement does not carry taint; the same value consumed *inside* the branch that assigns it does.

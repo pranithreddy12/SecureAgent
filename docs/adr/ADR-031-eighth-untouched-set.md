@@ -12,6 +12,10 @@ Freeze planted-flaw lists for two further applications chosen to stress cross-fi
 
 8/19 (42%). Pooled untouched recall over eight sets 166/318 (52%).
 
+**Correction (2026-10-14, ADR-036):** two of these counted misses (`vuln-nodejs-app:79`,
+`VulnNodeApp:127`) were my own truth-list line-pointing errors, not scanner gaps; both are genuinely
+`found`, a few lines from where I pointed. Corrected: 10/19 (53%). See ADR-036.
+
 ## Consequence
 
 Confirms, with a deliberately adversarial pick, that taint tracking does not follow a request value across

@@ -370,24 +370,28 @@ than the single-file labs most earlier sets used.
 
 | Application | Planted | Found | Missed |
 |---|---|---|---|
-| vuln-nodejs-app (payatu, Express) | 11 | 6 | a same-file SQL concat into `con.query` (regex miss, not cross-file), an IDOR with no owner check, `md5()` password hashing, a NoSQL `$where` string built from `req.body`, an upload path built from an unsanitised filename |
-| VulnNodeApp (4auvar, Express, MVC-style) | 8 | 2 | three SQL injections and the XXE sit in `models/`/`utils/` files reached only through a route -> controller -> model (or route -> util) call chain; two IDORs sit behind a `route -> local-helper -> controller -> model` chain |
-| **Total** | **19** | **8 (42%)** | |
+| vuln-nodejs-app (payatu, Express) | 11 | 7 | an IDOR with no owner check, `md5()` password hashing, a NoSQL `$where` string built from `req.body`, an upload path built from an unsanitised filename |
+| VulnNodeApp (4auvar, Express, MVC-style) | 8 | 3 | three SQL injections sit in `models/usersModel.js`, reached only through a route -> controller -> model call chain; two IDORs sit behind a `route -> local-helper -> controller -> model` chain |
+| **Total** | **19** | **10 (53%)** | |
 
-Eight untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 42%; pooled 166/318 = 52%.** The pooled
-figure barely moved; this set's low score confirms a gap rather than changing the overall picture.
+*(Corrected 2026-10-14 -- see "Correction" below: `vuln-nodejs-app:79` and `VulnNodeApp:127` were truth-list
+line-pointing errors on my part, not scanner misses; both are now `found`.)*
+
+Eight untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 53%; pooled 168/318 = 53%.**
 
 **What this set adds, precisely:** VulnNodeApp's design -- routes hold no logic beyond pulling `req.body`/
 `req.query` and calling a controller method with it, and the controller forwards straight to a model method
-that builds the query -- took its score to 2/8 (25%), far below every earlier set. The scanner's taint
-tracking does not follow a value across a function call into another file; it only matches patterns at the
-request-read site or within the same file (ADR-026's "parameter-fed sinks" gap was single-file; this is the
-same category of gap one level removed -- cross-file -- and it costs more). vuln-nodejs-app, where routes
-call sinks directly with `req.body`/`req.query` in the same file, scored 6/11 (55%), in the normal range.
+that builds the query -- took its score to 3/8 (38%), well below every earlier set (vuln-nodejs-app, where
+routes call sinks directly with `req.body`/`req.query` in the same file, scored 7/11 (64%)). The scanner's
+taint tracking does not follow a value across a function call into another file; it only matches patterns
+at the request-read site or within the same file (ADR-026's "parameter-fed sinks" gap was single-file; this
+is the same category of gap one level removed -- cross-file -- and it costs more). ADR-035 later found that
+this framing is partly about which vulnerability classes have a taint-agnostic structural rule (SQL does,
+command injection does not) rather than one uniform taint-engine limitation -- see the correction below.
 
 ### Gaps recorded (not fixed here)
 - Cross-file taint through a wrapper call (`routeHandler -> controller.method(req.x) -> model.method(arg)`),
-  the dominant miss in this set.
+  the dominant miss in this set (VulnNodeApp's three SQL injections, two IDORs).
 - `md5()` on its own call line without an obvious "password" variable name nearby was missed once
   (`md5(req.body.password)` -- the existing `weak_hash` rule may need the argument itself inspected, not
   just a adjacent assignment target name).
@@ -405,21 +409,19 @@ value read with `connexion.request.get_json()`/`.headers` inside the function bo
 |---|---|---|---|
 | Vulnerable-API (michealkeines, connexion) | 4 | 4 | none |
 | Expense-Reimbursement-API (devopslifter, Flask) | 2 | 2 | none |
-| vulnerable-api (jorritfolmer, connexion) | 8 | 5 | a command string assigned in one branch of an `if/else` (not a ternary); the same `if/else`-assigned
-  pattern for a SQL string; a nested-quantifier ReDoS regex |
-| **Total** | **14** | **11 (79%)** | |
+| vulnerable-api (jorritfolmer, connexion) | 8 | 7 | a nested-quantifier ReDoS regex |
+| **Total** | **14** | **13 (93%)** | |
 
-Nine untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 42%, 79%; pooled 177/332 = 53%.**
+*(Corrected 2026-10-14 -- see "Correction" below: `vAPI.py:73` and `vAPI.py:305` were truth-list
+line-pointing errors, not scanner misses; both are now `found`. The "if/else" claim this section originally
+made is retracted.)*
 
-**What this set adds:** `connexion.request.get_json()` turned out not to be the blind spot I expected --
-two call sites using it were found (one through a ternary-assigned variable, one directly inside a
-structural XXE check), so that attribute-qualified alias is handled somewhere already. The two misses that
-share a shape are both a variable assigned inside one branch of a plain `if`/`else` statement and used
-after it (`if content_type == "application/xml": ... else: data = connexion.request.get_json()`; `if flag:
-command = "uptime -" + flag else: command = "uptime"`) -- as opposed to the ternary form
-(`data = x if cond else y`), which this same file shows working two lines away. The ReDoS miss is a
-detector-vocabulary gap (the regex `([a-z]+)*[0-9]` is a textbook catastrophic-backtracking shape, but not
-one the `redos` rule's patterns recognise), unrelated to taint tracking.
+Nine untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 53%, 93%; pooled 181/332 = 55%.**
+
+**What this set adds:** `connexion.request.get_json()` is not a blind spot -- every call site using it was
+found. The ReDoS miss is a detector-vocabulary gap (the regex `([a-z]+)*[0-9]` is a textbook
+catastrophic-backtracking shape, but not one the `redos` rule's patterns recognise), unrelated to taint
+tracking.
 
 ## Tenth untouched set: extremely-vulnerable-flask-app, testing-sites (2026-10-14)
 
@@ -431,16 +433,46 @@ purpose-built reproductions, rather than being a random sample.
 | Application | Planted | Found | Missed |
 |---|---|---|---|
 | extremely-vulnerable-flask-app (Flask, SQLAlchemy, flask-login) | 6 | 3 | an IDOR, a mass-assignment via `obj.__dict__.update(dict)`, and the cross-file SSRF (ADR-031, confirmed again) |
-| testing-sites (five tiny Flask CTF levels) | 6 | 3 | the deliberate if/else reproduction, a stored/cross-handler XSS, and a cross-function command injection |
-| **Total** | **12** | **6 (50%)** | |
+| testing-sites (five tiny Flask CTF levels) | 6 | 4 | a hard-to-reach reflected XSS and a stored/cross-handler XSS |
+| **Total** | **12** | **7 (58%)** | |
 
-Ten untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 42%, 79%, 50%; pooled 183/344 = 53%.**
+*(Corrected 2026-10-14 -- see "Correction" below: `testing-sites/level4:29` was a truth-list line-pointing
+error, not a scanner miss; it is now `found`. The "if/else" claim this section originally made is
+retracted.)*
 
-**ADR-034's hypothesis confirmed cleanly.** `level1/app.py` is a minimal, deliberate reproduction --
-`user_in` is assigned in one branch of an `if`/`else`, the other branch assigns a literal, and the value is
-used after the statement -- and it missed, exactly as predicted. The same file's deserialization case in
-EVFA (`routes/account.py`), where the sink is *inside* the `else` branch consuming a value tainted just
-before it, was found -- so the gap is specifically "used after the branch", not "used inside a branch".
+Ten untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 53%, 93%, 58%; pooled 188/344 = 55%.**
+
+## Correction (2026-10-14): the "if/else taint gap" in ADR-034/035 does not exist
+
+Asked to fix it, I reproduced `level1/app.py` in isolation first. It did **not** reproduce: a value assigned
+in one branch of a plain `if`/`else` and used after the statement is tainted exactly like a ternary-assigned
+one -- `_function_tainted`'s fixpoint loop (`app/analysis/taint.py`) collects every assignment in the
+function with `ast.walk`, which does not distinguish control-flow branches at all, so it was never
+control-flow-sensitive in the way ADR-034/035 assumed.
+
+What was actually happening, case by case:
+- **`vAPI.py:73`/`:305` (ninth set) and `vuln-nodejs-app:79`, `VulnNodeApp:127` (eighth set):** all four are
+  genuinely found by the scanner, just a few lines away from where I pointed the truth entry -- the sink
+  call (`c.execute(user_query)`, `os.popen(command).read()`, `con.query(q, ...)`) sits several lines after
+  the string is built, and I had pointed the truth entry at the assignment rather than the call, in one case
+  (`VulnNodeApp:127` vs the real `:122`) at the *options dict*, not the call at all. `LINE_TOLERANCE` is 3
+  lines; the gaps were 4-11. Four false misses from my own truth-list authorship, not a detector gap.
+- **`testing-sites/level4:29` (tenth set):** same shape -- the real `command_injection` finding sits inside
+  the callee (`get_output`, line 19), 10 lines from the call site I annotated.
+- **`level1/app.py:15` (tenth set), the "minimal, deliberate reproduction":** genuinely missed, but for an
+  unrelated reason. `return_xss`/`_html_with_input` (`app/analysis/extra_detectors.py`) requires an HTML tag
+  **string literal** somewhere in the same return expression before it even looks at taint; `level1` builds
+  its page with `open("./templates/index.html").read() % user_in` -- no literal tag anywhere in `app.py`,
+  since the markup lives in the template file. Confirmed by reproducing the same statement with the HTML
+  inlined as a literal: the if/else-assigned value was then flagged immediately. This is a real, narrower
+  gap -- the sink check doesn't recognise "content read from a file and formatted with tainted data,
+  returned from a handler" as HTML -- but it is not a control-flow gap, and not what either ADR claimed.
+
+**Corrected recall:** eighth set 10/19 (53%, was 42%); ninth set 13/14 (93%, was 79%); tenth set 7/12 (58%,
+was 50%). Pooled untouched over ten sets: **188/344 = 55%** (was reported as 53%). `benchmark/known_vulnerable.json`'s five wrong line numbers were corrected directly (not re-labelled, not re-run against
+a changed detector -- the scanner was not touched for this correction). No fix was made for the if/else
+claim because there was nothing to fix; the real, narrower gap (file-sourced HTML sink) is recorded above,
+not fixed, pending its own decision.
 
 **One structural-rule side effect, worth noting precisely:** EVFA's `validate_token(code, session)` and
 `testing-sites/level5`'s `authenticate(password)` both build SQL with an f-string inside a same-file helper

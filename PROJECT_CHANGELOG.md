@@ -1181,3 +1181,14 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   AI executive summary accepted and grounded in real facts. Status/severity untouched, as designed.
   First time the opt-in AI pipeline stages have run against a live LLM (previously fake-transport
   tests only, then one bare-CLI `secureagent review` call).
+## 2026-10-14 (retracted the if/else taint gap -- ADR-036)
+
+- Asked to fix the ADR-034/035 if/else taint gap; reproduced it in isolation first and it did not
+  reproduce -- the taint fixpoint never distinguished if/else branches, so there was nothing to fix.
+- All four supposed if/else misses, plus one more from the eighth set, were my own truth-list line
+  numbers pointing at the assignment/call site rather than the sink line the scanner actually reports
+  (4-11 lines past LINE_TOLERANCE=3). Fixed the five lines in known_vulnerable.json; no detector touched.
+- One claimed miss (testing-sites/level1) is real but unrelated: return_xss requires a literal HTML tag
+  in the same expression, missing a page templated from an external file.
+- Corrected recall: eighth set 10/19 (53%, was 42%); ninth set 13/14 (93%, was 79%); tenth set 7/12 (58%,
+  was 50%). Pooled untouched over ten sets: 188/344 (55%, was 53%).

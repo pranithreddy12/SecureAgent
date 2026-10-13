@@ -231,8 +231,9 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-029 | Sixth untouched set (skf-labs, DVGA, DVRestaurant) | Accepted |
 | ADR-030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) | Accepted |
 | ADR-031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap | Accepted |
-| ADR-034 | Ninth untouched set; narrowed to an if/else assignment gap | Accepted |
-| ADR-035 | Tenth untouched set; confirmed if/else gap, structural-rule asymmetry | Accepted |
+| ADR-034 | Ninth untouched set (corrected by ADR-036) | Accepted |
+| ADR-035 | Tenth untouched set (corrected by ADR-036) | Accepted |
+| ADR-036 | Retracted the if/else taint gap; fixed five truth-list line errors | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 
@@ -518,19 +519,31 @@ mistral); `LLM_PROVIDER=mistral` + `MISTRAL_API_KEY` (+ optional `LLM_MODEL`) sw
 review/narrative stages and `secureagent review --provider mistral`. Unit-tested with a fake
 transport only; not run against the live Mistral API.
 
-**Ninth untouched set (2026-10-14, ADR-034):** 79% (11/14), no detector changed. Nine untouched:
-52/49/41/46/58/68/75/42/79%, pooled 53%. Narrowed the earlier "connexion.request" hypothesis: that alias is
-often recognised; the real miss pattern is a value assigned inside one branch of a plain `if`/`else` (not
-a ternary) and used afterwards. Also: `redos` rule misses `([a-z]+)*[0-9]`-style nested quantifiers.
+**Ninth untouched set (2026-10-14, ADR-034, corrected by ADR-036):** 93% (13/14), no detector changed
+(originally reported 79%/11/14 -- two misses were my own truth-list line-pointing errors, see ADR-036).
+`connexion.request.*` is not a blind spot. Also: `redos` rule
+misses `([a-z]+)*[0-9]`-style nested quantifiers.
 
-**Tenth untouched set (2026-10-14, ADR-035):** 50% (6/12), no detector changed. Ten untouched:
-52/49/41/46/58/68/75/42/79/50%, pooled 53%. Confirmed the ADR-034 if/else-branch-assignment gap with a
-minimal repro. Found the structural SQL rule (ADR-025) is taint-source-agnostic -- explains why a
-same-shaped command injection missed where SQL injection via a same-file helper didn't; "cross-file"/
-"parameter-fed" misses are partly about which classes have a structural rule. New narrow gaps:
-`flask_login.current_user` not recognised for IDOR (only `request.user`); `obj.__dict__.update(d)` not
-recognised for mass assignment. Recorded as likely-permanent: cross-handler stored XSS via a mutable
-global list needs cross-handler state modelling, not a taint fix.
+**Tenth untouched set (2026-10-14, ADR-035, corrected by ADR-036):** 58% (7/12), no detector changed
+(originally reported 50%/6/12). Ten untouched, corrected: 52/49/41/46/58/68/75/53/93/58%, pooled 55%. The
+structural SQL rule (ADR-025) is taint-source-agnostic -- explains why a same-shaped command injection
+missed where SQL injection via a same-file helper didn't; "cross-file"/"parameter-fed" misses are partly
+about which classes have a structural rule. New narrow gaps: `flask_login.current_user` not recognised for
+IDOR (only `request.user`); `obj.__dict__.update(d)` not recognised for mass assignment; a reflected-XSS
+sink check requires an HTML literal in the same expression, missing a page templated from an external file
+(see ADR-036). Recorded as likely-permanent: cross-handler stored XSS via a mutable global list needs
+cross-handler state modelling, not a taint fix.
+
+**If/else taint gap did not exist (2026-10-14, ADR-036):** asked to fix the ADR-034/035 "if/else" gap,
+reproduced it first -- it didn't reproduce (`_function_tainted`'s `ast.walk` fixpoint never distinguished
+branches; nothing to fix). All four supposed misses were my own truth-list lines pointing at the
+assignment/call-site rather than the real sink line the scanner reports, 4-11 lines past `LINE_TOLERANCE`
+(3); fixed the five wrong lines in `known_vulnerable.json`, no detector touched. One claimed miss
+(`testing-sites/level1`) is real but unrelated: `return_xss` requires a literal HTML tag in the same
+expression, so a page templated from an external file is invisible to it regardless of taint. Corrected
+pooled untouched over ten sets: 188/344 (55%), up from 183/344 (53%). Lesson: point truth entries at the
+sink's actual call line (including inside a callee), and verify with a direct `scan_repo` run before
+freezing, not just the eval harness's summary.
 
 **First live Mistral run (2026-10-14, ADR-033):** `mistral-large-latest` 403 tier_not_allowed (paid
 plan needed); `mistral-small-latest` tier-allowed but 429 rate-limited repeatedly; `codestral-latest`

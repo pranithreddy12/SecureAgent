@@ -13,7 +13,11 @@ source (already supported) with a `connexion.request.get_json()`/`.headers` sour
 
 11/14 (79%). Pooled untouched recall over nine sets 177/332 (53%).
 
-## Consequence
+**Correction (2026-10-14, ADR-036):** the "if/else" diagnosis below is retracted. `vAPI.py:73` and
+`vAPI.py:305` were my own truth-list line-pointing errors, not scanner gaps; both are genuinely `found`.
+Corrected: 13/14 (93%). See ADR-036 for the reproduction that disproved the if/else claim.
+
+## Consequence (superseded by ADR-036 -- kept for the record)
 
 `connexion.request.*` is not uniformly a blind spot -- two of three call sites using it were found. The
 real pattern in the two misses: a variable assigned inside one branch of a plain `if`/`else` (not a
