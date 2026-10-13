@@ -104,9 +104,9 @@ Details: [docs/deployment.md](docs/deployment.md).
 
 - Python is analysed deeply; JavaScript/TypeScript is regex-based and shallower.
 - Global middleware and framework defaults are invisible, so "unguarded" findings are review items.
-- Detector accuracy is measured on an **author-written** corpus (97% / 95%); the first real-project scan had
-  far lower precision, which is why a round of fixes followed (`tests/test_realworld_fp.py`). No independent
-  detection rate or LLM accuracy has been measured yet (`docs/paper/PAPER_PLAN.md`).
+- Detector accuracy is measured on an **author-written** corpus (97% / 95%). On real projects the first
+  sample was 28% precise; after fixes the same sample is ~82% (a holdout ~83%), labelled by a model and not
+  independently verified (`docs/evaluation.md`). Recall and LLM accuracy are unmeasured.
 - Zip upload accepts `.zip` only, with size/file-count limits; triage is per audit (use
   `secureagent suppress` for a rule that applies to future audits).
 - Login throttling and the interrupted-audit sweep assume a single API replica.
@@ -115,7 +115,7 @@ Details: [docs/deployment.md](docs/deployment.md).
 
 ```bash
 make testdb                              # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q        # 501 passed, 2 skipped
+cd backend && python -m pytest -q        # 521 passed, 2 skipped
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 39 unit tests
 cd frontend && npm run e2e               # 7 Playwright tests against the Docker stack
 ```
@@ -128,7 +128,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 |---|---|
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (20 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (21 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

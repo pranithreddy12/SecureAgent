@@ -91,12 +91,18 @@ def scan_logging(relpath: str, text: str) -> list[LoggingFinding]:
             sens = _sensitive_arg(node)
             if sens:
                 add("sensitive_data_in_log", f"logs sensitive value '{sens}'", node.lineno)
-        elif (
-            isinstance(node, ast.ExceptHandler)
-            and _is_swallowed(node)
-            and not _is_deliberate(node, lines)
-        ):
-            add("swallowed_exception", "except block only does pass/...", node.lineno)
+        elif isinstance(node, ast.Try):
+            body_lines = (
+                lines[node.body[0].lineno - 1 : node.body[-1].end_lineno] if node.body else []
+            )
+            body = " ".join(body_lines)
+            relevant = bool(_SECURITY_CALL.search(body))
+            for handler in node.handlers:
+                if _is_swallowed(handler) and not _is_deliberate(handler, lines):
+                    rule = "except block only does pass/..." + (
+                        " around a security-relevant operation" if relevant else ""
+                    )
+                    add("swallowed_exception", rule, handler.lineno)
 
     return out
 
@@ -104,6 +110,14 @@ def scan_logging(relpath: str, text: str) -> list[LoggingFinding]:
 _DELIBERATE_COMMENT = re.compile(
     r"(?i)noqa|best[- ]effort|fall ?back|optional|non-?fatal|expected|intentional|deliberate|"
     r"cleanup|harmless|not critical|ignore[sd]?\b|may fail|can fail|safe to"
+)
+
+
+# A swallowed exception matters when what it hides is a security decision; around ordinary
+# best-effort work (cleanup, optional lookups, UI setup) it is noise (0 of 9 held-out samples).
+_SECURITY_CALL = re.compile(
+    r"(?i)verify|decode|authen|authoriz|permission|token|signature|decrypt|validat|csrf|jwt|"
+    r"password|credential|sanitiz|check_access|login|acl\b"
 )
 
 

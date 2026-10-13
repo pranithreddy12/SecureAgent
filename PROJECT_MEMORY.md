@@ -220,6 +220,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-018 | Opt-in AI validator and report-narrative stages | Accepted |
 | ADR-019 | Zip upload, owner triage, MCP `explain_finding` | Accepted |
 | ADR-020 | MCP trust layer, opt-in verdict recording, detector gaps | Accepted |
+| ADR-021 | Real-project evaluation harness and the fixes it drove | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -367,6 +368,10 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - **Author-written benchmarks flatter the detector.** 97%/95% on the corpus; the first real project gave 204
   findings, mostly false positives. Treat real-world scans as the precision test and keep each fixed class
   as a regression test.
+- **Backslash escapes in shell heredocs keep corrupting regexes** (`\\b` became a backspace again, twice).
+  After any scripted edit that writes regexes, grep for `\\x08` in app/ and tests/.
+- **Real code is the only honest precision test.** 28% on the first eight real projects vs 97% on the
+  author corpus; fix classes, not instances, and re-measure on a set the fixes did not see.
 - **Deterministic first, LLM advisory.** AI output must be consented, redacted, quote-verified and unable
   to change status, severity or the gate; advisory stages degrade instead of failing the audit.
 
@@ -434,3 +439,9 @@ frontend upload form and triage control. 480 backend / 39 Vitest tests. The e2e 
 `record_verdict`, `security_review` prompt, new infra/secret-fallback detectors, two taint precision fixes.
 501 backend tests. Still not done: a scored with/without-MCP evaluation harness on independent repos
 (plan phase 4) and a live run of the new MCP behaviour in a client.
+
+**Real-project evaluation (2026-10-13, ADR-021):** `app/evaluation.py`; 145 sampled findings across 22 of the
+owner's local projects labelled (by Claude, not verified); precision 28% -> ~82% on the sample that guided the
+fixes, 59% -> 83% on the holdout. Per-finding sheets live outside the repo (they contain code). Next: a third,
+untouched set labelled by a human; the with/without-MCP model comparison; update `docs/paper/PAPER_PLAN.md`
+RQ1 with these caveats.

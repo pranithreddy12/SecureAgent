@@ -1,0 +1,75 @@
+# Real-project evaluation (MCP plan phase 4, paper RQ1)
+
+The author-written benchmark (`secureagent benchmark`, 97% / 95%) is a regression guard: the detectors
+were tuned against it. This page records what happened when the scanner was run on projects it had not
+been written against, how the numbers were produced, and what they do **not** show.
+
+## Method
+
+`python -m app.evaluation prepare REPO... --out DIR` scans each repository and writes `labels.json`: a
+sample of findings **stratified by finding type** (default 6 per type, most severe first), each with a
+redacted code excerpt and an empty `label`. A reader fills in `true` / `false` / `unsure` (and may add
+`extras`: real issues found another way, with `found_by_tool`). `python -m app.evaluation score` prints
+per-type precision, the unlabelled and unsure counts, and a recall estimate from the extras.
+
+Rules: only labelled items count; `unsure` is reported, not hidden; informational and
+suppressed findings are not sampled; the overall figure of a stratified sample is **not** a population
+rate.
+
+## What was run (2026-10-13)
+
+| Set | Projects | Findings sampled | Role |
+|---|---|---|---|
+| Development | 8 of the owner's own projects (Python/FastAPI, NestJS, Next.js, Flask, scripts) | 111 | used to find and fix systematic false positives |
+| Holdout | 14 other small projects (Flask, Express, React, scripts) | 34 | measured after the first round of fixes |
+
+**Labelled by Claude (a model), from reading the excerpts and, where needed, the surrounding code.
+Not independently verified by a human.** That is a real limitation: the labeller can be wrong, and is
+not the code's author.
+
+## Results
+
+| | Precision before fixes | After fixes (same items) | Real findings kept |
+|---|---|---|---|
+| Development sample | 28% (30 / 106) | 82% (23 / 28) | 23 / 30 |
+| Holdout sample | 59% (19 / 32) | 83% (19 / 23) | 19 / 19 |
+
+- Per type, before fixes: `missing_function_level_authorization` 9%, `idor` 17%, `sql_injection` 0%,
+  `hardcoded_secret` 41%, `swallowed_exception` 29%; `container_runs_as_root` and `unbounded_query`
+  100%.
+- The seven "lost" real findings in the development set are one inconsistent-authorization item (its
+  siblings used *optional* authentication, so it stopped being an outlier) and six swallowed-exception
+  items that are now informational because the `try` body is not a security operation.
+
+## What the failures were (all fixed, with regression tests in `tests/test_eval_regressions.py`)
+
+| Class | Cause |
+|---|---|
+| Missing authorization (9% -> ) | `Depends(current_org)` / `get_current_active_user` not recognised as guards; NestJS `@UseGuards` above `@Controller`; JS *client* calls (`api.put("/x")`) parsed as routes; public-by-design paths (token URLs, login, register, webhooks) |
+| IDOR (17% -> ) | ownership check on `organization_id` not recognised; repositories scoped at construction (`Repo(db, user.tenant_id)`); in-memory `*_store.get(code)` treated as a database |
+| SQL injection (0% -> ) | SQLAlchemy statement variables (`stmt = select(...).where(...)`) executed later; a same-file helper judged by its arguments instead of its return value |
+| Hard-coded secrets (41% -> ) | enum members, storage-key names, type aliases, `tokenUrl`, `MAX_TOKENS`, blockchain addresses, README prose, placeholder fallbacks |
+| Misc | `Path(x).name` and character-filter joins as path sanitizers; constant `innerHTML` markup; `int(md5(...).hexdigest(), 16)` bucketing; narrow or commented `except ... : pass` |
+
+## What this does and does not show
+
+- **Shows:** the first real-project precision (28% on the development sample) was far below the
+  benchmark's 97%, the causes were systematic, and they are fixed.
+- **Does not show:** a population precision. The samples are stratified and small; the same samples
+  guided the fixes, so the "after" figures are optimistic (the holdout was also seen before the final
+  swallowed-exception rule). A clean estimate needs a **third, untouched set** labelled by someone who
+  knows the code.
+- **Recall is unmeasured.** No independent list of real issues was available; the recall estimate in the
+  harness is only as good as the `extras` supplied. The with/without-MCP comparison (phase 4 proper)
+  needs model runs that could not be made from this environment.
+- The benchmark is unchanged at 97% / 95%; the fixes did not regress it.
+
+## Reproduce
+
+```bash
+python -m app.evaluation prepare path/to/repo1 path/to/repo2 --out eval_run
+# edit eval_run/labels.json: set "label" on every item, add "extras", set "labelled_by"
+python -m app.evaluation score eval_run/labels.json
+```
+
+Keep `labels.json` out of version control: it contains code excerpts.

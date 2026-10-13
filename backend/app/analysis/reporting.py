@@ -91,13 +91,19 @@ def _dependency_finding(f) -> ReportFinding:
 
 
 def _logging_finding(f) -> ReportFinding:
+    noise = f.category == "swallowed_exception" and "security-relevant" not in f.rule
     return ReportFinding(
         title=f.title,
         type=f.category,
         severity=Severity(f.severity),
         confidence=f.confidence,
-        status=FindingStatus.LIKELY,
-        status_reason="Logging/monitoring weakness present in source.",
+        status=FindingStatus.INFORMATIONAL if noise else FindingStatus.LIKELY,
+        status_reason=(
+            "A swallowed exception around ordinary best-effort work; reported for completeness "
+            "(it matters only if it hides a security decision)."
+            if noise
+            else "Logging/monitoring weakness present in source."
+        ),
         endpoint=f"{f.relpath}:{f.line}",
         evidence=f"{f.rule} — {f.evidence}",
         validation_method="static logging analysis",

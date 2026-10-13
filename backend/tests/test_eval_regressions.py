@@ -255,3 +255,22 @@ def test_path_name_and_character_filter_neutralise_path_traversal():
             f for f in analyze_taint("a.py", src(text)) if f.vuln_type == "path_traversal"
         ] == []
     assert [f for f in analyze_taint("a.py", src(raw)) if f.vuln_type == "path_traversal"]
+
+
+def test_swallowed_exception_is_informational_unless_it_hides_a_security_decision():
+    import tempfile
+    from pathlib import Path
+
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.scanner import scan_repo
+
+    def status_of(code: str) -> str:
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a.py").write_text(code, encoding="utf-8")
+            found = scan_to_report_context(scan_repo(tmp, check_osv=False)).findings
+            return next(f.status.value for f in found if f.type == "swallowed_exception")
+
+    best_effort = "try:\n    cleanup()\nexcept Exception:\n    pass\n"
+    assert status_of(best_effort) == "informational"
+    hides_auth = "try:\n    verify_signature(token)\nexcept Exception:\n    pass\n"
+    assert status_of(hides_auth) == "likely"

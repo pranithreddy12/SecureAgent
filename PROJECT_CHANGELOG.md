@@ -1002,3 +1002,26 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 
 ### Notes
 - Backend 501 passed, 2 skipped; benchmark unchanged (97% / 95% on the author corpus).
+
+## 2026-10-13 (real-project evaluation and fixes -- ADR-021)
+
+### Added
+- `python -m app.evaluation prepare|score`: stratified labelling sheet, redacted excerpts, honest scoring.
+- `docs/evaluation.md`: method, results, limits.
+
+### Fixed (precision, found by labelling 145 findings across 22 real projects)
+- Missing-authorization: `current_*` dependencies are guards (optional ones are not); NestJS guard above
+  `@Controller`; JS client `api.*` calls are not routes; public-by-design paths.
+- IDOR: `organization_id`-style ownership comparisons; repositories scoped at construction; `*_store`
+  receivers.
+- SQL injection: SQLAlchemy statement variables; same-file helpers judged by return value (also across
+  files).
+- Secrets: enum/identifier values, descriptive keys, type aliases, addresses, prose files, placeholder
+  fallbacks.
+- Sanitizers/others: `Path(x).name`, character-filter joins, constant `innerHTML`, hash bucketing,
+  narrow/explained `except`, swallowed exceptions informational unless security-relevant.
+
+### Notes
+- Backend 521 passed, 2 skipped; benchmark unchanged (97% / 95%).
+- Two backspace characters (`\x08`, from shell-escaped `\b`) were found and fixed in regexes -- the same
+  class of bug as the earlier over-claim filter.

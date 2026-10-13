@@ -85,12 +85,12 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 480 passed, 2 skipped (PDF locally, Windows symlink) |
+| Backend tests | 521 passed, 2 skipped (PDF locally, Windows symlink) |
 | Frontend | 39 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
 | Benchmark | 35 TP / 1 FP / 2 FN = 97% precision, 95% recall on an **author-written** corpus (a regression guard, not a real-world rate) |
-| Independent signal | the first real-project scan produced 204 findings, mostly false positives; every class was fixed with a regression test (`tests/test_realworld_fp.py`); not yet re-measured |
+| Independent signal | 28% precision on a stratified sample of eight real projects (before fixes), ~82% on the same items after, ~83% on a 14-project holdout; labelled by a model, not verified by a human -- see `docs/evaluation.md` |
 | Self-scan | clean apart from one accepted dev-only advisory (`braces`) |
 
 ## 8. What does **not** exist
@@ -126,6 +126,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 018 | Opt-in AI validator and narrative stages |
 | 019 | Zip upload, owner triage, MCP `explain_finding` |
 | 020 | MCP trust layer, opt-in verdict recording, detector gaps |
+| 021 | Real-project evaluation harness and the fixes it drove |
 
 ## 10. Document map
 
