@@ -1109,3 +1109,9 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 
 - Truth frozen (`784f091`), scanner unchanged: 11/19 (58%): Pixi 4/8, DVSA 5/7, crAPI 2/4. Pooled
   untouched recall over five sets 107/226 (47%); overall incl. tuned-on 181/226 (80%).
+
+## 2026-10-13 (sixth untouched set -- ADR-029)
+
+- Truth frozen (`9cb3618`), scanner unchanged: 39/57 (68%): skf-labs 35/47, DVGA 1/7, DVRestaurant 3/3.
+  Pooled untouched over six sets 146/283 (52%); overall 220/283 (78%). Set is easy (tiny labs, literal
+  secrets); DVGA shows the resolver-argument blind spot.

@@ -317,3 +317,28 @@ Noise to know about: Pixi reports 108 findings (71 in a single proxy `server.js`
 "unguarded route" and structural NoSQL), crAPI 132 (58 are `sensitive_data_in_log` in a chatbot service).
 The new structural rules and the volume of "unguarded" reports make the *count* of findings a poor
 proxy for risk on API-heavy projects; triage by type and severity.
+
+## Sixth untouched set: skf-labs (Python), DVGA, Damn-Vulnerable-RESTaurant (2026-10-13)
+
+57 in-taxonomy planted flaws were committed before scoring (`9cb3618`); the scanner was the post-ADR-028
+version, **unchanged**. The truth list is one reader's (mine, a model), built from the labs' own intent.
+
+| Application | Planted | Found | Missed |
+|---|---|---|---|
+| skf-labs python labs (~65 tiny Flask apps) | 47 | 35 | LFI-2/3 (`open_resource`), `text("..." + x)` in graphql lab, `pulldom.parseString`, `send_from_directory` IDOR, 5 template-level XSS / `Markup`, `app.secret_key` inside `__main__`, Mongo `find_one` with request JSON |
+| DVGA (Flask + graphene) | 7 | 1 | GraphQL resolver arguments are not request sources: 3 command injections, 1 SQL, 1 path, plus `app.config['SECRET_KEY'] = 'dvga'` |
+| Damn-Vulnerable-RESTaurant (FastAPI) | 3 | 3 | none |
+| **Total** | **57** | **39 (68%)** | |
+
+Six untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%; pooled 146/283 = 52%.** Over all 283 planted
+flaws incl. tuned-on ones: 220 (78%).
+
+Reading it honestly: 68% is the highest so far, but the set is **easy by construction**. skf-labs are
+single-file, one-flaw-per-file apps with the sink next to the request read, and 10 of the 35 hits are
+hard-coded `SECRET_KEY` literals. Excluding secrets the rate is 29/46 (63%). The real-application result in
+the set (DVGA) is 1/7, which matches earlier sets: framework-mediated input (GraphQL resolver arguments)
+is the blind spot, not simple Flask code.
+
+Gaps recorded (not fixed here): GraphQL/graphene resolver arguments as sources; `Markup()` and
+template-level XSS; `app.secret_key = "..."` in a `__main__` block and `config['SECRET_KEY']` with a
+short word; `text("..." + x)` as a statement argument; `current_app.open_resource`; `pulldom`.
