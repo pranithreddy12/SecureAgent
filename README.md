@@ -130,6 +130,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 
 | Topic | Document |
 |---|---|
+| **How to run it (CLI, web app, MCP)** | [docs/MANUAL.md](docs/MANUAL.md) |
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
 | Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (35 ADRs) |
