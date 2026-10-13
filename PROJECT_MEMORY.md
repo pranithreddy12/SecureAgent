@@ -531,3 +531,8 @@ same-shaped command injection missed where SQL injection via a same-file helper 
 `flask_login.current_user` not recognised for IDOR (only `request.user`); `obj.__dict__.update(d)` not
 recognised for mass assignment. Recorded as likely-permanent: cross-handler stored XSS via a mutable
 global list needs cross-handler state modelling, not a taint fix.
+
+**First live Mistral run (2026-10-14, ADR-033):** `mistral-large-latest` 403 tier_not_allowed (paid
+plan needed); `mistral-small-latest` tier-allowed but 429 rate-limited repeatedly; `codestral-latest`
+worked -- real TRUE POSITIVE verdict, quote verified. Provider wiring (payload/headers/parsing)
+confirmed correct against a live response, on one account, one finding type.

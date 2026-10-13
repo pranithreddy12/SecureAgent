@@ -1162,3 +1162,12 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   Two new narrow gaps: `flask_login.current_user` not recognised for IDOR; `obj.__dict__.update(d)` not
   recognised for mass assignment. One likely-permanent gap recorded: cross-handler stored XSS via a
   mutable global.
+
+## 2026-10-14 (first live Mistral run -- ADR-033)
+
+- `secureagent review --provider mistral` run live against `benchmark/corpus/py_injection.py` with
+  the owner's own key (never seen by the assistant). `mistral-large-latest`/a newer large alias: 403
+  tier_not_allowed (needs a paid plan). `mistral-small-latest`: tier-allowed but 429 rate-limited every
+  attempt. `codestral-latest`: worked -- TRUE POSITIVE 90% on a real code_injection finding, quote
+  verified against the code sent. Confirms the provider abstraction is correct end to end, not just
+  against the fake-transport tests. `MISTRAL_DEFAULT_MODEL` left as `mistral-large-latest`.

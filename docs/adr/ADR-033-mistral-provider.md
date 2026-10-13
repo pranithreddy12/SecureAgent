@@ -27,9 +27,29 @@ Mistral uses the OpenAI-compatible chat-completions shape (`Authorization: Beare
 with a `system` role, `choices[0].message.content`), which is why the abstraction is a per-provider
 payload/header/extractor rather than a single Anthropic-shaped `Reviewer`.
 
+## Live run (2026-10-14)
+
+Ran `secureagent review` against `benchmark/corpus/py_injection.py` with a real `MISTRAL_API_KEY`
+(the key was never seen by the assistant: read from the user's own environment variable store inside
+one shell call, never echoed or logged). Three model ids were tried on the owner's account:
+
+| Model | Result |
+|---|---|
+| `mistral-large-latest` / a newer large alias | `403 tier_not_allowed` -- needs a paid plan |
+| `mistral-small-latest` | tier-allowed, but `429 rate_limited` on every attempt, minutes apart |
+| `codestral-latest` | **worked** |
+
+`codestral-latest` returned a genuine verdict end to end: `TRUE POSITIVE 90% code_injection` on the
+file's `eval("themes." + _theme())` cookie-driven code-injection case, with its quote verified against
+the code actually sent (not downgraded to `unclear`), on the first try. Redaction, prompt construction,
+response parsing and the "never changes status/gate" behaviour all held against a live response, not
+just the fake-transport tests.
+
 ## Not claimed
 
-Nobody has run a live Mistral review yet; the new provider is covered by unit tests with a fake
-transport (`tests/test_llm_review.py`), the same way the Anthropic path already was before any live
-run. Redaction, quote verification, caching and the "never changes status/gate" guarantee are
-provider-agnostic and apply identically to both.
+This is one live run, on one account, on one finding type, with a free-tier key. It establishes that
+the provider abstraction genuinely talks to Mistral's real API (payload shape, auth header and
+response parsing are all correct), not that every model id or every finding type has been tried
+live, and not that accuracy on this provider has been measured the way the deterministic scanner's
+has. `MISTRAL_DEFAULT_MODEL` is left as `mistral-large-latest` (the model Mistral documents as its
+flagship) rather than changed to match one account's current tier.
