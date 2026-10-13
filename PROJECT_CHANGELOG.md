@@ -1152,3 +1152,13 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   2/2, vulnerable-api (jorritfolmer) 5/8. Pooled untouched over nine sets 177/332 (53%).
 - `connexion.request.get_json()` is not uniformly missed (2 of 3 sites found); the real pattern in the
   misses is a variable assigned inside one branch of a plain `if`/`else` (not a ternary).
+
+## 2026-10-14 (tenth untouched set -- ADR-035)
+
+- Truth frozen (`897d424`), scanner unchanged: 6/12 (50%): extremely-vulnerable-flask-app 3/6,
+  testing-sites 3/6. Pooled untouched over ten sets 183/344 (53%).
+- Confirmed ADR-034's if/else hypothesis with a minimal reproduction. Found the structural SQL rule is
+  taint-source-agnostic, explaining why same-shaped command injection missed where SQL injection didn't.
+  Two new narrow gaps: `flask_login.current_user` not recognised for IDOR; `obj.__dict__.update(d)` not
+  recognised for mass assignment. One likely-permanent gap recorded: cross-handler stored XSS via a
+  mutable global.

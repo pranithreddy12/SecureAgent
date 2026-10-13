@@ -420,3 +420,46 @@ command = "uptime -" + flag else: command = "uptime"`) -- as opposed to the tern
 (`data = x if cond else y`), which this same file shows working two lines away. The ReDoS miss is a
 detector-vocabulary gap (the regex `([a-z]+)*[0-9]` is a textbook catastrophic-backtracking shape, but not
 one the `redos` rule's patterns recognise), unrelated to taint tracking.
+
+## Tenth untouched set: extremely-vulnerable-flask-app, testing-sites (2026-10-14)
+
+12 in-taxonomy planted flaws were committed before scoring (`897d424`); the scanner was the post-ADR-034
+version, **unchanged**. Both apps were picked to test specific hypotheses from ADR-031 (cross-file sink)
+and ADR-034 (a value assigned in one branch of a plain `if`/`else`, used after it) with minimal,
+purpose-built reproductions, rather than being a random sample.
+
+| Application | Planted | Found | Missed |
+|---|---|---|---|
+| extremely-vulnerable-flask-app (Flask, SQLAlchemy, flask-login) | 6 | 3 | an IDOR, a mass-assignment via `obj.__dict__.update(dict)`, and the cross-file SSRF (ADR-031, confirmed again) |
+| testing-sites (five tiny Flask CTF levels) | 6 | 3 | the deliberate if/else reproduction, a stored/cross-handler XSS, and a cross-function command injection |
+| **Total** | **12** | **6 (50%)** | |
+
+Ten untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 42%, 79%, 50%; pooled 183/344 = 53%.**
+
+**ADR-034's hypothesis confirmed cleanly.** `level1/app.py` is a minimal, deliberate reproduction --
+`user_in` is assigned in one branch of an `if`/`else`, the other branch assigns a literal, and the value is
+used after the statement -- and it missed, exactly as predicted. The same file's deserialization case in
+EVFA (`routes/account.py`), where the sink is *inside* the `else` branch consuming a value tainted just
+before it, was found -- so the gap is specifically "used after the branch", not "used inside a branch".
+
+**One structural-rule side effect, worth noting precisely:** EVFA's `validate_token(code, session)` and
+`testing-sites/level5`'s `authenticate(password)` both build SQL with an f-string inside a same-file helper
+function and were **found**, even though the tainted value only reaches the helper as a plain function
+argument (the same shape ADR-026 called a miss for `vulnpy`). The structural SQL rule (ADR-025) matches an
+f-string/`%`/`.format` string built right before `execute`/`text`, regardless of whether the interpolated
+name is provably tainted -- so it does not need real cross-function taint tracking to fire. By contrast,
+`level4`'s command injection, which has the identical call shape (`get_output(f"host {user_in}")`,
+`subprocess.run(cmd, shell=True)` in the callee), **missed**: there is no equivalent taint-agnostic
+structural rule for `command_injection`. ADR-026/031's "cross-file" and "parameter-fed" framing was partly
+an artifact of which classes happen to have a structural rule, not a single taint-engine limitation.
+
+**Two new, narrower gaps found:**
+- The IDOR check does not recognise `flask_login`'s `current_user` as the ownership-check identity; every
+  working IDOR example that detector has caught so far compared against `request.user`.
+- The mass-assignment check looks for a constructor call (`Model(**d)`, `new User(req.body)`); it does not
+  recognise `obj.__dict__.update(filtered_dict)`.
+
+**A likely-permanent gap, recorded rather than treated as fixable:** `testing-sites/level2` stores a
+comment in a module-level list in one request handler and renders it with `|safe` in a different one. No
+single-pass, per-request taint analysis sees this without modelling mutable global state across handlers --
+a materially larger feature than anything else in this list.

@@ -232,6 +232,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) | Accepted |
 | ADR-031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap | Accepted |
 | ADR-034 | Ninth untouched set; narrowed to an if/else assignment gap | Accepted |
+| ADR-035 | Tenth untouched set; confirmed if/else gap, structural-rule asymmetry | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 
@@ -521,3 +522,12 @@ transport only; not run against the live Mistral API.
 52/49/41/46/58/68/75/42/79%, pooled 53%. Narrowed the earlier "connexion.request" hypothesis: that alias is
 often recognised; the real miss pattern is a value assigned inside one branch of a plain `if`/`else` (not
 a ternary) and used afterwards. Also: `redos` rule misses `([a-z]+)*[0-9]`-style nested quantifiers.
+
+**Tenth untouched set (2026-10-14, ADR-035):** 50% (6/12), no detector changed. Ten untouched:
+52/49/41/46/58/68/75/42/79/50%, pooled 53%. Confirmed the ADR-034 if/else-branch-assignment gap with a
+minimal repro. Found the structural SQL rule (ADR-025) is taint-source-agnostic -- explains why a
+same-shaped command injection missed where SQL injection via a same-file helper didn't; "cross-file"/
+"parameter-fed" misses are partly about which classes have a structural rule. New narrow gaps:
+`flask_login.current_user` not recognised for IDOR (only `request.user`); `obj.__dict__.update(d)` not
+recognised for mass assignment. Recorded as likely-permanent: cross-handler stored XSS via a mutable
+global list needs cross-handler state modelling, not a taint fix.
