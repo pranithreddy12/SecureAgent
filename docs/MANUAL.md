@@ -4,13 +4,14 @@ A practical "how do I actually run this" guide. For *what was built and why* see
 [docs/OVERVIEW.md](OVERVIEW.md); for the honesty/safety model and limitations see the main
 [README.md](../README.md). This page only covers using the tool.
 
-There are three independent ways to run SecureAgent. Pick whichever fits what you're doing right now —
+There are four independent ways to run SecureAgent. Pick whichever fits what you're doing right now —
 they all share the same deterministic scanner underneath.
 
 | Way | Best for | Needs |
 |---|---|---|
 | **CLI** (`secureagent`) | One-off scans, CI gating, scripting | Python 3.12+, nothing else |
 | **Web app** (`/run` page) | Reviewing findings interactively, tracking audits over time, the opt-in AI layer | Docker Compose |
+| **Desktop app** | The same web app, as a native window instead of a browser tab | Docker Compose, Node |
 | **MCP server** | Letting Claude Code / another AI assistant check its own work as it codes | Your AI tool's MCP support |
 
 ---
@@ -90,7 +91,7 @@ secureagent review . --provider mistral --model codestral-latest --yes
 secureagent review . --report with-ai.html --yes
 ```
 Reads the key from `ANTHROPIC_API_KEY` or `MISTRAL_API_KEY` (never a flag, never logged). See
-[§4](#4-the-opt-in-ai-layer-providers) for what each provider needs. The verdict is shown beside each
+[§5](#5-the-opt-in-ai-layer-providers) for what each provider needs. The verdict is shown beside each
 finding and **never** changes its status or the exit code.
 
 #### `benchmark` — measure precision/recall against a labelled corpus
@@ -136,7 +137,7 @@ Click **Run** in the sidebar (or go to `/run`). It's a single page:
    *browser* and uploaded — `node_modules`, `.git`, `.next`, `venv`, `dist`, `build` are skipped
    automatically so the archive stays small), or pick a project you registered earlier.
 2. **How to analyse it** — static analysis always runs; tick **AI review** if you want a second opinion
-   (only shown when a key is configured on the server — see §4). "Agent (MCP-driven)" is shown but
+   (only shown when a key is configured on the server — see §5). "Agent (MCP-driven)" is shown but
    disabled; it isn't built yet.
 3. **Authorization and run** — tick the confirmation and click **Run security audit**.
 
@@ -169,7 +170,28 @@ shows you.
 
 ---
 
-## 3. MCP — inside your AI coding assistant
+## 3. The desktop app
+
+The exact same web app, in a native window instead of a browser tab -- no address bar, a real title
+bar and app menu.
+
+```bash
+cd desktop
+npm install
+npm start
+```
+
+It runs `docker compose up -d postgres backend frontend` for you (safe to call even if the stack is
+already running), shows a branded splash while it waits for the backend to answer, then loads the app.
+If Docker isn't running, or the backend doesn't come up within two minutes, the splash says so instead
+of hanging silently. Details, including why Electron rather than Tauri: [desktop/README.md](../desktop/README.md),
+[ADR-038](adr/ADR-038-desktop-shell.md).
+
+It doesn't bundle the backend/database into the app -- Docker Compose is still the runtime underneath.
+
+---
+
+## 4. MCP — inside your AI coding assistant
 
 Lets Claude Code (or any MCP client) check code it just wrote, explain a finding with its taint path,
 or get verified-patch suggestions, without you leaving your editor.
@@ -186,7 +208,7 @@ confined to the working directory, offline by default. Full setup (Claude Deskto
 
 ---
 
-## 4. The opt-in AI layer: providers
+## 5. The opt-in AI layer: providers
 
 Both the CLI's `review` command and the web app's `ai_review`/`ai_validator`/`ai_narrative` stages go
 through the same provider table (`app/analysis/llm_review.py`). Two providers exist today:
@@ -222,14 +244,14 @@ evidence is checked against the code actually sent (an invented quote downgrades
 
 ---
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
 | `docker compose ps` shows backend unhealthy | Check `docker compose logs backend`; usually a missing/short `SECRET_KEY` or Postgres still starting. |
 | "AI review" checkbox doesn't appear | `GET /api/health` → `llm_configured: false`; `LLM_API_KEY` isn't set on the backend, or the backend hasn't been restarted since you set it. |
 | `secureagent review` says a var `is not set` | That's `ANTHROPIC_API_KEY` or `MISTRAL_API_KEY` depending on `--provider` — it reads the real process environment, not `.env` (the CLI doesn't load `.env`; the web app does, via the backend container). |
-| Mistral `403 tier_not_allowed` or repeated `429` | Account tier/rate limit, not a bug — see §4's caveat. |
+| Mistral `403 tier_not_allowed` or repeated `429` | Account tier/rate limit, not a bug — see §5's caveat. |
 | Project registration rejects a path | Must be under `SOURCE_ROOTS` (compose sets this to `/workspace`, mounted from `./workspace` on the host, read-only). Use the zip upload or the Run page's folder picker instead if your code isn't there. |
 | Zip upload rejected | Size/file-count limits (`MAX_UPLOAD_MB`, default 25) or an unsafe archive (zip-slip, symlink, zip bomb, encrypted) — all rejected on purpose. |
 

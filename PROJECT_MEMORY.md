@@ -237,6 +237,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
+| ADR-038 | A desktop shell, not just a web app | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -563,3 +564,10 @@ tokens and shared components only (`app/globals.css`, `layout.tsx`, `components/
 `Source Serif 4` for headings/wordmark over the existing sans body, `rounded-xl/-lg` -> `rounded-sm`
 throughout, filled button -> outlined, sidebar active-link pill -> hairline left rule. Same layout/data,
 new look, applied everywhere via shared tokens so no page-by-page rewrite was needed.
+
+**Desktop shell (2026-10-14, ADR-038):** `desktop/` is a thin Electron window around the existing web
+app (not a rewrite): starts `docker compose up -d`, polls `/api/health` behind a branded splash, then
+loads `http://localhost:3000` in a native BrowserWindow (no Node integration exposed to the page).
+Verified against the real window (screenshotted, not dev-tools): stack-already-running path, and
+stopped-containers auto-recovery path, both reach the login screen unattended. Electron over Tauri:
+no Rust toolchain on the machine. Not bundling backend/db into the app -- Docker stays the runtime.

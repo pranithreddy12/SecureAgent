@@ -41,7 +41,7 @@ test checks it stays in sync with the settings class. Important ones:
 | `FRONTEND_ORIGIN` | CORS allow-list entry for the browser origin. |
 | `ALLOW_PRIVATE_TARGETS`, `TARGET_ALLOWLIST` | Reserved for target safety validation (not implemented yet). |
 | `DEMO_MODE` | Reserved for the audit pipeline demo; the static demo is `secureagent demo`. |
-| `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL` | Optional; powers the opt-in `ai_review`/`ai_validator`/`ai_narrative` pipeline stages and `secureagent review`. `LLM_PROVIDER` is `anthropic` (default) or `mistral`; empty `LLM_MODEL` picks that provider's default. See [docs/MANUAL.md §4](MANUAL.md#4-the-opt-in-ai-layer-providers). |
+| `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL` | Optional; powers the opt-in `ai_review`/`ai_validator`/`ai_narrative` pipeline stages and `secureagent review`. `LLM_PROVIDER` is `anthropic` (default) or `mistral`; empty `LLM_MODEL` picks that provider's default. See [docs/MANUAL.md §5](MANUAL.md#5-the-opt-in-ai-layer-providers). |
 
 Never commit `.env`. It is git-ignored; `.env.example` contains placeholders only.
 

@@ -1,0 +1,23 @@
+{
+  "name": "secureagent-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native window for SecureAgent -- starts the Docker stack and shows it as an app, not a browser tab.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.19"
+  },
+  "build": {
+    "appId": "com.secureagent.desktop",
+    "productName": "SecureAgent",
+    "files": ["main.js", "preload.js", "splash.html", "icon.ico"],
+    "win": { "target": "nsis", "icon": "icon.ico" },
+    "linux": { "target": "AppImage" },
+    "mac": { "target": "dmg" }
+  }
+}

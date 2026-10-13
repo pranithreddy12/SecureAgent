@@ -144,6 +144,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 | 037 | Classic, ledger-style design instead of the default dark-dashboard look |
+| 038 | A desktop shell, not just a web app |
 
 ## 10. Document map
 

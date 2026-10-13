@@ -92,6 +92,15 @@ retried or resumed from the failed stage, and any finding can be marked a false 
 reason (reversible). Set `LLM_API_KEY` to offer the optional AI review/summary.
 Details: [docs/deployment.md](docs/deployment.md).
 
+### As a desktop app, not a browser tab
+
+```bash
+cd desktop && npm install && npm start
+```
+Starts the Docker stack for you and opens it in a native window (title bar, app menu, a branded splash
+while the backend comes up) instead of a browser tab. See [desktop/README.md](desktop/README.md) and
+[ADR-038](docs/adr/ADR-038-desktop-shell.md).
+
 ## Honesty and safety model
 
 - Read-only: scanned code is never executed; paths are confined to `SOURCE_ROOTS`.
@@ -134,7 +143,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 | **How to run it (CLI, web app, MCP)** | [docs/MANUAL.md](docs/MANUAL.md) |
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (37 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (38 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

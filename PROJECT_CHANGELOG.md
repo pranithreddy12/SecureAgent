@@ -1202,3 +1202,11 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   on individual pages, so every page picked it up without a rewrite. Verified against the real app in
   Docker (login, dashboard, /run, audit list, a completed audit with all five severities). tsc/eslint/
   vitest (40/40)/next build all clean.
+
+## 2026-10-14 (desktop shell -- ADR-038)
+
+- Added `desktop/` (Electron): starts the Docker stack, shows a branded splash while polling backend
+  health, then opens the real web app in a native window -- no browser chrome. Verified both the
+  already-running path and a stopped-containers auto-recovery path against the real window. Linked
+  from README and `docs/MANUAL.md` (new §3); `docs/deployment.md`'s AI-provider anchor link fixed
+  to match the manual's renumbered sections.
