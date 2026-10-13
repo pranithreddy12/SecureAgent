@@ -234,3 +234,12 @@ and escaped-output check, and none after.
 Still missed: Mongoose `User.find({password: req.body.password})`-style bodies through helpers,
 `findById`-by-title BOLA in spec-first handlers (VAmPI), mass assignment of an alias (`const fields =
 req.body`), `fetch(url)` in a helper, template placeholders, `readFileSync(join(base, user))`.
+
+## Human labelling sheet
+
+`python -m app.evaluation html labels.json --out sheet.html` writes a self-contained page (no server, no
+network) for a person to label a sample in a browser: each finding shows its code excerpt, a one-line
+question for its type, and Real / Not real / Unsure buttons plus a note. Choices persist in the browser;
+**Download labels.json** writes a file that `python -m app.evaluation score` accepts, with `labelled_by`
+set to the reviewer's name. A 49-finding sample (at most 3 per type, shuffled) was prepared from the five
+third-set applications for this purpose.

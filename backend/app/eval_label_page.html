@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SecureAgent labelling sheet</title>
+<style>
+  :root { --bg:#fafafa; --fg:#1b1f23; --card:#fff; --line:#d0d7de; --mut:#57606a; --ok:#1a7f37; --no:#cf222e; --un:#9a6700; --acc:#0969da; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --card:#161b22; --line:#30363d; --mut:#8b949e; --ok:#3fb950; --no:#f85149; --un:#d29922; --acc:#58a6ff; } }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  header { position:sticky; top:0; background:var(--card); border-bottom:1px solid var(--line); padding:10px 16px; z-index:2; }
+  header h1 { font-size:16px; margin:0 0 4px; }
+  .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; font-size:13px; color:var(--mut); }
+  .bar input[type=text] { padding:4px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); }
+  button { cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--fg); padding:6px 12px; border-radius:6px; font:inherit; }
+  button.primary { background:var(--acc); color:#fff; border-color:var(--acc); }
+  main { max-width:980px; margin:0 auto; padding:16px; }
+  .help { border:1px solid var(--line); background:var(--card); padding:10px 14px; border-radius:8px; font-size:14px; margin-bottom:14px; }
+  .card { border:1px solid var(--line); background:var(--card); border-radius:8px; margin-bottom:14px; padding:12px 14px; }
+  .card.done { opacity:.75; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px 14px; font-size:13px; color:var(--mut); margin-bottom:6px; }
+  .tag { font-weight:600; color:var(--fg); }
+  pre { margin:6px 0 10px; padding:10px; overflow:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .btns button.sel-true { background:var(--ok); color:#fff; border-color:var(--ok); }
+  .btns button.sel-false { background:var(--no); color:#fff; border-color:var(--no); }
+  .btns button.sel-unsure { background:var(--un); color:#fff; border-color:var(--un); }
+  textarea { flex:1 1 260px; min-height:34px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
+  .q { font-size:13px; color:var(--mut); margin:2px 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SecureAgent precision sample <span id="count"></span></h1>
+  <div class="bar">
+    <label>Your name <input type="text" id="who" placeholder="reviewer"></label>
+    <label><input type="checkbox" id="onlyTodo"> only unlabelled</label>
+    <button class="primary" id="export">Download labels.json</button>
+    <span id="saved"></span>
+  </div>
+</header>
+<main>
+  <div class="help">
+    <b>For each finding, decide from the code shown:</b>
+    <b style="color:var(--ok)">Real</b> = the flagged line has the problem the type names (it is a genuine,
+    reportable weakness, even if the app is deliberately vulnerable);
+    <b style="color:var(--no)">Not real</b> = the report is wrong (constant data, already validated/escaped,
+    wrong class, third-party noise);
+    <b style="color:var(--un)">Unsure</b> = you cannot tell from this excerpt. Unsure items are excluded
+    from the precision figure, not counted as wins. Your choices are saved in this browser as you go.
+    Open the real file if the excerpt is not enough; <code>&gt;</code> marks the flagged line.
+  </div>
+  <div id="list"></div>
+</main>
+<script>
+const DATA = __DATA__;
+const KEY = "secureagent-labels-v1:" + DATA.items.length + ":" + (DATA.items[0] ? DATA.items[0].id : "");
+const QUESTIONS = {
+  sql_injection: "Is attacker-influenced data concatenated or interpolated into the SQL text (not a bound parameter, not a constant/whitelisted identifier)?",
+  nosql_injection: "Can a request value reach the Mongo filter or $where string un-cast, so operators or script could be injected?",
+  missing_function_level_authorization: "Does this endpoint really lack authentication/authorization (and is it not public by design: login, health, token URL)?",
+  idor: "Can a caller reach another user's record by changing the id, with no owner/tenant check on this path?",
+  hardcoded_secret: "Is this a real credential/secret committed to the repo (not a placeholder, test value or public key)?",
+  command_injection: "Does request data reach a shell/exec call (not a constant command)?",
+  path_traversal: "Can request data steer a file path outside the intended directory?",
+  open_redirect: "Is the redirect target taken from the request without validation?",
+  reflected_xss: "Does request data reach an HTML response unescaped?",
+  mass_assignment: "Is the whole request body (or arbitrary fields) written to a model/row?",
+  plaintext_password: "Is a password stored or compared without hashing?",
+  sensitive_data_in_log: "Is a secret/password/token written to a log?",
+  insecure_session_cookie: "Is the session cookie an unsigned, client-writable value?",
+};
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { state = {}; }
+const els = { list: document.getElementById("list"), count: document.getElementById("count"), who: document.getElementById("who"), todo: document.getElementById("onlyTodo"), saved: document.getElementById("saved") };
+els.who.value = state.__who || "";
+
+function save() {
+  state.__who = els.who.value;
+  try { localStorage.setItem(KEY, JSON.stringify(state)); els.saved.textContent = "saved"; } catch (e) { els.saved.textContent = "not saved (private mode?)"; }
+}
+function get(i) { return state[i.id + "|" + i.location] || { label: null, note: "" }; }
+function set(i, patch) { state[i.id + "|" + i.location] = Object.assign(get(i), patch); save(); render(); }
+
+function render() {
+  const done = DATA.items.filter(i => get(i).label).length;
+  els.count.textContent = "- " + done + " / " + DATA.items.length + " labelled";
+  els.list.innerHTML = "";
+  DATA.items.forEach((i, n) => {
+    const g = get(i);
+    if (els.todo.checked && g.label) return;
+    const c = document.createElement("div");
+    c.className = "card" + (g.label ? " done" : "");
+    const q = QUESTIONS[i.type] || "Is this a genuine, reportable security weakness at the flagged line?";
+    c.innerHTML = '<div class="meta"><span class="tag">#' + (n + 1) + " " + i.type + '</span><span>' + i.repo + '</span><span>' + i.location + '</span><span>scanner: ' + i.severity + " / " + i.status + '</span></div>' +
+      '<div class="q">' + q + '</div><pre></pre><div class="btns"></div>';
+    c.querySelector("pre").textContent = i.excerpt || "(no excerpt available)";
+    const b = c.querySelector(".btns");
+    [["true", "Real"], ["false", "Not real"], ["unsure", "Unsure"]].forEach(([v, t]) => {
+      const x = document.createElement("button");
+      x.textContent = t; if (g.label === v) x.className = "sel-" + v;
+      x.onclick = () => set(i, { label: g.label === v ? null : v });
+      b.appendChild(x);
+    });
+    const ta = document.createElement("textarea");
+    ta.placeholder = "optional note (why)"; ta.value = g.note || "";
+    ta.onchange = () => set(i, { note: ta.value });
+    b.appendChild(ta);
+    els.list.appendChild(c);
+  });
+}
+document.getElementById("export").onclick = () => {
+  const out = JSON.parse(JSON.stringify(DATA));
+  out.labelled_by = (els.who.value || "unnamed reviewer") + " (human)";
+  out.items.forEach(i => { const g = get(i); i.label = g.label; i.note = g.note || ""; });
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "labels.json"; a.click();
+};
+els.who.oninput = save; els.todo.onchange = render;
+render();
+</script>
+</body>
+</html>

@@ -96,3 +96,26 @@ def test_cli_prepare_and_score_round_trip(tmp_path, capsys):
     assert main(["score", str(tmp_path / "e" / "labels.json")]) == 0
     assert "ALL (stratified sample)" in capsys.readouterr().out
     assert main(["prepare", str(tmp_path / "missing"), "--out", str(tmp_path / "z")]) == 2
+
+
+def test_labelling_page_embeds_findings_and_escapes_script_end(tmp_path):
+    from app.evaluation import render_labelling_page
+
+    data = {
+        "items": [
+            {
+                "id": "ab12",
+                "type": "sql_injection",
+                "repo": "r",
+                "location": "a.py:1",
+                "severity": "high",
+                "status": "likely",
+                "excerpt": "</script><b>x",
+                "label": None,
+            }
+        ]
+    }
+    page = render_labelling_page(data)
+    assert "__DATA__" not in page and "a.py:1" in page
+    assert "</script><b>x" not in page  # a literal script end in a finding cannot break the page
+    assert page.count("</script>") == 1

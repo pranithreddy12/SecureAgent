@@ -262,6 +262,15 @@ def render_recall(r: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def render_labelling_page(data: dict[str, Any]) -> str:
+    """A self-contained HTML page for a human to label ``labels.json`` items in a browser.
+
+    Choices persist in ``localStorage``; "Download labels.json" writes a file ``score`` accepts."""
+    template = (Path(__file__).parent / "eval_label_page.html").read_text(encoding="utf-8")
+    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    return template.replace("__DATA__", payload)
+
+
 def _pct(num: int, den: int) -> str:
     return f"{100 * num / den:.0f}%" if den else "n/a"
 
@@ -339,6 +348,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("repos", nargs="+")
     p.add_argument("--out", required=True)
     p.add_argument("--per-type", type=int, default=6)
+    h = sub.add_parser("html", help="write a browser page for a human to label labels.json")
+    h.add_argument("labels")
+    h.add_argument("--out", required=True)
     k = sub.add_parser("recall", help="score against a list of planted vulnerabilities")
     k.add_argument(
         "--truth",
@@ -363,6 +375,11 @@ def main(argv: list[str] | None = None) -> int:
                 f"({m['findings_reviewable']} reviewable), sampled {m['sampled']}"
             )
         print(f'wrote {Path(args.out) / "labels.json"} -- fill in each item\'s "label"')
+        return 0
+    if args.cmd == "html":
+        data = json.loads(Path(args.labels).read_text(encoding="utf-8"))
+        Path(args.out).write_text(render_labelling_page(data), encoding="utf-8")
+        print(f"wrote {args.out} ({len(data.get('items', []))} findings)")
         return 0
     if args.cmd == "recall":
         rec = known_recall(args.truth, args.apps)
