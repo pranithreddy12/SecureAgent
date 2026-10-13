@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -1901,6 +1901,123 @@
           "line": 10,
           "class": "ssrf",
           "note": "requests.get(image_url)"
+        }
+      ]
+    },
+    "Vulnerable-Flask-App-videvelopers": {
+      "url": "https://github.com/videvelopers/Vulnerable-Flask-App",
+      "commit": "155a9d4020cd6382e7cef2a4166a714c54af3441",
+      "held_out": "seventh",
+      "known": [
+        {
+          "file": "vulnerable-flask-app-linux.py",
+          "line": 20,
+          "class": "sql_injection",
+          "note": "'...%s' % name"
+        },
+        {
+          "file": "vulnerable-flask-app-linux.py",
+          "line": 51,
+          "class": "template_injection",
+          "note": "render_template_string(f-string with ?name=)"
+        },
+        {
+          "file": "vulnerable-flask-app-linux.py",
+          "line": 58,
+          "class": "command_injection",
+          "note": "'dig ' + hostname, shell=True"
+        },
+        {
+          "file": "vulnerable-flask-app-linux.py",
+          "line": 77,
+          "class": "path_traversal",
+          "note": "open(?filename=)"
+        },
+        {
+          "file": "vulnerable-flask-app-linux.py",
+          "line": 97,
+          "class": "deserialization",
+          "note": "pickle.loads(socket data)"
+        },
+        {
+          "file": "vulnerable-flask-app-linux.py",
+          "line": 119,
+          "class": "command_injection",
+          "note": "'/bin/bash ' + filename, shell=True"
+        }
+      ]
+    },
+    "ivna": {
+      "url": "https://github.com/VitthalS/ivna",
+      "commit": "78ab2bfa97b0afd32db15cc11d53c8288ede951f",
+      "held_out": "seventh",
+      "known": [
+        {
+          "file": "src/routers/user.js",
+          "line": 17,
+          "class": "mass_assignment",
+          "note": "new User(req.body)"
+        },
+        {
+          "file": "src/routers/user.js",
+          "line": 194,
+          "class": "ssrf",
+          "note": "needle.get(query.url)"
+        },
+        {
+          "file": "src/routers/user.js",
+          "line": 197,
+          "class": "open_redirect",
+          "note": "res.redirect(query.url)"
+        },
+        {
+          "file": "src/routers/user.js",
+          "line": 215,
+          "class": "code_injection",
+          "note": "eval(req.query.name)"
+        },
+        {
+          "file": "src/routers/user.js",
+          "line": 291,
+          "class": "idor",
+          "note": "User.findById(req.params.id) then update, no owner check"
+        },
+        {
+          "file": "src/routers/user.js",
+          "line": 308,
+          "class": "idor",
+          "note": "User.findByIdAndDelete(req.params.id), no owner check"
+        },
+        {
+          "file": "src/middleware/auth.js",
+          "line": 8,
+          "class": "secret",
+          "note": "jwt.verify(token, 'hardsecret')"
+        }
+      ]
+    },
+    "vulnerable-app-nodejs-express": {
+      "url": "https://github.com/samoylenko/vulnerable-app-nodejs-express",
+      "commit": "75fdfdc36c3a182a9da44008efdaa6234a48a9ad",
+      "held_out": "seventh",
+      "known": [
+        {
+          "file": "index.js",
+          "line": 7,
+          "class": "secret",
+          "note": "password: 'mysecretpassword' db credential"
+        },
+        {
+          "file": "index.js",
+          "line": 32,
+          "class": "reflected_xss",
+          "note": "res.send(`Hello, ${req.query.name}`)"
+        },
+        {
+          "file": "index.js",
+          "line": 43,
+          "class": "sql_injection",
+          "note": "template-literal SQL with req.params.id"
         }
       ]
     }
