@@ -1122,3 +1122,10 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   5/7, vulnerable-app-nodejs-express 1/3. Pooled untouched over seven sets 158/299 (53%).
 - Misses: SSRF/redirect from a `url.parse(req.url, true).query` value (not `req.query`); a template-literal
   sink returned directly from `res.send`/`client.query` without an intermediate variable.
+
+## 2026-10-14 (unified Run page -- ADR-030)
+
+- New `/run` page: pick a local folder (zipped client-side) or an existing project, see the real
+  authorization statement, choose static / +AI review (MCP agent mode shown but disabled -- not wired
+  into the app), then hand off to the existing live audit page. No backend change; three existing
+  endpoints chained into one flow. `jszip` added to the frontend. Frontend 40 Vitest passing.

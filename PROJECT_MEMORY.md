@@ -496,3 +496,9 @@ sources, `Markup()`/template XSS, `app.secret_key` in `__main__`.
 **Seventh untouched set (2026-10-14, ADR-030):** 75% (12/16), no detector changed. Seven untouched:
 52/49/41/46/58/68/75%, pooled 53%. New narrow gaps: `url.parse(req.url, true).query` as a source; a
 template-literal sink returned directly from `res.send`/`client.query`.
+
+**Unified Run page (2026-10-14, ADR-030):** `/run` chains the existing upload/authorize/start-audit
+APIs into one page with a real folder picker (client-side zip via `jszip`) and shows, but disables, an
+"MCP agent mode" option since the in-progress agent files (`app/agents/`, `app/tools/`, `app/workflows/`,
+the two target-management services) are not wired into `app/main.py` and this session was told not to
+read/edit/commit them. No backend change.
