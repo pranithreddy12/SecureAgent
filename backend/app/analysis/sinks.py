@@ -380,9 +380,65 @@ def _constant_assignment(text: str, end: int) -> bool:
     )
 
 
+_ESCAPER = re.compile(
+    r"^(?:\w+\.)?(?:esc|escape|escapehtml|eschtml|escapeattr|sanitize|sanitizehtml|purify|"
+    r"encodeuricomponent|encodeuri|safe)\w*\s*\(",
+    re.IGNORECASE,
+)
+_NUMERIC = re.compile(
+    r"^[\d\s+\-*/%().]+$|\bMath\.\w+\(|\.length\b|\.toFixed\(|\.toLocaleString\(|"
+    r"\bparseInt\(|\bNumber\(|^\w{1,2}\s*[+\-*/]\s*\d+$|^\w{1,2}$"
+)
+_STRING_TERNARY = re.compile(r"\?\s*(['\"`])[^'\"`]*\1\s*:\s*(['\"`])[^'\"`]*\2\s*$")
+_SOURCEY = re.compile(
+    r"\blocation\b|document\.cookie|window\.name|localStorage|sessionStorage|\breq\.|"
+    r"\brequest\.|\bparams\b|\bfetch\(|\bXMLHttpRequest\b|\bWebSocket\b|\bawait\b|"
+    r"\bresponse\b|\bres\.|\bevent\.|\be\.target|postMessage|\.json\("
+)
+_CONST_DATA = re.compile(
+    r"^[ \t]*const\s+([A-Za-z_]\w*)\s*=[ \t]*[\[{][ \t\n]*[{['\"\d]", re.MULTILINE
+)
+
+
+def _xss_class(text: str, end: int, const_names: set[str]) -> str:
+    """Classify the statement after ``innerHTML =``:
+
+    ``skip``    constant markup, or every interpolation is escaped / numeric / a literal choice, or
+                it renders the file's own constant data tables (no request-ish source in sight);
+    ``opaque``  the value comes from a call (``items.map(card).join('')``): cannot be judged here;
+    ``dynamic`` an unescaped, non-constant value is concatenated or interpolated.
+    """
+    if _constant_assignment(text, end):
+        return "skip"
+    stop = text.find(";", end)
+    stmt = text[end : stop if stop != -1 else end + 1500]
+    interps = re.findall(r"\$\{((?:[^{}]|\{[^{}]*\})*)\}", stmt)
+    stripped = _JS_STRINGS.sub("", re.sub(r"\$\{(?:[^{}]|\{[^{}]*\})*\}", "", stmt))
+    operands = [p.strip() for p in stripped.split("+") if p.strip()]
+    has_concat = "+" in stripped
+    exprs = [e.strip() for e in interps] + (operands if has_concat else [])
+    if not interps and not has_concat:
+        # no interpolation and no concatenation: a bare call chain / identifier
+        if re.fullmatch(r"\s*[\w$.]+\s*", stmt):
+            return "dynamic"  # el.innerHTML = value
+        return "opaque"
+
+    def safe(e: str) -> bool:
+        return bool(_ESCAPER.match(e) or _NUMERIC.search(e) or _STRING_TERNARY.search(e))
+
+    if all(safe(e) for e in exprs if e not in ("", ",", ")", "(")):
+        return "skip"
+    if any(re.search(rf"\b{re.escape(n)}\b", stmt) for n in const_names) and not _SOURCEY.search(
+        stmt
+    ):
+        return "skip"
+    return "dynamic"
+
+
 def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:
     findings: list[SinkFinding] = []
     uses_child_process = "child_process" in text
+    const_names = set(_CONST_DATA.findall(text))
     offsets: list[int] = []
     pos = 0
     for raw in text.splitlines(keepends=True):
@@ -395,14 +451,19 @@ def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:
             m = pattern.search(line)
             if m and category == "command_injection" and not uses_child_process:
                 continue  # no child_process in this file: `exec(` is something else
-            if (
-                m
-                and category == "xss_sink"
-                and _constant_assignment(text, offsets[lineno - 1] + m.end())
-            ):
+            xss = (
+                _xss_class(text, offsets[lineno - 1] + m.end(), const_names)
+                if m and category == "xss_sink"
+                else None
+            )
+            if xss == "dynamic" and not _SOURCEY.search(text):
+                xss = "opaque"  # this file reads no input/network: the data arrives from elsewhere
+            if xss == "skip":
                 continue
             if m:
                 sev, conf, _ = CATEGORY_RISK[category]
+                if xss == "opaque":  # value built by a call we cannot see into
+                    sev, conf = "low", 0.25
                 findings.append(
                     SinkFinding(
                         category, m.group(0).strip(), sev, conf, relpath, lineno, line.strip()[:160]

@@ -105,8 +105,9 @@ Details: [docs/deployment.md](docs/deployment.md).
 - Python is analysed deeply; JavaScript/TypeScript is regex-based and shallower.
 - Global middleware and framework defaults are invisible, so "unguarded" findings are review items.
 - Detector accuracy is measured on an **author-written** corpus (97% / 95%). On real projects the first
-  sample was 28% precise; after fixes the same sample is ~82% (a holdout ~83%), labelled by a model and not
-  independently verified (`docs/evaluation.md`). Recall and LLM accuracy are unmeasured.
+  sample was 28% precise; after fixes the same sample is ~82% (a holdout ~83%), but a third, untouched set
+  measured **48%** before its own fixes. Labels are a model's first pass, not independently verified
+  (`docs/evaluation.md`). Recall and LLM accuracy are unmeasured.
 - Zip upload accepts `.zip` only, with size/file-count limits; triage is per audit (use
   `secureagent suppress` for a rule that applies to future audits).
 - Login throttling and the interrupted-audit sweep assume a single API replica.

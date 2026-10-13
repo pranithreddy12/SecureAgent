@@ -445,3 +445,7 @@ owner's local projects labelled (by Claude, not verified); precision 28% -> ~82%
 fixes, 59% -> 83% on the holdout. Per-finding sheets live outside the repo (they contain code). Next: a third,
 untouched set labelled by a human; the with/without-MCP model comparison; update `docs/paper/PAPER_PLAN.md`
 RQ1 with these caveats.
+
+**Third evaluation set (2026-10-13):** 48% precision (20/42) on 23 untouched projects, all noise from
+`xss_sink`; fixed to 56%. Use 48% as the honest generalisation number, not the 82-83% figures from sets that
+guided fixes. Still needed: a human-labelled set, and a set of known-vulnerable apps for recall.

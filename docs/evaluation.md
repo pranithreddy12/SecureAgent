@@ -22,6 +22,7 @@ rate.
 |---|---|---|---|
 | Development | 8 of the owner's own projects (Python/FastAPI, NestJS, Next.js, Flask, scripts) | 111 | used to find and fix systematic false positives |
 | Holdout | 14 other small projects (Flask, Express, React, scripts) | 34 | measured after the first round of fixes |
+| Third | 23 remaining local projects, mostly tiny scripts and static sites (one is a near-duplicate of a development project) | 42 | scanned **before** its failures were fixed: the only set that tests the code as it was |
 
 **Labelled by Claude (a model), from reading the excerpts and, where needed, the surrounding code.
 Not independently verified by a human.** That is a real limitation: the labeller can be wrong, and is
@@ -33,6 +34,15 @@ not the code's author.
 |---|---|---|---|
 | Development sample | 28% (30 / 106) | 82% (23 / 28) | 23 / 30 |
 | Holdout sample | 59% (19 / 32) | 83% (19 / 23) | 19 / 19 |
+| Third set | **48% (20 / 42)** -- measured on the code as it stood | 56% (20 / 36) | 20 / 20 |
+
+**The third set is the honest generalisation figure: 48%.** It was labelled before any fix was made for
+it. All 22 of its false positives were `xss_sink` (`innerHTML` assignments of escaped or constant data in
+static sites and small UIs); the other three types were 100% (20 / 20). Fixing that class (escaped,
+numeric, literal-choice and constant-table interpolations; files that read no input or network report
+only as low) moves the same items to 56%. Those 16 remaining items are still reported, as low
+severity, because an `innerHTML` assignment whose data arrives from another file cannot be judged by a
+per-file scan.
 
 - Per type, before fixes: `missing_function_level_authorization` 9%, `idor` 17%, `sql_injection` 0%,
   `hardcoded_secret` 41%, `swallowed_exception` 29%; `container_runs_as_root` and `unbounded_query`
@@ -55,6 +65,9 @@ not the code's author.
 
 - **Shows:** the first real-project precision (28% on the development sample) was far below the
   benchmark's 97%, the causes were systematic, and they are fixed.
+- **Shows:** each evaluation round found a new class of noise the previous ones had not (guards and ORM
+  statements, then `swallowed_exception`, then `innerHTML`); the fixes generalise only partly. Expect
+  precision on unseen code to be well below the development-set figure until more rounds are done.
 - **Does not show:** a population precision. The samples are stratified and small; the same samples
   guided the fixes, so the "after" figures are optimistic (the holdout was also seen before the final
   swallowed-exception rule). A clean estimate needs a **third, untouched set** labelled by someone who

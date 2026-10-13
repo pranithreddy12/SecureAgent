@@ -1025,3 +1025,12 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Backend 521 passed, 2 skipped; benchmark unchanged (97% / 95%).
 - Two backspace characters (`\x08`, from shell-escaped `\b`) were found and fixed in regexes -- the same
   class of bug as the earlier over-claim filter.
+
+## 2026-10-13 (third evaluation set)
+
+- 42 findings from 23 untouched projects labelled before fixing: 48% precision (20 / 42); all 22 false positives
+  were `xss_sink`, the other types 20 / 20.
+- `xss_sink` (JS `innerHTML`): skipped when every interpolation is escaped (`esc(...)`, `DOMPurify`,
+  `encodeURIComponent`), numeric, a literal choice, or renders a file-local constant table; reported only as
+  low when the file reads no input/network or the value comes from an opaque call.
+- Same items after: 56% (20 / 36), 20 / 20 real findings kept. Dev 82%, holdout 83%.

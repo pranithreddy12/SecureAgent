@@ -90,7 +90,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
 | Benchmark | 35 TP / 1 FP / 2 FN = 97% precision, 95% recall on an **author-written** corpus (a regression guard, not a real-world rate) |
-| Independent signal | 28% precision on a stratified sample of eight real projects (before fixes), ~82% on the same items after, ~83% on a 14-project holdout; labelled by a model, not verified by a human -- see `docs/evaluation.md` |
+| Independent signal | 28% precision on a stratified sample of eight real projects (before fixes), ~82% on the same items after, ~83% on a 14-project holdout; **48%** on a third untouched set before its fixes; labelled by a model, not verified by a human -- see `docs/evaluation.md` |
 | Self-scan | clean apart from one accepted dev-only advisory (`braces`) |
 
 ## 8. What does **not** exist

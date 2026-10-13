@@ -274,3 +274,23 @@ def test_swallowed_exception_is_informational_unless_it_hides_a_security_decisio
     assert status_of(best_effort) == "informational"
     hides_auth = "try:\n    verify_signature(token)\nexcept Exception:\n    pass\n"
     assert status_of(hides_auth) == "likely"
+
+
+def test_inner_html_with_escaped_or_static_interpolations_is_not_reported_as_medium():
+    def xss(code: str) -> list:
+        return [(f.severity) for f in scan_sinks("a.js", code) if f.category == "xss_sink"]
+
+    escaped = "el.innerHTML = items.map((x) => `<li>${esc(x.name)}</li>`).join('');\n"
+    assert xss(escaped) == []
+    numeric = "el.innerHTML = `<td>${i + 1}</td><td>${row.total.toFixed(2)}</td>`;\n"
+    assert xss(numeric) == []
+    choice = "el.innerHTML = `<b class=\"${ok ? 'good' : 'bad'}\">x</b>`;\n"
+    assert xss(choice) == []
+    # unescaped value in a file that reads the network: still a medium finding
+    fetched = "const r = await fetch(u);\nel.innerHTML = '<b>' + r.name + '</b>';\n"
+    assert xss(fetched) == ["medium"]
+    # unescaped value in a file with no input of its own: reported, but only as low
+    static_file = "el.innerHTML = `<b>${tour.title}</b>`;\n"
+    assert xss(static_file) == ["low"]
+    # bare identifier assigned to innerHTML is always a sink
+    assert xss("el.innerHTML = value;\n") == ["low"] or xss("el.innerHTML = value;\n") == ["medium"]
