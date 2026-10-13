@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'eighth' marks the eighth batch (payatu/vuln-nodejs-app, 4auvar/VulnNodeApp): lists written and committed before the scanner was run on them; no detector was changed for them. Both deliberately test deep cross-file indirection (route -> controller -> model, or route -> helper util) between the request read and the sink. 'held_out': 'ninth' marks the ninth batch (michealkeines/Vulnerable-API, devopslifter/Expense-Reimbursement-API, jorritfolmer/vulnerable-api): lists written and committed before the scanner was run on them; no detector was changed for them. VAPI-folmer deliberately mixes connexion path-param handlers (request data arrives as a function argument, already supported) with connexion.request.get_json()/.headers (a request access qualified by the connexion module, not flask's bare 'request' name) to test whether that alias is recognised as a source.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'eighth' marks the eighth batch (payatu/vuln-nodejs-app, 4auvar/VulnNodeApp): lists written and committed before the scanner was run on them; no detector was changed for them. Both deliberately test deep cross-file indirection (route -> controller -> model, or route -> helper util) between the request read and the sink. 'held_out': 'ninth' marks the ninth batch (michealkeines/Vulnerable-API, devopslifter/Expense-Reimbursement-API, jorritfolmer/vulnerable-api): lists written and committed before the scanner was run on them; no detector was changed for them. VAPI-folmer deliberately mixes connexion path-param handlers (request data arrives as a function argument, already supported) with connexion.request.get_json()/.headers (a request access qualified by the connexion module, not flask's bare 'request' name) to test whether that alias is recognised as a source. 'held_out': 'tenth' marks the tenth batch (manuelz120/extremely-vulnerable-flask-app, R-Rothrock/testing-sites): lists written and committed before the scanner was run on them; no detector was changed for them. Both were picked to test specific hypotheses from ADR-031 (cross-file sink) and ADR-034 (a value assigned in one branch of a plain if/else, used after it, not carrying taint) rather than being a random sample.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -2251,6 +2251,92 @@
           "line": 251,
           "class": "redos",
           "note": "nested-quantifier regex '([a-z]+)*[0-9]' applied to request data"
+        }
+      ]
+    },
+    "EVFA": {
+      "url": "https://github.com/manuelz120/extremely-vulnerable-flask-app",
+      "commit": "d5d8875559e21222bbbaadb7b9f0af592c6eb7fa",
+      "held_out": "tenth",
+      "known": [
+        {
+          "file": "routes/account.py",
+          "line": 33,
+          "class": "sql_injection",
+          "note": "sqlalchemy text(f\"...like '%{search_param}%'\")"
+        },
+        {
+          "file": "routes/account.py",
+          "line": 46,
+          "class": "idor",
+          "note": "get_personal_notes(user_id): filters by the URL's user_id, not current_user.id"
+        },
+        {
+          "file": "routes/account.py",
+          "line": 118,
+          "class": "deserialization",
+          "note": "pickle loads(b64decode(cookie)) inside before_request's else branch"
+        },
+        {
+          "file": "routes/account.py",
+          "line": 81,
+          "class": "mass_assignment",
+          "note": "current_user.__dict__.update(filtered_values); AccountForm has an is_admin field"
+        },
+        {
+          "file": "routes/account.py",
+          "line": 61,
+          "class": "ssrf",
+          "note": "get_base64_image_blob(form.url.data) -> urlopen(url) in utils/profile_image.py (cross-file)"
+        },
+        {
+          "file": "routes/signup.py",
+          "line": 17,
+          "class": "sql_injection",
+          "note": "validate_token(code, session): f-string SQL, code is a same-file helper-function parameter"
+        }
+      ]
+    },
+    "testing-sites": {
+      "url": "https://github.com/R-Rothrock/testing-sites",
+      "commit": "69406127b5d960f9faacc4633a3fbbdabf2af2b5",
+      "held_out": "tenth",
+      "known": [
+        {
+          "file": "level1/app.py",
+          "line": 15,
+          "class": "reflected_xss",
+          "note": "stream.read() % user_in; user_in assigned in one branch of an if/else, used after it"
+        },
+        {
+          "file": "level2/app.py",
+          "line": 27,
+          "class": "reflected_xss",
+          "note": "request.form['submit'] appended to a list rendered with |safe in a different handler (stored, cross-request -- a hard case)"
+        },
+        {
+          "file": "level2/app.py",
+          "line": 30,
+          "class": "debug",
+          "note": "app.run(debug=True)"
+        },
+        {
+          "file": "level4/app.py",
+          "line": 29,
+          "class": "command_injection",
+          "note": "f'host {user_in}' passed to a same-file helper get_output(cmd), shell=True"
+        },
+        {
+          "file": "level5/app.py",
+          "line": 17,
+          "class": "sql_injection",
+          "note": "f-string SQL in a same-file helper authenticate(password)"
+        },
+        {
+          "file": "level5/app.py",
+          "line": 43,
+          "class": "debug",
+          "note": "app.run(debug=True)"
         }
       ]
     }
