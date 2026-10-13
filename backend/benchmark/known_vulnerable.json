@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'eighth' marks the eighth batch (payatu/vuln-nodejs-app, 4auvar/VulnNodeApp): lists written and committed before the scanner was run on them; no detector was changed for them. Both deliberately test deep cross-file indirection (route -> controller -> model, or route -> helper util) between the request read and the sink.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'seventh' marks the seventh batch (videvelopers/Vulnerable-Flask-App, VitthalS/ivna, samoylenko/vulnerable-app-nodejs-express): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'eighth' marks the eighth batch (payatu/vuln-nodejs-app, 4auvar/VulnNodeApp): lists written and committed before the scanner was run on them; no detector was changed for them. Both deliberately test deep cross-file indirection (route -> controller -> model, or route -> helper util) between the request read and the sink. 'held_out': 'ninth' marks the ninth batch (michealkeines/Vulnerable-API, devopslifter/Expense-Reimbursement-API, jorritfolmer/vulnerable-api): lists written and committed before the scanner was run on them; no detector was changed for them. VAPI-folmer deliberately mixes connexion path-param handlers (request data arrives as a function argument, already supported) with connexion.request.get_json()/.headers (a request access qualified by the connexion module, not flask's bare 'request' name) to test whether that alias is recognised as a source.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -2146,6 +2146,111 @@
           "line": 218,
           "class": "idor",
           "note": "idorUpdateProfile: update any user's profile by ?id=, no owner check"
+        }
+      ]
+    },
+    "Vulnerable-API": {
+      "url": "https://github.com/michealkeines/Vulnerable-API",
+      "commit": "f7797964e1cd63a1cbcc8ced721fa41db674c8e0",
+      "held_out": "ninth",
+      "known": [
+        {
+          "file": "sqli.py",
+          "line": 16,
+          "class": "sql_injection",
+          "note": "f-string into execute(); connexion x-body-name param"
+        },
+        {
+          "file": "lfi.py",
+          "line": 3,
+          "class": "path_traversal",
+          "note": "open(name), name from a same-file helper call"
+        },
+        {
+          "file": "rfi.py",
+          "line": 5,
+          "class": "ssrf",
+          "note": "requests.get(url=name), name from a same-file helper call"
+        },
+        {
+          "file": "ssti.py",
+          "line": 10,
+          "class": "template_injection",
+          "note": "jinja2 Template('...' + exp).render()"
+        }
+      ]
+    },
+    "Expense-Reimbursement-API": {
+      "url": "https://github.com/devopslifter/Expense-Reimbursement-API",
+      "commit": "2ec62b3916c4614b1968dcd4614f5e563c91cf3c",
+      "held_out": "ninth",
+      "known": [
+        {
+          "file": "app.py",
+          "line": 60,
+          "class": "sql_injection",
+          "note": "f-string email interpolation (inline-commented VULN 2)"
+        },
+        {
+          "file": "config.py",
+          "line": 11,
+          "class": "debug",
+          "note": "DEBUG = True, used in app.run(debug=DEBUG)"
+        }
+      ]
+    },
+    "VAPI-folmer": {
+      "url": "https://github.com/jorritfolmer/vulnerable-api",
+      "commit": "562fb3473f8222857f972a29f6d52459a0c58237",
+      "held_out": "ninth",
+      "known": [
+        {
+          "file": "vAPI.py",
+          "line": 187,
+          "class": "sql_injection",
+          "note": "'...id = %s' % user, user is a connexion path param (handler arg, auto-tainted)"
+        },
+        {
+          "file": "vAPI.py",
+          "line": 305,
+          "class": "command_injection",
+          "note": "'uptime -' + flag, flag is a connexion path param"
+        },
+        {
+          "file": "vAPI.py",
+          "line": 96,
+          "class": "weak_hash",
+          "note": "hashlib.md5(expire_date) as the auth token"
+        },
+        {
+          "file": "vAPI.py",
+          "line": 395,
+          "class": "debug",
+          "note": "app.run(debug=True)"
+        },
+        {
+          "file": "vAPI.py",
+          "line": 73,
+          "class": "sql_injection",
+          "note": "username/password read via connexion.request.get_json(), not flask's request -- source not recognised"
+        },
+        {
+          "file": "vAPI.py",
+          "line": 254,
+          "class": "sql_injection",
+          "note": "username read via connexion.request.get_json(), same gap"
+        },
+        {
+          "file": "vAPI.py",
+          "line": 61,
+          "class": "xxe",
+          "note": "etree.XMLParser(resolve_entities=True) on connexion.request.body, same gap"
+        },
+        {
+          "file": "vAPI.py",
+          "line": 251,
+          "class": "redos",
+          "note": "nested-quantifier regex '([a-z]+)*[0-9]' applied to request data"
         }
       ]
     }
