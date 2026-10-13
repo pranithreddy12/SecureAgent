@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -1403,6 +1403,141 @@
           "line": 16,
           "class": "xxe",
           "note": "sax.parseString"
+        }
+      ]
+    },
+    "Pixi": {
+      "url": "https://github.com/DevSlop/Pixi",
+      "commit": "cb716a94fa368acade96e9bdb8b25c1a68703e60",
+      "held_out": "fifth",
+      "known": [
+        {
+          "file": "api/api.js",
+          "line": 70,
+          "class": "nosql_injection",
+          "note": "findOne({email: user, password: pass}) from request"
+        },
+        {
+          "file": "api/api.js",
+          "line": 110,
+          "class": "mass_assignment",
+          "note": "is_admin accepted at registration"
+        },
+        {
+          "file": "api/api.js",
+          "line": 531,
+          "class": "mass_assignment",
+          "note": "is_admin accepted in edit_info"
+        },
+        {
+          "file": "api/api.js",
+          "line": 69,
+          "class": "sensitive_data_in_log",
+          "note": "logs user and password"
+        },
+        {
+          "file": "api/api.js",
+          "line": 164,
+          "class": "sensitive_data_in_log",
+          "note": "logs the JWT session secret"
+        },
+        {
+          "file": "api/api.js",
+          "line": 260,
+          "class": "missing_authorization",
+          "note": "delete route without api_token_check"
+        },
+        {
+          "file": "api/api.js",
+          "line": 556,
+          "class": "idor",
+          "note": "other_user_info by user_id"
+        },
+        {
+          "file": "api/api.js",
+          "line": 631,
+          "class": "missing_authorization",
+          "note": "admin endpoint with only a token check"
+        }
+      ]
+    },
+    "DVSA": {
+      "url": "https://github.com/OWASP/DVSA",
+      "commit": "c04e0a536ac54db8f732144be92b5f208169f8c4",
+      "held_out": "fifth",
+      "known": [
+        {
+          "file": "backend/functions/admin/admin_get_orders.py",
+          "line": 37,
+          "class": "code_injection",
+          "note": "eval of filter built from event"
+        },
+        {
+          "file": "backend/functions/admin/admin_get_orders.py",
+          "line": 45,
+          "class": "code_injection",
+          "note": "eval of filter built from event"
+        },
+        {
+          "file": "backend/functions/admin/admin_shell.js",
+          "line": 36,
+          "class": "code_injection",
+          "note": "eval(cmd)"
+        },
+        {
+          "file": "backend/functions/admin/admin_shell.js",
+          "line": 45,
+          "class": "path_traversal",
+          "note": "'/tmp/' + body.file"
+        },
+        {
+          "file": "backend/functions/admin/admin_update_orders.py",
+          "line": 51,
+          "class": "deserialization",
+          "note": "jsonpickle.decode"
+        },
+        {
+          "file": "backend/functions/order-manager/order-manager.js",
+          "line": 10,
+          "class": "deserialization",
+          "note": "node-serialize unserialize(event.body)"
+        },
+        {
+          "file": "backend/functions/order-manager/order-manager.js",
+          "line": 11,
+          "class": "deserialization",
+          "note": "node-serialize unserialize(event.headers)"
+        }
+      ]
+    },
+    "crAPI": {
+      "url": "https://github.com/OWASP/crAPI",
+      "commit": "b5fc307f3e5f875809b095b771108ef342a33724",
+      "held_out": "fifth",
+      "known": [
+        {
+          "file": "services/workshop/crapi/shop/views.py",
+          "line": 388,
+          "class": "sql_injection",
+          "note": "coupon_code concatenated"
+        },
+        {
+          "file": "services/workshop/crapi/merchant/views.py",
+          "line": 87,
+          "class": "ssrf",
+          "note": "requests.get(mechanic_api)"
+        },
+        {
+          "file": "services/workshop/crapi/shop/views.py",
+          "line": 250,
+          "class": "mass_assignment",
+          "note": "order status from request"
+        },
+        {
+          "file": "services/workshop/crapi/mechanic/views.py",
+          "line": 235,
+          "class": "idor",
+          "note": "service report by id, no owner check"
         }
       ]
     }
