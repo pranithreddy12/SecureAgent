@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed.",
+  "description": "Planted vulnerabilities in public intentionally-vulnerable applications, read from their source by hand. 'in_taxonomy': false marks a planted flaw whose class had no detector at the time; all current entries are in the taxonomy since ADR-023. Clone each repository at the pinned commit; never run the code. 'held_out': true marks applications added after the detectors were designed: their truth lists were written BEFORE the scanner was run on them and no detector was tuned on them before the first score. 'held_out': 'third' marks the third batch (VAmPI, dvpwa, nodejs-goof, vulnerable-node, dvws-node): truth lists written and committed before the scanner was run on them. 'clean_files' list files that must produce no finding (negatives). 'held_out': 'fourth' marks the fourth batch (lets-be-bad-guys, django.nV, Tiredful-API, vulnpy): lists written and committed before the scanner was run on them; no detector was changed for them. 'held_out': 'fifth' marks Pixi, DVSA and crAPI (workshop service): lists written and committed before the scanner was run; no detector changed. 'held_out': 'sixth' marks the sixth batch (skf-labs python labs, DVGA, Damn-Vulnerable-RESTaurant): lists written and committed before the scanner was run on them; no detector was changed for them.",
   "repos": {
     "DSVW": {
       "url": "https://github.com/stamparm/DSVW",
@@ -1538,6 +1538,369 @@
           "line": 235,
           "class": "idor",
           "note": "service report by id, no owner check"
+        }
+      ]
+    },
+    "skf-labs": {
+      "url": "https://github.com/blabla1337/skf-labs",
+      "commit": "35199b6f49658b75f860530c0f09b91e985198aa",
+      "held_out": "sixth",
+      "known": [
+        {
+          "file": "python/CMD/CMD.py",
+          "line": 17,
+          "class": "command_injection",
+          "note": "os.system with form size"
+        },
+        {
+          "file": "python/CMD/CMD.py",
+          "line": 28,
+          "class": "debug",
+          "note": "app.run(debug=True, host=0.0.0.0)"
+        },
+        {
+          "file": "python/CMD-Blind/CMD-Blind.py",
+          "line": 17,
+          "class": "command_injection",
+          "note": "os.system('echo ' + input)"
+        },
+        {
+          "file": "python/CMD2/CMD2.py",
+          "line": 16,
+          "class": "command_injection",
+          "note": "os.popen('zip ' + log_type)"
+        },
+        {
+          "file": "python/CMD2/CMD2.py",
+          "line": 37,
+          "class": "code_injection",
+          "note": "eval(lines_type + ...)"
+        },
+        {
+          "file": "python/CMD3/File-upload-cmd.py",
+          "line": 11,
+          "class": "command_injection",
+          "note": "os.popen(command) via template call"
+        },
+        {
+          "file": "python/CMD4/CMD4.py",
+          "line": 24,
+          "class": "command_injection",
+          "note": "os.system('ping -c1 ' + ip)"
+        },
+        {
+          "file": "python/DES-Pickle/DES-Pickle.py",
+          "line": 26,
+          "class": "deserialization",
+          "note": "pickle.load of uploaded data"
+        },
+        {
+          "file": "python/DES-Pickle-2/Login.py",
+          "line": 31,
+          "class": "deserialization",
+          "note": "pickle.loads(b64decode(cookie))"
+        },
+        {
+          "file": "python/DES-Yaml/DES.py",
+          "line": 19,
+          "class": "deserialization",
+          "note": "yaml.load without Loader"
+        },
+        {
+          "file": "python/DNS-rebinding/rebind.py",
+          "line": 25,
+          "class": "ssrf",
+          "note": "requests.get(hostname from query)"
+        },
+        {
+          "file": "python/SSRF/SSRF.py",
+          "line": 22,
+          "class": "ssrf",
+          "note": "requests.head(form url)"
+        },
+        {
+          "file": "python/RFI/RFI.py",
+          "line": 23,
+          "class": "code_injection",
+          "note": "eval(requests.get(url).text)"
+        },
+        {
+          "file": "python/LFI/LFI.py",
+          "line": 18,
+          "class": "path_traversal",
+          "note": "open(form filename)"
+        },
+        {
+          "file": "python/LFI-2/LFI-2.py",
+          "line": 18,
+          "class": "path_traversal",
+          "note": "open_resource after weak ../ strip"
+        },
+        {
+          "file": "python/LFI-3/LFI-3.py",
+          "line": 18,
+          "class": "path_traversal",
+          "note": "open_resource after double decode"
+        },
+        {
+          "file": "python/SQLI/models/sqlimodel.py",
+          "line": 7,
+          "class": "sql_injection",
+          "note": "'...pageId=' + pageId"
+        },
+        {
+          "file": "python/SQLI-blind/models/sqlimodel.py",
+          "line": 8,
+          "class": "sql_injection",
+          "note": "'...pageId=' + pageId"
+        },
+        {
+          "file": "python/SQLI-like/models/sqlimodel.py",
+          "line": 7,
+          "class": "sql_injection",
+          "note": "LIKE '%' + username"
+        },
+        {
+          "file": "python/SQLI-login-bypass/models/sqlimodel.py",
+          "line": 22,
+          "class": "sql_injection",
+          "note": "db.execute(query) built from input"
+        },
+        {
+          "file": "python/SQLI-login-bypass/SQLI-login-bypass.py",
+          "line": 54,
+          "class": "weak_hash",
+          "note": "sha1 session id"
+        },
+        {
+          "file": "python/graphql-injections/app.py",
+          "line": 132,
+          "class": "sql_injection",
+          "note": "text(\"username ='\" + username + \"'\")"
+        },
+        {
+          "file": "python/graphql-injections/app.py",
+          "line": 125,
+          "class": "command_injection",
+          "note": "os.system('nc ' + host + port)"
+        },
+        {
+          "file": "python/SSTI/SSTI.py",
+          "line": 218,
+          "class": "template_injection",
+          "note": "render_template_string of request.url"
+        },
+        {
+          "file": "python/Url-redirection/redirect.py",
+          "line": 13,
+          "class": "open_redirect",
+          "note": "redirect(?newurl=)"
+        },
+        {
+          "file": "python/Url-redirection-harder/redirect.py",
+          "line": 25,
+          "class": "open_redirect",
+          "note": "redirect(?newurl=) weak filter"
+        },
+        {
+          "file": "python/Url-redirection-harder2/redirect.py",
+          "line": 25,
+          "class": "open_redirect",
+          "note": "redirect(?newurl=) weak filter"
+        },
+        {
+          "file": "python/XXE/XXE.py",
+          "line": 16,
+          "class": "xxe",
+          "note": "pulldom.parseString(form)"
+        },
+        {
+          "file": "python/IDOR/IDOR.py",
+          "line": 37,
+          "class": "idor",
+          "note": "send_from_directory by pdf_id"
+        },
+        {
+          "file": "python/XSS/XSS.py",
+          "line": 16,
+          "class": "reflected_xss",
+          "note": "form string into template (|safe)"
+        },
+        {
+          "file": "python/XSS-attribute/XSS-attribute.py",
+          "line": 15,
+          "class": "reflected_xss",
+          "note": "form string into attribute"
+        },
+        {
+          "file": "python/XSS-url/XSS-url.py",
+          "line": 15,
+          "class": "reflected_xss",
+          "note": "form string into url"
+        },
+        {
+          "file": "python/CSSI/CSSI.py",
+          "line": 17,
+          "class": "reflected_xss",
+          "note": "flask.Markup(form value)"
+        },
+        {
+          "file": "python/http-response-splitting/http-response-splitting.py",
+          "line": 18,
+          "class": "reflected_xss",
+          "note": "flask.Markup(value)"
+        },
+        {
+          "file": "python/Session-Management-1/models/SQL.py",
+          "line": 25,
+          "class": "weak_hash",
+          "note": "md5 password hash"
+        },
+        {
+          "file": "python/Auth-bypass-1/Login.py",
+          "line": 24,
+          "class": "weak_hash",
+          "note": "sha1(username) session cookie"
+        },
+        {
+          "file": "python/Attack-Server/attack-server.py",
+          "line": 112,
+          "class": "secret",
+          "note": "app.secret_key literal"
+        },
+        {
+          "file": "python/JWT-null/JWT-null.py",
+          "line": 33,
+          "class": "secret",
+          "note": "SECRET_KEY literal"
+        },
+        {
+          "file": "python/JWT-secret/JWT.py",
+          "line": 29,
+          "class": "secret",
+          "note": "SECRET_KEY = 'secret'"
+        },
+        {
+          "file": "python/graphql-IDOR/app.py",
+          "line": 18,
+          "class": "secret",
+          "note": "secret_key literal"
+        },
+        {
+          "file": "python/account-provisioning-process/account-provisioning-process.py",
+          "line": 13,
+          "class": "secret",
+          "note": "secret_key literal"
+        },
+        {
+          "file": "python/NoSQL/NoSQL.py",
+          "line": 13,
+          "class": "secret",
+          "note": "secret_key literal"
+        },
+        {
+          "file": "python/Host-Header-Authentication-Bypass/host-header-authentication-bypass.py",
+          "line": 135,
+          "class": "secret",
+          "note": "secret_key literal"
+        },
+        {
+          "file": "python/ratelimiting/ratelimiting.py",
+          "line": 4,
+          "class": "secret",
+          "note": "SECRET_KEY literal"
+        },
+        {
+          "file": "python/CORS/CORS.py",
+          "line": 14,
+          "class": "secret",
+          "note": "SECRET_KEY literal"
+        },
+        {
+          "file": "python/CSRF/CSRF.py",
+          "line": 13,
+          "class": "secret",
+          "note": "SECRET_KEY literal"
+        },
+        {
+          "file": "python/NoSQL/NoSQL.py",
+          "line": 43,
+          "class": "nosql_injection",
+          "note": "users.find_one with request JSON"
+        }
+      ]
+    },
+    "Damn-Vulnerable-GraphQL-Application": {
+      "url": "https://github.com/dolevf/Damn-Vulnerable-GraphQL-Application",
+      "commit": "a961308c02d1fb462b192681c336b0739e432da7",
+      "held_out": "sixth",
+      "known": [
+        {
+          "file": "core/helpers.py",
+          "line": 9,
+          "class": "command_injection",
+          "note": "os.popen(cmd), called with user input"
+        },
+        {
+          "file": "core/views.py",
+          "line": 211,
+          "class": "command_injection",
+          "note": "curl built from scheme/host/port/path"
+        },
+        {
+          "file": "core/views.py",
+          "line": 352,
+          "class": "command_injection",
+          "note": "ps {arg}"
+        },
+        {
+          "file": "core/views.py",
+          "line": 320,
+          "class": "sql_injection",
+          "note": "text(\"title = '%s'\" % filter)"
+        },
+        {
+          "file": "core/helpers.py",
+          "line": 25,
+          "class": "path_traversal",
+          "note": "open(UPLOADDIR + filename)"
+        },
+        {
+          "file": "app.py",
+          "line": 14,
+          "class": "secret",
+          "note": "SECRET_KEY = 'dvga'"
+        },
+        {
+          "file": "app.py",
+          "line": 15,
+          "class": "secret",
+          "note": "JWT_SECRET_KEY = 'dvga'"
+        }
+      ]
+    },
+    "Damn-Vulnerable-RESTaurant-API-Game": {
+      "url": "https://github.com/theowni/Damn-Vulnerable-RESTaurant-API-Game",
+      "commit": "d32d09972aec7830f5f1d4a5d274cac7aae7eb82",
+      "held_out": "sixth",
+      "known": [
+        {
+          "file": "app/apis/admin/utils.py",
+          "line": 5,
+          "class": "command_injection",
+          "note": "shell=True 'df -h ' + parameters"
+        },
+        {
+          "file": "app/apis/orders/services/get_order_status.py",
+          "line": 41,
+          "class": "sql_injection",
+          "note": "raw f-string UPDATE via text()"
+        },
+        {
+          "file": "app/apis/menu/utils.py",
+          "line": 10,
+          "class": "ssrf",
+          "note": "requests.get(image_url)"
         }
       ]
     }
