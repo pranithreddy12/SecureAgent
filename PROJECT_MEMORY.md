@@ -232,6 +232,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) | Accepted |
 | ADR-031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
+| ADR-033 | Mistral as a second LLM provider | Accepted |
 
 Other design decisions (2026-10-02): JWT in httpOnly cookie (+ Bearer for tests);
 2026-10-03: browser calls same-origin `/api/*`, Next.js rewrites proxy to FastAPI
@@ -509,3 +510,8 @@ read/edit/commit them. No backend change.
 taint and it did: VulnNodeApp (route->controller->model, different files) 25%, vuln-nodejs-app (same-file)
 55%. Eight untouched: 52/49/41/46/58/68/75/42%, pooled 52%. Confirmed gap: taint tracking is same-file only,
 does not follow a value across a function call into another file.
+
+**Mistral LLM provider (2026-10-14, ADR-033):** `llm_review.py` now has a provider table (anthropic /
+mistral); `LLM_PROVIDER=mistral` + `MISTRAL_API_KEY` (+ optional `LLM_MODEL`) switches the opt-in AI
+review/narrative stages and `secureagent review --provider mistral`. Unit-tested with a fake
+transport only; not run against the live Mistral API.

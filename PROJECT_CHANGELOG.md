@@ -1137,3 +1137,11 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Set chosen to stress cross-file request flow: VulnNodeApp (route -> controller -> model, every sink in a
   different file) scored 25%; vuln-nodejs-app (same-file route -> sink) scored 55%, confirming taint
   tracking does not follow a value across a function call into another file.
+
+## 2026-10-14 (Mistral LLM provider -- ADR-033)
+
+- `app/analysis/llm_review.py`: provider table (anthropic / mistral) driving URL, auth header,
+  payload shape and response parsing; `Reviewer.provider`, `api_key_from_env(provider)`. Wired
+  `settings.llm_provider` into the pipeline's `ai_validator`/`ai_narrative` stages and added
+  `secureagent review --provider`. `LLM_PROVIDER=mistral` + `MISTRAL_API_KEY` switches the whole
+  opt-in AI layer. 3 new tests (570 passed, 2 skipped total); no live Mistral call made yet.

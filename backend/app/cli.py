@@ -425,12 +425,18 @@ def _run_review(args) -> int:
         print("Nothing to review (no reviewable findings with readable code).")
         return 0
 
+    provider = args.provider or os.environ.get("SECUREAGENT_REVIEW_PROVIDER") or "anthropic"
+    try:
+        spec = lr.provider_spec(provider)
+    except lr.ReviewError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     chars = sum(len(c.text) for _, _, c in prepared)
     files = sorted({name for _, _, c in prepared for name in c.files})
-    model = args.model or os.environ.get("SECUREAGENT_REVIEW_MODEL") or lr.DEFAULT_MODEL
+    model = args.model or os.environ.get("SECUREAGENT_REVIEW_MODEL") or spec.default_model
     print(
         f"LLM review: {len(prepared)} finding(s), about {chars // 1024 + 1} KiB of code from "
-        f"{len(files)} file(s), model {model}.\n"
+        f"{len(files)} file(s), provider {provider}, model {model}.\n"
         "Secret-looking values are redacted; secret findings and git-ignored files are never "
         "sent. The verdict is shown beside each finding and never changes status or gating.",
         file=sys.stderr,
@@ -441,7 +447,7 @@ def _run_review(args) -> int:
         print("\n(dry run: nothing was sent)", file=sys.stderr)
         return 0
     try:
-        key = lr.api_key_from_env()
+        key = lr.api_key_from_env(provider)
     except lr.ReviewError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -450,17 +456,20 @@ def _run_review(args) -> int:
             print("error: refusing to send code without --yes in a non-interactive session",
                   file=sys.stderr)  # fmt: skip
             return 2
-        if input(f"Send these excerpts to {lr.API_URL}? [y/N] ").strip().lower() not in {
+        if input(f"Send these excerpts to {provider}? [y/N] ").strip().lower() not in {
             "y",
             "yes",
         }:
             print("Cancelled; nothing was sent.", file=sys.stderr)
             return 1
 
+    # Looked up as module attributes (not spec.transport) so tests/embedders can monkeypatch them.
+    transport = lr.mistral_transport if provider == "mistral" else lr.http_transport
     reviewer = lr.Reviewer(
         api_key=key,
         model=model,
-        transport=lr.http_transport,  # looked up now so tests/embedders can replace it
+        provider=provider,
+        transport=transport,
         cache_path=lr.default_cache_path(),
     )
     reviewed = {}
@@ -827,11 +836,17 @@ def main(argv: list[str] | None = None) -> int:
 
     review = sub.add_parser(
         "review",
-        help="Opt-in LLM second opinion on findings (sends code excerpts to the Anthropic API).",
+        help="Opt-in LLM second opinion on findings (sends code excerpts to Anthropic or Mistral).",
     )
     review.add_argument("path", nargs="?", default=".", help="Project directory (default: .)")
     review.add_argument(
         "--limit", type=int, default=15, help="Max findings to review (default 15)."
+    )
+    review.add_argument(
+        "--provider",
+        choices=("anthropic", "mistral"),
+        default=None,
+        help="LLM provider (default: SECUREAGENT_REVIEW_PROVIDER, else anthropic).",
     )
     review.add_argument(
         "--model", default=None, help="Model id (default: SECUREAGENT_REVIEW_MODEL)."

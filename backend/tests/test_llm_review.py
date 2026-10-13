@@ -95,6 +95,52 @@ def test_verified_verdict_is_kept_and_the_payload_has_no_secret(project):
     assert fake.calls[0]["payload"]["temperature"] == 0
 
 
+def test_mistral_provider_uses_bearer_auth_and_openai_shaped_payload(project):
+    f = sqli(project)
+    ctx = lr.build_context(str(project), f)
+    quote = 'cur.execute("SELECT * FROM t WHERE n = \'" + term + "\'")'
+    response = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "verdict": "true_positive",
+                            "confidence": 0.8,
+                            "reason": "x",
+                            "quote": quote,
+                        }
+                    )
+                }
+            }
+        ]
+    }
+    fake = Fake(response)
+    r = lr.Reviewer(api_key="mk-test", provider="mistral", transport=fake).review(f, ctx)
+    assert r.verdict == "true_positive" and r.quote_verified
+    assert r.model == lr.MISTRAL_DEFAULT_MODEL
+    payload, headers = fake.calls[0]["payload"], fake.calls[0]["headers"]
+    assert headers["authorization"] == "Bearer mk-test" and "x-api-key" not in headers
+    assert payload["messages"][0] == {"role": "system", "content": lr.SYSTEM}
+    assert payload["model"] == lr.MISTRAL_DEFAULT_MODEL
+
+
+def test_unknown_provider_is_a_clean_error(project):
+    f = sqli(project)
+    ctx = lr.build_context(str(project), f)
+    with pytest.raises(lr.ReviewError):
+        lr.Reviewer(api_key="k", provider="made-up", transport=Fake(reply())).review(f, ctx)
+
+
+def test_api_key_from_env_reads_the_provider_specific_variable(monkeypatch):
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    monkeypatch.setenv("MISTRAL_API_KEY", "mk-123")
+    assert lr.api_key_from_env("mistral") == "mk-123"
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    with pytest.raises(lr.ReviewError):
+        lr.api_key_from_env("mistral")
+
+
 def test_a_verdict_with_an_invented_quote_is_downgraded_to_unclear(project):
     f = sqli(project)
     ctx = lr.build_context(str(project), f)

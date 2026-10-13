@@ -12,8 +12,10 @@ What this layer will never do:
 - trust the model: a verdict whose supporting quote is not literally present in the code that was
   sent is downgraded to ``unclear``.
 
-It uses the Anthropic Messages API over the standard library (no SDK dependency) and the key is
-read from ``ANTHROPIC_API_KEY`` only (never a command-line argument, never logged).
+It talks to the Anthropic Messages API or the Mistral chat-completions API over the standard
+library (no SDK dependency); which one is picked by ``provider`` ("anthropic", the default, or
+"mistral"). The key is read from ``ANTHROPIC_API_KEY`` / ``MISTRAL_API_KEY`` only (never a
+command-line argument, never logged).
 """
 
 from __future__ import annotations
@@ -37,6 +39,10 @@ from app.schemas.report import ReportFinding
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
 DEFAULT_MODEL = "claude-sonnet-5-5"
+
+MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
+MISTRAL_DEFAULT_MODEL = "mistral-large-latest"
+
 MAX_CONTEXT_CHARS = 9000
 MAX_HELPERS = 3
 MAX_RESPONSE_BYTES = 200_000
@@ -249,9 +255,9 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def http_transport(payload: dict, headers: dict[str, str]) -> dict:
-    req = urllib.request.Request(  # noqa: S310 - fixed https host, not user input
-        API_URL, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
+def _request(url: str, payload: dict, headers: dict[str, str]) -> dict:
+    req = urllib.request.Request(  # noqa: S310 - https URL is one of PROVIDERS, not user input
+        url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
     )
     delay = 2.0
     for attempt in range(3):
@@ -276,13 +282,107 @@ def http_transport(payload: dict, headers: dict[str, str]) -> dict:
     raise ReviewError("the API kept failing")
 
 
-def parse_verdict(response: dict, context: Context, model: str) -> Review:
+def http_transport(payload: dict, headers: dict[str, str]) -> dict:
+    """Anthropic Messages API."""
+    return _request(API_URL, payload, headers)
+
+
+def mistral_transport(payload: dict, headers: dict[str, str]) -> dict:
+    """Mistral's OpenAI-compatible chat-completions API."""
+    return _request(MISTRAL_API_URL, payload, headers)
+
+
+def _anthropic_headers(key: str) -> dict[str, str]:
+    return {"content-type": "application/json", "x-api-key": key, "anthropic-version": API_VERSION}
+
+
+def _anthropic_payload(model: str, system: str, content: str, max_tokens: int) -> dict:
+    return {
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": 0,
+        "system": system,
+        "messages": [{"role": "user", "content": content}],
+    }
+
+
+def _anthropic_text(response: dict) -> str:
+    return "".join(
+        block.get("text", "") for block in response.get("content", []) if isinstance(block, dict)
+    )
+
+
+def _mistral_headers(key: str) -> dict[str, str]:
+    return {"content-type": "application/json", "authorization": f"Bearer {key}"}
+
+
+def _mistral_payload(model: str, system: str, content: str, max_tokens: int) -> dict:
+    return {
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": 0,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": content},
+        ],
+    }
+
+
+def _mistral_text(response: dict) -> str:
+    choices = response.get("choices") or []
+    first = choices[0] if choices else {}
+    return str((first.get("message") or {}).get("content", "")) if isinstance(first, dict) else ""
+
+
+@dataclass(frozen=True)
+class ProviderSpec:
+    env_var: str
+    default_model: str
+    transport: Transport
+    headers: Callable[[str], dict[str, str]]
+    build_payload: Callable[[str, str, str, int], dict]
+    extract_text: Callable[[dict], str]
+
+
+# Add a provider here to support another API: everything else (CLI flag, pipeline setting,
+# redaction, quote verification) already works against this table.
+PROVIDERS: dict[str, ProviderSpec] = {
+    "anthropic": ProviderSpec(
+        env_var="ANTHROPIC_API_KEY",
+        default_model=DEFAULT_MODEL,
+        transport=http_transport,
+        headers=_anthropic_headers,
+        build_payload=_anthropic_payload,
+        extract_text=_anthropic_text,
+    ),
+    "mistral": ProviderSpec(
+        env_var="MISTRAL_API_KEY",
+        default_model=MISTRAL_DEFAULT_MODEL,
+        transport=mistral_transport,
+        headers=_mistral_headers,
+        build_payload=_mistral_payload,
+        extract_text=_mistral_text,
+    ),
+}
+
+
+def provider_spec(provider: str) -> ProviderSpec:
     try:
-        text = "".join(
-            block.get("text", "")
-            for block in response.get("content", [])
-            if isinstance(block, dict)
-        )
+        return PROVIDERS[provider]
+    except KeyError:
+        raise ReviewError(
+            f"unknown LLM provider {provider!r}; choose one of {', '.join(PROVIDERS)}"
+        ) from None
+
+
+def parse_verdict(
+    response: dict,
+    context: Context,
+    model: str,
+    extract_text: Callable[[dict], str] = _anthropic_text,
+) -> Review:
+    try:
+        text = extract_text(response)
         match = re.search(r"\{.*\}", text, re.S)
         data = json.loads(match.group(0)) if match else {}
     except (ValueError, AttributeError):
@@ -311,12 +411,18 @@ def parse_verdict(response: dict, context: Context, model: str) -> Review:
 @dataclass
 class Reviewer:
     api_key: str
-    model: str = DEFAULT_MODEL
-    transport: Transport = http_transport
+    model: str = ""
+    provider: str = "anthropic"
+    transport: Transport | None = None
     cache_path: Path | None = None
     _cache: dict[str, dict] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        spec = provider_spec(self.provider)
+        if not self.model:
+            self.model = spec.default_model
+        if self.transport is None:
+            self.transport = spec.transport
         if self.cache_path and self.cache_path.is_file():
             try:
                 self._cache = json.loads(self.cache_path.read_text(encoding="utf-8"))
@@ -326,23 +432,15 @@ class Reviewer:
     def review(
         self, finding: ReportFinding, context: Context, path: tuple[str, ...] = ()
     ) -> Review:
+        spec = provider_spec(self.provider)
         prompt = build_prompt(finding, context, path)
-        key = hashlib.sha256(f"{self.model}\n{prompt}".encode()).hexdigest()
+        key = hashlib.sha256(f"{self.provider}\n{self.model}\n{prompt}".encode()).hexdigest()
         if key in self._cache:
             return Review(**self._cache[key])
-        payload = {
-            "model": self.model,
-            "max_tokens": 400,
-            "temperature": 0,
-            "system": SYSTEM,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        headers = {
-            "content-type": "application/json",
-            "x-api-key": self.api_key,
-            "anthropic-version": API_VERSION,
-        }
-        review = parse_verdict(self.transport(payload, headers), context, self.model)
+        payload = spec.build_payload(self.model, SYSTEM, prompt, 400)
+        headers = spec.headers(self.api_key)
+        response = self.transport(payload, headers)
+        review = parse_verdict(response, context, self.model, spec.extract_text)
         self._cache[key] = asdict(review)
         return review
 
@@ -364,11 +462,12 @@ def default_cache_path() -> Path:
     return Path(base) / "secureagent" / "review-cache.json"
 
 
-def api_key_from_env() -> str:
-    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+def api_key_from_env(provider: str = "anthropic") -> str:
+    env_var = provider_spec(provider).env_var
+    key = os.environ.get(env_var, "").strip()
     if not key:
         raise ReviewError(
-            "ANTHROPIC_API_KEY is not set. LLM review is opt-in and uses your own key; "
+            f"{env_var} is not set. LLM review is opt-in and uses your own key; "
             "nothing is sent without it."
         )
     return key
@@ -438,18 +537,9 @@ def acceptable_narrative(text: str) -> str | None:
 
 def narrate(reviewer: Reviewer, facts: dict) -> str | None:
     """Ask the model for a short summary; None if the answer is unusable (caller falls back)."""
-    payload = {
-        "model": reviewer.model,
-        "max_tokens": 450,
-        "temperature": 0,
-        "system": NARRATIVE_SYSTEM,
-        "messages": [{"role": "user", "content": json.dumps(facts, ensure_ascii=False)}],
-    }
-    headers = {
-        "content-type": "application/json",
-        "x-api-key": reviewer.api_key,
-        "anthropic-version": API_VERSION,
-    }
+    spec = provider_spec(reviewer.provider)
+    content = json.dumps(facts, ensure_ascii=False)
+    payload = spec.build_payload(reviewer.model, NARRATIVE_SYSTEM, content, 450)
+    headers = spec.headers(reviewer.api_key)
     response = reviewer.transport(payload, headers)
-    text = "".join(b.get("text", "") for b in response.get("content", []) if isinstance(b, dict))
-    return acceptable_narrative(text)
+    return acceptable_narrative(spec.extract_text(response))

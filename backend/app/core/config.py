@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     frontend_origin: str = "http://localhost:3000"
 
+    # "anthropic" or "mistral" (app/analysis/llm_review.py:PROVIDERS). Empty llm_model picks that
+    # provider's default.
     llm_provider: str = "anthropic"
     llm_api_key: str = ""
     llm_model: str = ""

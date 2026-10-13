@@ -85,8 +85,8 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 567 passed, 2 skipped (PDF locally, Windows symlink) |
-| Frontend | 39 Vitest tests; lint, typecheck, build |
+| Backend tests | 570 passed, 2 skipped (PDF locally, Windows symlink) |
+| Frontend | 40 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
 | Benchmark | 35 TP / 1 FP / 2 FN = 97% precision, 95% recall on an **author-written** corpus (a regression guard, not a real-world rate) |
@@ -139,6 +139,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 030 | Seventh untouched set (Vulnerable-Flask-App, ivna, vulnerable-app-nodejs-express) |
 | 031 | Eighth untouched set (vuln-nodejs-app, VulnNodeApp); confirmed cross-file taint gap |
 | 032 | A single "Run" page instead of three separate forms |
+| 033 | Mistral as a second LLM provider |
 
 ## 10. Document map
 

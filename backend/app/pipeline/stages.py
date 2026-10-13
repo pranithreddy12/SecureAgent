@@ -301,10 +301,14 @@ async def _ai_settings(ctx: Ctx):
     settings = get_settings()
     if not settings.llm_api_key:
         return audit, None, "skipped: no LLM key is configured on this server"
+    provider = settings.llm_provider or "anthropic"
+    # looked up as attributes (not bound eagerly) so tests can monkeypatch them
+    transport = lr.mistral_transport if provider == "mistral" else lr.http_transport
     reviewer = lr.Reviewer(
         api_key=settings.llm_api_key,
-        model=settings.llm_model or lr.DEFAULT_MODEL,
-        transport=lr.http_transport,  # looked up now so tests can replace it
+        model=settings.llm_model,
+        provider=provider,
+        transport=transport,
         cache_path=lr.default_cache_path(),
     )
     return audit, (reviewer, ai), None
