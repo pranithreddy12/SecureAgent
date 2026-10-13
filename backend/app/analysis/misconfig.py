@@ -307,8 +307,11 @@ class _Visitor(ast.NodeVisitor):
         last = name.rsplit(".", 1)[-1]
         kw = {k.arg: k.value for k in node.keywords if k.arg}
 
-        if last == "run" and _is_true(kw.get("debug")):
-            self._add("debug_enabled", "app.run(debug=True)", node.lineno)
+        if (
+            last == "run"
+            or re.search(r"(?i)application$|^(flask|fastapi|sanic|quart|create_app)$", last)
+        ) and _is_true(kw.get("debug")):
+            self._add("debug_enabled", f"{last}(debug=True)", node.lineno)
 
         origins = kw.get("allow_origins") or kw.get("origins")
         if origins is not None and _contains_star(origins):
@@ -335,7 +338,10 @@ class _Visitor(ast.NodeVisitor):
         if last == "set_cookie" and (_is_false(kw.get("secure")) or _is_false(kw.get("httponly"))):
             self._add("insecure_cookie", "set_cookie without Secure/HttpOnly", node.lineno)
 
-        if last in {"Environment", "select_autoescape"} and _is_false(kw.get("autoescape")):
+        if (
+            last in {"Environment", "select_autoescape"}
+            or re.search(r"(?i)jinja|template|autoescape", last)
+        ) and _is_false(kw.get("autoescape")):
             self._add("template_autoescape_off", "autoescape=False", node.lineno)
 
         self.generic_visit(node)

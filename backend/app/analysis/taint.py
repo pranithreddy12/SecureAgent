@@ -18,6 +18,7 @@ import re
 from dataclasses import dataclass
 
 from app.analysis import extra_detectors as xd
+from app.analysis.openapi_spec import SPEC_HANDLERS
 from app.analysis.routes import _CBV_BASE_HINTS, _CBV_METHOD_MAP, HTTP_METHODS
 
 SOURCE_ROOTS = {"request", "req"}
@@ -805,15 +806,23 @@ _JS_SINKS = [
     (
         "path_traversal",
         re.compile(
-            r"\bfs\.(?:readFile|readFileSync|createReadStream|writeFile)\s*\(|\.sendFile\s*\("
+            r"\bfs\.(?:readFile|readFileSync|createReadStream|writeFile)\s*\(|"
+            r"\.(?:sendFile|download)\s*\("
         ),
         None,
     ),
-    ("open_redirect", re.compile(r"\.redirect\s*\("), None),
+    ("open_redirect", re.compile(r"\.(?:redirect|location)\s*\("), None),
+    (
+        "reflected_xss",
+        re.compile(
+            r"""\b(?:res|response)\.(?:send|write|end)\s*\(\s*(?:['"`][^'"`]*<\s*[A-Za-z])"""
+        ),
+        None,
+    ),
 ]
 
 
-_JS_LITERAL_ARG = re.compile(r"""\(\s*(['"`])[^'"`$\\]*\1\s*[,)]""")
+_JS_LITERAL_ARG = re.compile(r"""\(\s*(?:(['"`])[^'"`$\\]*\1\s*,?\s*)+(?:\{[^{}]*\}\s*)?\)""")
 
 
 def _js_constant_call(sink_re: re.Pattern[str], line: str) -> bool:
@@ -1013,6 +1022,11 @@ def mark_view_handlers(tree: ast.AST) -> None:
     the requesting user are additionally marked ``_sa_scoped`` (ownership enforced there)."""
     _mark_constant_lookups(tree)
     _mark_http_server_handlers(tree)
+    spec_handlers = SPEC_HANDLERS.get()
+    if spec_handlers:  # functions named by an OpenAPI operationId
+        for fn in ast.walk(tree):
+            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and fn.name in spec_handlers:
+                fn._sa_handler = True  # type: ignore[attr-defined]
     for cls in ast.walk(tree):
         if not isinstance(cls, ast.ClassDef):
             continue

@@ -28,6 +28,13 @@ from app.analysis.intent import (
 )
 from app.analysis.logging_checks import LoggingFinding, scan_logging
 from app.analysis.misconfig import MisconfigFinding, scan_misconfig
+from app.analysis.openapi_spec import (
+    SPEC_HANDLERS,
+    SPEC_OPERATIONS,
+    SpecOperation,
+    locate_handler,
+    parse_spec,
+)
 from app.analysis.osv import OsvClient, OsvError, Vuln
 from app.analysis.recon import ApplicationModel
 from app.analysis.routes import (
@@ -209,6 +216,45 @@ def scan_repo(
     intent: str | None = None,
     suppressions: str | None = None,
 ) -> ScanResult:
+    """Ingest ``root`` (read-only) and run all static analysers (see ``_scan_repo``).
+
+    OpenAPI documents are read first so spec-first handlers (``operationId``) are known to every
+    analyser; the discovered names live in a context variable for the duration of the scan only."""
+    ops: list[SpecOperation] = []
+    probe_kwargs: dict = {"stats": IngestStats(), "exclude": [*load_ignore_file(root), *exclude]}
+    for f in iter_source_files(root, **probe_kwargs):
+        if f.relpath.lower().endswith((".yml", ".yaml", ".json")) and f.size <= 2_000_000:
+            try:
+                ops.extend(parse_spec(f.relpath, read_text(f)))
+            except OSError:
+                continue
+    handlers = SPEC_HANDLERS.set(frozenset(o.function for o in ops))
+    operations = SPEC_OPERATIONS.set(tuple(ops))
+    try:
+        return _scan_repo(
+            root,
+            max_files=max_files,
+            check_osv=check_osv,
+            osv_client=osv_client,
+            exclude=exclude,
+            intent=intent,
+            suppressions=suppressions,
+        )
+    finally:
+        SPEC_OPERATIONS.reset(operations)
+        SPEC_HANDLERS.reset(handlers)
+
+
+def _scan_repo(
+    root: str,
+    *,
+    max_files: int | None = None,
+    check_osv: bool = True,
+    osv_client: OsvClient | None = None,
+    exclude: Sequence[str] = (),
+    intent: str | None = None,
+    suppressions: str | None = None,
+) -> ScanResult:
     """Ingest ``root`` (read-only) and run all static analysers.
 
     ``exclude`` patterns (plus any in ``<root>/.secureagentignore``) skip files entirely;
@@ -264,6 +310,21 @@ def scan_repo(
     # Taint runs once over the whole project so flow can cross files.
     result.taint_findings = analyze_taint_project(taint_sources)
     result.routes = apply_include_guards(result.routes, taint_sources)
+    for op in SPEC_OPERATIONS.get():  # spec-first routes: no decorator, the document is the table
+        where = locate_handler(op, taint_sources)
+        if where is not None:
+            result.routes.append(
+                Route(
+                    op.method.upper(),
+                    op.path,
+                    "openapi",
+                    where[0],
+                    where[1],
+                    op.function,
+                    op.secured,
+                    "openapi security" if op.secured else None,
+                )
+            )
     result.route_findings = route_findings(result.routes)
     for route in result.routes:
         result.app_model.absorb_route_path(route.path)

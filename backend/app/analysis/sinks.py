@@ -59,6 +59,11 @@ CATEGORY_META = {
         "A03:2021 Injection",
         "Do not assign untrusted data to innerHTML; use textContent or sanitize.",
     ),
+    "sql_injection": (
+        "CWE-89",
+        "A03:2021 Injection",
+        "Use parameterised queries / bound parameters; never build SQL by formatting strings.",
+    ),
     "insecure_session_cookie": (
         "CWE-565",
         "A07:2021 Identification and Authentication Failures",
@@ -91,6 +96,7 @@ CATEGORY_RISK = {
     "xxe": ("medium", 0.5, False),
     "xml_entity_expansion": ("low", 0.4, False),
     "insecure_session_cookie": ("medium", 0.5, False),
+    "sql_injection": ("medium", 0.4, False),
     "plaintext_password": ("medium", 0.5, False),
     "xss_sink": ("medium", 0.4, False),
 }
@@ -279,6 +285,11 @@ class _SinkVisitor(ast.NodeVisitor):
         ):
             self._add("weak_hash", name, node.lineno)
 
+        # SQL assembled by string formatting (no request source needed: function arguments count)
+        if last in {"execute", "executemany", "executescript", "raw"} and node.args:
+            if len(node.args) == 1 and _builds_sql_string(node.args[0], self.assigns):
+                self._add("sql_injection", "query built by string formatting", node.lineno)
+
         # Session cookie that is just an encoded, unsigned value
         cookie = xd.insecure_session_cookie(node, self.assigns)
         if cookie:
@@ -310,6 +321,47 @@ class _SinkVisitor(ast.NodeVisitor):
                 )
 
         self.generic_visit(node)
+
+
+_SQL_WORDS = re.compile(
+    r"(?is)\b(select\b.+\bfrom|insert\s+into|update\s+\w+\s+set|delete\s+from)\b"
+)
+
+
+def _builds_sql_string(node: ast.expr, assigns: dict[str, list[ast.expr]], depth: int = 0) -> bool:
+    """An SQL string that is assembled from non-literal parts (f-string, ``%``, ``+``, ``.format``).
+
+    ``execute(text(q))`` and ``execute(q)`` with ``q`` assigned from such an expression count too."""
+    if depth > 2:
+        return False
+    if isinstance(node, ast.Call):
+        name = _dotted(node.func) or ""
+        if name.rsplit(".", 1)[-1] in {"text", "sql", "SQL"} and node.args:
+            return _builds_sql_string(node.args[0], assigns, depth + 1)
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+            base = node.func.value
+            return (
+                isinstance(base, ast.Constant)
+                and isinstance(base.value, str)
+                and bool(_SQL_WORDS.search(base.value))
+                and any(not isinstance(a, ast.Constant) for a in node.args)
+            )
+        return False
+    if isinstance(node, ast.Name):
+        return any(_builds_sql_string(v, assigns, depth + 1) for v in assigns.get(node.id, []))
+    literal = " ".join(
+        n.value for n in ast.walk(node) if isinstance(n, ast.Constant) and isinstance(n.value, str)
+    )
+    if not _SQL_WORDS.search(literal):
+        return False
+    if isinstance(node, ast.JoinedStr):
+        return any(isinstance(v, ast.FormattedValue) for v in node.values)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
+        return any(
+            isinstance(n, ast.Name) or isinstance(n, (ast.Subscript, ast.Attribute, ast.Call))
+            for n in ast.walk(node)
+        )
+    return False
 
 
 def _assignments(func: ast.AST) -> dict[str, list[ast.expr]]:
@@ -449,6 +501,8 @@ _JS_RULES = [
     ("xss_sink", re.compile(r"\.innerHTML\s*=(?!=)")),
     # libxmljs: parseXml(String)(data, {noent: true}) resolves external entities
     ("xxe", re.compile(r"\bparseXml(?:String)?\s*\(.*\bnoent\s*:\s*true")),
+    # libxmljs2: `{ noent: true }` on its own line next to parseXml
+    ("xxe", re.compile(r"\bnoent\s*:\s*true\b")),
     # libxml2 bindings: the NOENT parse option substitutes external entities
     ("xxe", re.compile(r"\bXML_PARSE_NOENT\b")),
     ("weak_hash", re.compile(r"\bcreateHash\(\s*['\"](?:md5|sha1)['\"]\s*\)")),
@@ -534,7 +588,7 @@ def _xss_class(text: str, end: int, const_names: set[str]) -> str:
     return "dynamic"
 
 
-_LITERAL_CALL_ARG = re.compile(r"""\(\s*(['"`])[^'"`$\\]*\1\s*[,)]""")
+_LITERAL_CALL_ARG = re.compile(r"""\(\s*(?:(['"`])[^'"`$\\]*\1\s*,?\s*)+(?:\{[^{}]*\}\s*)?\)""")
 
 
 def _js_sinks(relpath: str, text: str) -> list[SinkFinding]:

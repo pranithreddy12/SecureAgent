@@ -137,6 +137,34 @@ _JS_ID_FETCH = re.compile(
     r"findByIdAndDelete|destroy|remove|deleteOne|updateOne)\s*\("
 )
 _JS_REQ_ID = re.compile(r"\breq(?:uest)?\.(?:body|params|query)\.\w*[Ii]d\b|\breq\.params\.id\b")
+_JS_BY_ID = re.compile(
+    r"\b\w+\.(?:\w*[Bb]yId|get\w*ById|find\w*ById)\s*\(\s*req(?:uest)?\.(?:params|query|body)\.\w+"
+)
+_JS_MASS_ASSIGN = re.compile(
+    r"\bnew\s+[A-Z]\w*\s*\(\s*req(?:uest)?\.body\s*\)"
+    r"|\b[A-Z]\w*\.(?:create|insertMany|build)\s*\(\s*req(?:uest)?\.body\s*[,)]"
+    r"|\.(?:findOneAndUpdate|findByIdAndUpdate|updateOne|update)\s*\([^)]*,\s*req(?:uest)?\.body\s*[,)]"
+    r"|Object\.assign\s*\([^)]*req(?:uest)?\.body"
+)
+_JS_LOG_SECRET = re.compile(
+    r"(?i)\b(?:console\.(?:log|info|debug|warn|error)|logger\.\w+|log\.\w+)\s*\([^)]*"
+    r"(?:password|passwd|secret|api[_-]?key|token)\b[^)]*"
+)
+_JS_ZIPSLIP = re.compile(r"\.extractAllTo\s*\(|\.extract\s*\(\s*\{\s*path\s*:")
+_JS_NOSQL_ALIAS_CALL = re.compile(
+    r"\.(?:find|findOne|update|updateOne|updateMany|deleteOne|deleteMany|remove|findOneAndUpdate)"
+    r"\s*\(\s*(\w+)\s*[,)]"
+)
+_JS_NOSQL_BODYISH = re.compile(
+    r"\.(?:find|findOne|update|updateOne|updateMany|deleteOne|deleteMany|remove)\s*\(\s*"
+    r"(?:body|payload|input|params|queryParams|filter\w*)\s*[,)]"
+)
+_JS_REQ_ISH = r"(?:req(?:uest)?\.(?:body|query|params)|body|query|queryParams|params|payload)"
+_JS_SQL_CALL = re.compile(r"\.(?:query|execute|raw|run|all|get|prepare)\s*\(")
+_JS_SQL_WORD = re.compile(
+    r"(?i)\b(?:select\s.+\sfrom|insert\s+into|update\s+\w+\s+set|delete\s+from)\b"
+)
+_JS_STRING_BUILT = re.compile(r"""\$\{|['"`]\s*\+|\+\s*['"`]""")
 _JS_OWNER = re.compile(
     r"(?i)\breq\.user\b|req\.session|\buserId\b|\buser\.id\b|currentUser|\bowner\b|tenant|"
     r"organi[sz]ation|\bsession\b|\.userId|\bwhere\b[^\n]*\buser"
@@ -186,12 +214,59 @@ def js_findings(lines: list[str], tainted_vars: set[str]) -> list[tuple[str, int
             "\n".join(lines[i : i + 3])
         ):
             out.append(("nosql_injection", lineno, "filter field from request", snippet))
+        window3 = "\n".join(lines[i : i + 4])
         m = _JS_TEMPLATE.search(line)
-        if m and tainted_line(line):
+        if m and tainted_line(window3):
             out.append(("template_injection", lineno, m.group(0).strip("( "), snippet))
         m = _JS_XPATH.search(line)
-        if m and tainted_line(line):
+        if m and tainted_line(window3):
             out.append(("xpath_injection", lineno, m.group(0).strip("( "), snippet))
+        if _JS_MASS_ASSIGN.search(line):
+            out.append(("mass_assignment", lineno, "request body into a model", snippet))
+        if _JS_LOG_SECRET.search(line) and not re.search(r"(?i)token\s*:\s*['\"]", line):
+            out.append(("sensitive_data_in_log", lineno, "logs a secret value", snippet))
+        if _JS_ZIPSLIP.search(line):
+            out.append(("path_traversal", lineno, "archive extraction (zip slip)", snippet))
+        if _JS_BY_ID.search(line):
+            start = max(0, i - 8)
+            if not _JS_OWNER.search("\n".join(lines[start : i + 3])):
+                out.append(("idor", lineno, "record fetched by request id", snippet))
+        m = _JS_NOSQL_ALIAS_CALL.search(line)
+        if m:
+            var = m.group(1)
+            before = "\n".join(lines[max(0, i - 8) : i])
+            if re.search(
+                r"\b" + re.escape(var) + r"\b[^\n]*" + _JS_REQ_ISH + r"\.\w+", before
+            ) or re.search(
+                r"\b" + re.escape(var) + r"\.\w+\s*=\s*" + _JS_REQ_ISH + r"\.\w+", before
+            ):
+                out.append(("nosql_injection", lineno, "filter built from request values", snippet))
+        elif _JS_NOSQL_BODYISH.search(line):
+            out.append(("nosql_injection", lineno, "request object as filter", snippet))
+        if _JS_SQL_CALL.search(line):
+            window = "\n".join(lines[i : i + 4])
+            if _JS_SQL_WORD.search(window) and _JS_STRING_BUILT.search(window):
+                out.append(
+                    ("sql_injection", lineno, "query built by string concatenation", snippet)
+                )
+            else:
+                m2 = re.search(r"\.(?:query|execute|raw|run|all|get)\s*\(\s*(\w+)\s*[,)]", line)
+                if m2:
+                    before = "\n".join(lines[max(0, i - 6) : i])
+                    pat = r"\b" + re.escape(m2.group(1)) + r"\b\s*=\s*[^;]*"
+                    for assign in re.finditer(pat, before):
+                        if _JS_SQL_WORD.search(assign.group(0)) and _JS_STRING_BUILT.search(
+                            assign.group(0)
+                        ):
+                            out.append(
+                                (
+                                    "sql_injection",
+                                    lineno,
+                                    "query built by string concatenation",
+                                    snippet,
+                                )
+                            )
+                            break
         if _JS_ID_FETCH.search(line):
             window = "\n".join(lines[i : i + 5])
             start = i  # look back only to the start of the enclosing handler (<= 8 lines)

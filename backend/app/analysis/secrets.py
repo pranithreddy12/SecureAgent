@@ -76,8 +76,10 @@ def key_looks_secret(key: str) -> bool:
 
 # key = "value" / key: "value" / "key": "value"  (captures the quoted value)
 ASSIGNMENT = re.compile(
-    r"""(?P<key>[A-Za-z0-9_.\-]{2,64})\s*[:=]\s*['"](?P<val>[^'"\n]{6,512})['"]"""
+    r"""(?P<key>[A-Za-z0-9_.\-]{2,64})['"]?\]?\s*[:=]\s*['"](?P<val>[^'"\n]{6,512})['"]"""
 )
+# express-session / cookie-session: the key is `secret`, the value may be a phrase ("keyboard cat")
+_SESSION_SECRET = re.compile(r"""\bsecret\s*:\s*['"](?P<val>[^'"\n]{4,64})['"]""")
 
 # Placeholder / reference values that are not real leaked secrets.
 _PLACEHOLDER = re.compile(
@@ -259,6 +261,24 @@ def scan_text(relpath: str, text: str) -> list[SecretFinding]:
             _fingerprint(m.group(0)) for rule in PROVIDER_RULES for m in rule.pattern.finditer(line)
         }
 
+        for m in _SESSION_SECRET.finditer(line):
+            val = m.group("val")
+            if (
+                not _is_placeholder(val)
+                and not _is_identifier_value(val.replace(" ", "_"))
+                and _fingerprint(val) not in provider_fps
+                and re.search(r"(?i)session|cookie|express|jwt", text)
+            ):
+                _add(
+                    findings,
+                    seen,
+                    "Hardcoded session/signing secret",
+                    "medium",
+                    0.6,
+                    relpath,
+                    lineno,
+                    val,
+                )
         for m in _CRYPTO_LITERAL_KEY.finditer(line):
             val = m.group("k1") or m.group("k2")
             if val and not _is_placeholder(val) and _fingerprint(val) not in provider_fps:
