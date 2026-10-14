@@ -368,22 +368,117 @@ def _handler_param_taint(func) -> set[str]:
     }
 
 
-def _allowlist_guarded(func) -> set[str]:
-    """Names validated by an early-exit allow-list check::
+def _locally_guarded_names(func) -> set[str]:
+    """Names validated by an early-exit allow-list check within this function's own body::
 
         if host not in ALLOWED:        # also: assert host in ALLOWED
             return / raise / abort(...)
+
+        cfg = DATASETS.get(name)       # a dict-lookup guard: `if not cfg` / `if cfg is None`
+        if not cfg:
+            abort(...)
 
     After such a check the value is one of the allowed ones, so it is not attacker-shaped. The
     check is position-insensitive (a use *before* the guard is not distinguished)."""
     guarded: set[str] = set()
     for node in ast.walk(func):
-        if isinstance(node, ast.If) and _membership_name(node.test, negated=True):
+        if isinstance(node, ast.If):
             name = _membership_name(node.test, negated=True)
-            if _exits(node.body) or _resets_to_default(node.body, name, func):
+            if name and (_exits(node.body) or _resets_to_default(node.body, name, func)):
                 guarded.add(name)
+            elif _exits(node.body):
+                dict_name = _dict_lookup_guard_name(func, node)
+                if dict_name:
+                    guarded.add(dict_name)
         elif isinstance(node, ast.Assert) and _membership_name(node.test, negated=False):
             guarded.add(_membership_name(node.test, negated=False))
+    return guarded
+
+
+def _dict_lookup_guard_name(func, if_node: ast.If) -> str | None:
+    """``cfg = SOMETHING.get(name)`` elsewhere in ``func``, guarded here by
+    ``if not cfg:`` / ``if cfg is None:`` (body already known to exit): afterwards ``name`` can
+    only be a key ``SOMETHING`` actually has, so it is allow-list validated too -- the common
+    Flask shape ``cfg = DATASETS.get(name) or abort(404)`` spelled as two statements.
+
+    Requires the ``.get()`` call to already be ``_sa_const`` (``_mark_constant_lookups``): a
+    genuinely constant, never-mutated module dict. If ``SOMETHING`` is mutated with request data
+    elsewhere, the lookup is not constant and this guard must not fire either -- a key being
+    "allowed" says nothing when the table's own values might be attacker-controlled."""
+    test = if_node.test
+    if (
+        isinstance(test, ast.UnaryOp)
+        and isinstance(test.op, ast.Not)
+        and isinstance(test.operand, ast.Name)
+    ):
+        checked = test.operand.id
+    elif (
+        isinstance(test, ast.Compare)
+        and len(test.ops) == 1
+        and isinstance(test.ops[0], ast.Is)
+        and isinstance(test.left, ast.Name)
+        and isinstance(test.comparators[0], ast.Constant)
+        and test.comparators[0].value is None
+    ):
+        checked = test.left.id
+    else:
+        return None
+    for node in ast.walk(func):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == checked
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and node.value.func.attr == "get"
+            and node.value.args
+            and isinstance(node.value.args[0], ast.Name)
+            and getattr(node.value, "_sa_const", False)
+        ):
+            return node.value.args[0].id
+    return None
+
+
+def _validator_guarded_param(func) -> str | None:
+    """A parameter of ``func`` that its own body allow-list-guards (``_locally_guarded_names``):
+    a normal return (no exception, no abort) means that argument was one of the allowed values."""
+    own_params = {a.arg for a in _all_params(func)}
+    hit = _locally_guarded_names(func) & own_params
+    return next(iter(hit), None)
+
+
+def _cross_function_guarded(func, ctx) -> set[str]:
+    """Names passed to a same-file "validator" function -- one that allow-list-guards one of its
+    own parameters (``_cfg(name)`` aborting unless ``name`` is a known key, say) -- are guarded
+    here too: the call could not have returned normally with a disallowed value. One hop only,
+    matching the rest of this module's position-insensitive, same-file-only sanitizer modelling."""
+    guarded: set[str] = set()
+    for node in ast.walk(func):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        callee = ctx.functions.get(node.func.id)
+        if callee is None or callee is func:
+            continue
+        param = _validator_guarded_param(callee)
+        if param is None:
+            continue
+        positional = [a.arg for a in [*callee.args.posonlyargs, *callee.args.args]]
+        if param in positional:
+            idx = positional.index(param)
+            if idx < len(node.args) and isinstance(node.args[idx], ast.Name):
+                guarded.add(node.args[idx].id)
+                continue
+        for kw in node.keywords:
+            if kw.arg == param and isinstance(kw.value, ast.Name):
+                guarded.add(kw.value.id)
+    return guarded
+
+
+def _allowlist_guarded(func, ctx: _Ctx | None = None) -> set[str]:
+    guarded = _locally_guarded_names(func)
+    if ctx is not None:
+        guarded |= _cross_function_guarded(func, ctx)
     return guarded
 
 
@@ -457,7 +552,7 @@ def _function_tainted(
     ctx: _Ctx | None = None,
     origins: dict[str, list[str]] | None = None,
 ) -> _TaintSet:
-    guarded = _allowlist_guarded(func)
+    guarded = _allowlist_guarded(func, ctx)
     tainted = _TaintSet(set(initial) - guarded)
     tainted.parents = {}
     tainted.orm_names = _orm_statement_names(func)

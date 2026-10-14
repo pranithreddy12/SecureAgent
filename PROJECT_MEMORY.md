@@ -235,6 +235,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-035 | Tenth untouched set (corrected by ADR-036) | Accepted |
 | ADR-036 | Retracted the if/else taint gap; fixed five truth-list line errors | Accepted |
 | ADR-039 | Eleventh untouched set; two new vocabulary gaps | Accepted |
+| ADR-040 | Allow-list validation through a helper function, not just inline | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
@@ -577,3 +578,9 @@ no Rust toolchain on the machine. Not bundling backend/db into the app -- Docker
 verified against a direct scan_repo run before freezing (ADR-036's lesson). Eleven untouched:
 52/49/41/46/58/68/75/53/93/58/65%, pooled 55%. Two new vocabulary gaps: secrets fallback rule misses
 `os.getenv(x) or "literal"`; JS structural SQL sink list is missing pg-promise's `db.one`/`db.many`.
+
+**Cross-function allow-list guard (2026-10-14, ADR-040):** taint tracking now recognises
+`cfg = D.get(name); if not cfg: abort()` (gated on `_sa_const`, so a mutated dict still isn't
+trusted) both inline and through a same-file helper call (`cfg = _cfg(name)`), one hop,
+position-insensitive. Fixed a real report's 8 false-positive SQL-injection findings; a first pass
+without the `_sa_const` gate regressed an existing mutated-dict test, fixed before landing.

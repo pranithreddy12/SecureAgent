@@ -85,7 +85,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 570 passed, 2 skipped (PDF locally, Windows symlink) |
+| Backend tests | 573 passed, 2 skipped (PDF locally, Windows symlink) |
 | Frontend | 40 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
@@ -142,6 +142,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 035 | Tenth untouched set (corrected by ADR-036) |
 | 036 | Retracted the if/else taint gap; fixed five truth-list line errors |
 | 039 | Eleventh untouched set; two new vocabulary gaps |
+| 040 | Allow-list validation through a helper function, not just inline |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 | 037 | Classic, ledger-style design instead of the default dark-dashboard look |

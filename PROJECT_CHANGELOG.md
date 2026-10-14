@@ -1220,3 +1220,18 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   default-argument form); JS structural SQL rule's sink list is missing pg-promise's `db.one`/`db.many`.
   Confirmed the structural command_injection/sql_injection rules fire even when the tainted value comes
   from `input()`, not a web request -- provenance-agnostic by design, not a bug.
+
+## 2026-10-14 (cross-function allow-list guard -- ADR-040)
+
+- Owner reported 8/18 findings in a real audit (all SQL injection, high/likely) as false
+  positives, with a code-level rebuttal: every route validates the table name through a helper
+  (`_cfg(name)`: a dict lookup that aborts on an unknown key) before using `name` directly, and
+  the taint engine didn't recognise validation performed *inside a called helper*, only inline.
+- `app/analysis/taint.py`: `_dict_lookup_guard_name` (the `X = D.get(k); if not X: abort()` shape,
+  gated on `_sa_const` so a dict mutated with request data is never trusted), `_validator_guarded_param`,
+  `_cross_function_guarded` (one hop, same file, position-insensitive). A first pass without the
+  `_sa_const` gate broke an existing regression test by also suppressing an unrelated, correct
+  mutated-dict detection; fixed and documented in ADR-040.
+- 3 new tests in `tests/test_realworld_fp.py` reproducing the exact reported pattern plus its
+  "no validator"/"validator doesn't abort" variants. 573 passed, 2 skipped. Benchmark unchanged
+  97%/97%.

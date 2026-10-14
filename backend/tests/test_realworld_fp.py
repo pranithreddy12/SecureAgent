@@ -437,3 +437,43 @@ def test_the_nearest_real_variants_are_still_reported():
         "        return cfg\n", "        return request.args.get('table')\n"
     )
     assert _sqli(passthrough)
+
+
+# A real report (2026-10-14): CONFIG_DRIVEN never uses the raw `name` parameter itself as the SQL
+# table -- only derived values (`cfg['table']`, `col`, `direction`). This project used `name`
+# directly after validating it with a separate helper, `_cfg`, that looks it up in a constant dict
+# and aborts on a miss -- the scanner's taint tracking missed that cross-function allow-list guard
+# and reported 8 false-positive "high" SQL injections.
+DATASET_NAME_AS_TABLE = """
+    import sqlite3
+    from flask import Flask, request, abort, jsonify
+    app = Flask(__name__)
+    DATASETS = {"brokers": {"cols": ["name"]}, "targets": {"cols": ["name"]}}
+
+    def _cfg(name):
+        cfg = DATASETS.get(name)
+        if not cfg:
+            abort(404)
+        return cfg
+
+    @app.route("/<name>/")
+    def listing(name):
+        cfg = _cfg(name)
+        rows = sqlite3.connect("x").execute(f"SELECT * FROM {name}").fetchall()
+        return jsonify(rows)
+"""
+
+
+def test_dataset_name_used_directly_after_a_validator_call_is_not_request_data():
+    assert _sqli(DATASET_NAME_AS_TABLE) == []
+
+
+def test_without_the_validator_call_the_same_pattern_is_still_reported():
+    unguarded = DATASET_NAME_AS_TABLE.replace("        cfg = _cfg(name)\n", "")
+    assert _sqli(unguarded)
+
+
+def test_a_validator_that_does_not_abort_does_not_guard_anything():
+    # `_cfg` returns None silently instead of aborting: a bad `name` reaches the sink unchanged.
+    silent = DATASET_NAME_AS_TABLE.replace("        if not cfg:\n            abort(404)\n", "")
+    assert _sqli(silent)
