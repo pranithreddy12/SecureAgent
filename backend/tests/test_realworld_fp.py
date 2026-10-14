@@ -551,3 +551,30 @@ def test_the_actually_tainted_element_of_the_same_tuple_is_still_reported():
         'where = "WHERE col = " + cfg["literal"]', 'where = "WHERE col = " + q'
     )
     assert _sqli(leaky)
+
+
+# The structural `static:sinks` SQL rule has no request source, so it flags *any* f-string-built
+# query passed to execute() -- including one the taint engine has already proven safe via
+# ADR-040/041's guard, which is just noise at that point. The rule now skips names it can see are
+# already allow-list-validated in the same function (reusing taint._allowlist_guarded directly).
+GUARDED_NAME_IN_SAME_FUNCTION = """
+    DATASETS = {"brokers": {}}
+
+    def detail(name):
+        cfg = DATASETS.get(name)
+        if not cfg:
+            abort(404)
+        rows = db().execute(f"SELECT * FROM {name}")
+"""
+
+
+def test_structural_sql_rule_skips_a_name_guarded_in_the_same_function():
+    assert scan_sinks("app.py", textwrap.dedent(GUARDED_NAME_IN_SAME_FUNCTION)) == []
+
+
+def test_structural_sql_rule_still_flags_it_without_the_guard():
+    unguarded = GUARDED_NAME_IN_SAME_FUNCTION.replace(
+        "        cfg = DATASETS.get(name)\n        if not cfg:\n            abort(404)\n", ""
+    )
+    findings = scan_sinks("app.py", textwrap.dedent(unguarded))
+    assert any(f.category == "sql_injection" for f in findings)

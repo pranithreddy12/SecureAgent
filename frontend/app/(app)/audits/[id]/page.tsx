@@ -13,7 +13,7 @@ import {
 } from "@/components/badges";
 import { Button, Card, ErrorMessage } from "@/components/ui";
 import { auditService } from "@/services/audits";
-import type { AuditDetail, AuditLogEntry, Finding, Severity } from "@/types/api";
+import type { AuditDetail, AuditLogEntry, Finding, Severity, SuggestedFix } from "@/types/api";
 
 const POLL_MS = 2000;
 const STAGES = [
@@ -97,6 +97,47 @@ function Triage({
           Cancel
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** A deterministic, verified one-line patch (ADR-013), fetched on demand -- most finding types
+ * have none, and this says so plainly rather than inventing a plausible-looking snippet. */
+function SuggestedFixPanel({ auditId, findingId }: { auditId: string; findingId: string }) {
+  const [fix, setFix] = useState<SuggestedFix | "loading" | "error" | null>(null);
+
+  if (fix === null) {
+    return (
+      <Button
+        type="button"
+        className="self-start"
+        onClick={() => {
+          setFix("loading");
+          auditService.suggestFix(auditId, findingId).then(setFix, () => setFix("error"));
+        }}
+      >
+        Suggest a fix
+      </Button>
+    );
+  }
+  if (fix === "loading") return <p className="text-sm text-muted">Checking for a fix…</p>;
+  if (fix === "error") return <p className="text-sm text-danger">Could not check for a fix.</p>;
+  if (!fix.available) {
+    return (
+      <p className="text-sm text-muted">
+        No automatic fix for this finding type yet -- see the remediation guidance above.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-sm border border-border p-3 text-sm">
+      <p>
+        <span className="font-semibold">{fix.verified ? "Verified fix" : "Proposed fix"}: </span>
+        {fix.description}
+      </p>
+      <pre className="overflow-x-auto rounded bg-background p-2 font-mono text-xs">{fix.diff}</pre>
+      {fix.caveat && <p className="text-xs text-muted">Check: {fix.caveat}</p>}
+      <p className="text-xs text-muted">{fix.note}</p>
     </div>
   );
 }
@@ -399,6 +440,9 @@ export default function AuditDetailPage() {
                           setFindings((list) => list.map((x) => (x.id === u.id ? u : x)))
                         }
                       />
+                    )}
+                    {audit.status === "completed" && (
+                      <SuggestedFixPanel auditId={audit.id} findingId={f.id} />
                     )}
                     {f.evidence && (
                       <pre className="overflow-x-auto rounded bg-background p-2 font-mono text-xs">

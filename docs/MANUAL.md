@@ -145,8 +145,12 @@ You land on the audit page: a live stage checklist (authorization → reconnaiss
 verification → validator → the two AI stages if enabled → correlation → report) that polls every two
 seconds, a scrolling activity log, and the findings themselves — severity-filterable, each one
 expandable to its evidence, taint path, remediation, CVE/CVSS and (if AI review ran) the model's verdict
-with its supporting quote. Any finding can be marked a false positive with a reason (reversible); a
-failed audit can be retried or resumed from the stage that failed.
+with its supporting quote. Click **Suggest a fix** on a finding for a deterministic, verified patch
+if one exists (a handful of types: `weak_hash`, `hardcoded_secret`, `debug_enabled`,
+`csrf_disabled`, `jwt_verification_disabled`, `insecure_deserialization`/yaml) — for everything
+else it says plainly that there's no automatic fix yet, rather than inventing a plausible snippet.
+Any finding can be marked a false positive with a reason (reversible); a failed audit can be
+retried or resumed from the stage that failed.
 
 ### The longer way (registering a project first)
 

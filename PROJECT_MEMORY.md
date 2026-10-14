@@ -237,6 +237,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-039 | Eleventh untouched set; two new vocabulary gaps | Accepted |
 | ADR-040 | Allow-list validation through a helper function, not just inline | Accepted |
 | ADR-041 | A config-derived allow-list reset, and per-element tuple-return taint | Accepted |
+| ADR-042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
@@ -593,3 +594,10 @@ not just a literal. `_function_tainted` now tracks `(a, b) = f()`-style tuple re
 when every return in `f` is a literal tuple of the same arity, instead of tainting the whole tuple
 because one element legitimately carries request data. Zero regression: benchmark 97%/97%, full
 recall identical (273/361), 577 backend tests passing.
+
+**Guard-aware sinks + suggested-fix UI (2026-10-14, ADR-042):** the structural SQL rule
+(`sinks.py`) now skips names `taint._allowlist_guarded` already proved safe in the same function
+(doesn't yet reach validated-by-caller cases). New `GET /audits/{id}/findings/{finding_id}/fix`
+surfaces the existing verified-patch engine (ADR-013) per finding in the web UI for the first
+time, honestly returning `available: false` for the many finding types with no deterministic
+fixer. Verified live in the rebuilt Docker stack with screenshots, not just unit tests.

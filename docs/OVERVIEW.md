@@ -85,8 +85,8 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 577 passed, 2 skipped (PDF locally, Windows symlink) |
-| Frontend | 40 Vitest tests; lint, typecheck, build |
+| Backend tests | 580 passed, 2 skipped (PDF locally, Windows symlink) |
+| Frontend | 42 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
 | Benchmark | 35 TP / 1 FP / 2 FN = 97% precision, 95% recall on an **author-written** corpus (a regression guard, not a real-world rate) |
@@ -144,6 +144,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 039 | Eleventh untouched set; two new vocabulary gaps |
 | 040 | Allow-list validation through a helper function, not just inline |
 | 041 | A config-derived allow-list reset, and per-element tuple-return taint |
+| 042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 | 037 | Classic, ledger-style design instead of the default dark-dashboard look |

@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass
 
 from app.analysis import extra_detectors as xd
+from app.analysis import taint as _taint
 
 # category -> (cwe, owasp, remediation)
 CATEGORY_META = {
@@ -189,10 +190,25 @@ def _python_sinks(relpath: str, text: str) -> list[SinkFinding]:
         return []
     lines = text.splitlines()
     _mark_nonsecurity_hashes(tree)
-    visitor = _SinkVisitor(relpath, lines, _collect_aliases(tree))
+    _taint.mark_view_handlers(tree)  # _sa_const on constant-table lookups: _guarded_names needs it
+    funcs = {
+        n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    ctx = _taint._Ctx(funcs, 0, {})
+    visitor = _SinkVisitor(relpath, lines, _collect_aliases(tree), ctx)
     visitor.const_strings = _module_string_constants(tree)
     visitor.visit(tree)
     return visitor.findings
+
+
+def _guarded_names(func, ctx) -> set[str]:
+    """Names the taint engine has already proven allow-list-validated in this function
+    (``taint._allowlist_guarded``, ADR-040/041): the structural SQL rule below skips them too,
+    instead of re-flagging at lower confidence exactly what the deeper analysis already cleared."""
+    try:
+        return _taint._allowlist_guarded(func, ctx)
+    except Exception:  # noqa: BLE001 - this rule must never break the rest of the scan
+        return set()
 
 
 def _collect_aliases(tree: ast.AST) -> dict[str, str]:
@@ -209,24 +225,29 @@ def _collect_aliases(tree: ast.AST) -> dict[str, str]:
 
 
 class _SinkVisitor(ast.NodeVisitor):
-    def __init__(self, relpath: str, lines: list[str], aliases: dict[str, str]) -> None:
+    def __init__(
+        self, relpath: str, lines: list[str], aliases: dict[str, str], ctx: object | None = None
+    ) -> None:
         self.relpath = relpath
         self.lines = lines
         self.aliases = aliases
+        self.ctx = ctx  # taint._Ctx: lets the SQL rule see names the taint engine already cleared
         self.quoted: set[str] = set()
         self.const_strings: set[str] = set()  # module-level NAME = "literal"
         self.assigns: dict[str, list[ast.expr]] = {}  # current function: name -> assigned values
+        self.guarded: set[str] = set()  # current function: allow-list-validated names (taint.py)
         self.findings: list[SinkFinding] = []
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802 (ast API)
-        outer, outer_assigns = self.quoted, self.assigns
+        outer, outer_assigns, outer_guarded = self.quoted, self.assigns, self.guarded
         self.quoted = _quoted_names(node)  # scoped: another function may reuse the name
         self.assigns = _assignments(node)
+        self.guarded = _guarded_names(node, self.ctx)
         found = xd.plaintext_password(node)
         if found is not None:
             self._add("plaintext_password", found[1], found[0])
         self.generic_visit(node)
-        self.quoted, self.assigns = outer, outer_assigns
+        self.quoted, self.assigns, self.guarded = outer, outer_assigns, outer_guarded
 
     visit_AsyncFunctionDef = visit_FunctionDef  # noqa: N815
 
@@ -287,7 +308,7 @@ class _SinkVisitor(ast.NodeVisitor):
 
         # SQL assembled by string formatting (no request source needed: function arguments count)
         if last in {"execute", "executemany", "executescript", "raw"} and node.args:
-            if len(node.args) == 1 and _builds_sql_string(node.args[0], self.assigns):
+            if len(node.args) == 1 and _builds_sql_string(node.args[0], self.assigns, self.guarded):
                 self._add("sql_injection", "query built by string formatting", node.lineno)
 
         # Session cookie that is just an encoded, unsigned value
@@ -328,17 +349,24 @@ _SQL_WORDS = re.compile(
 )
 
 
-def _builds_sql_string(node: ast.expr, assigns: dict[str, list[ast.expr]], depth: int = 0) -> bool:
+def _builds_sql_string(
+    node: ast.expr,
+    assigns: dict[str, list[ast.expr]],
+    guarded: set[str] = frozenset(),
+    depth: int = 0,
+) -> bool:
     """An SQL string that is assembled from non-literal parts (f-string, ``%``, ``+``, ``.format``).
 
     ``execute(text(q))`` and ``execute(q)`` with ``q`` assigned from such an expression count
-    too."""
+    too. A part built entirely from ``guarded`` names (the taint engine's own allow-list-validated
+    names, ADR-040/041) does not count either -- it is exactly what that deeper analysis already
+    proved safe, not a reason to re-flag it here at lower confidence."""
     if depth > 2:
         return False
     if isinstance(node, ast.Call):
         name = _dotted(node.func) or ""
         if name.rsplit(".", 1)[-1] in {"text", "sql", "SQL"} and node.args:
-            return _builds_sql_string(node.args[0], assigns, depth + 1)
+            return _builds_sql_string(node.args[0], assigns, guarded, depth + 1)
         if isinstance(node.func, ast.Attribute) and node.func.attr == "format":
             base = node.func.value
             return (
@@ -349,7 +377,9 @@ def _builds_sql_string(node: ast.expr, assigns: dict[str, list[ast.expr]], depth
             )
         return False
     if isinstance(node, ast.Name):
-        return any(_builds_sql_string(v, assigns, depth + 1) for v in assigns.get(node.id, []))
+        return any(
+            _builds_sql_string(v, assigns, guarded, depth + 1) for v in assigns.get(node.id, [])
+        )
     literal = " ".join(
         n.value for n in ast.walk(node) if isinstance(n, ast.Constant) and isinstance(n.value, str)
     )
@@ -357,7 +387,10 @@ def _builds_sql_string(node: ast.expr, assigns: dict[str, list[ast.expr]], depth
         return False
     if isinstance(node, ast.JoinedStr):
         parts = [v.value for v in node.values if isinstance(v, ast.FormattedValue)]
-        return any(not _is_numeric_value(p, assigns) for p in parts)
+        return any(
+            not _is_numeric_value(p, assigns) and not _is_guarded_value(p, assigns, guarded)
+            for p in parts
+        )
     if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
         leaves: list[ast.expr] = []
         stack = [node]
@@ -369,8 +402,26 @@ def _builds_sql_string(node: ast.expr, assigns: dict[str, list[ast.expr]], depth
                 stack += list(n.elts)
             elif not isinstance(n, ast.Constant):
                 leaves.append(n)
-        return any(not _is_numeric_value(p, assigns) for p in leaves)
+        return any(
+            not _is_numeric_value(p, assigns) and not _is_guarded_value(p, assigns, guarded)
+            for p in leaves
+        )
     return False
+
+
+def _is_guarded_value(
+    node: ast.expr, assigns: dict[str, list[ast.expr]], guarded: set[str], depth: int = 0
+) -> bool:
+    """A name the taint engine already proved allow-list-validated, or one only ever reassigned
+    from such names."""
+    if depth > 2 or not guarded:
+        return False
+    if not isinstance(node, ast.Name):
+        return False
+    if node.id in guarded:
+        return True
+    values = assigns.get(node.id, [])
+    return bool(values) and all(_is_guarded_value(v, assigns, guarded, depth + 1) for v in values)
 
 
 def _is_numeric_value(node: ast.expr, assigns: dict[str, list[ast.expr]]) -> bool:

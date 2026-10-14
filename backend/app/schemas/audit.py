@@ -82,6 +82,19 @@ class FindingOut(BaseModel):
     ai_review: dict[str, Any] | None = None
 
 
+class SuggestedFix(BaseModel):
+    """A deterministic, verified one-line patch for this finding (ADR-013), or none: most finding
+    types (anything data-flow-shaped, like injection or access control) have no safe automatic
+    rewrite, and this says so rather than fabricating one."""
+
+    available: bool
+    verified: bool = False
+    diff: str | None = None
+    description: str | None = None
+    caveat: str | None = None
+    note: str | None = None
+
+
 class TriageRequest(BaseModel):
     """Owner's verdict on one finding: mark it a false positive (with a reason) or undo that."""
 

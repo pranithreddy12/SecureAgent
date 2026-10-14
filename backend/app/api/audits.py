@@ -20,6 +20,7 @@ from app.schemas.audit import (
     FindingOut,
     LogOut,
     SourceAuditCreate,
+    SuggestedFix,
     TriageRequest,
 )
 from app.schemas.report import AttackChain
@@ -213,6 +214,38 @@ async def triage_finding(
     item = FindingOut.model_validate(row)
     item.ai_review = vr.get("ai_review")
     return item
+
+
+@router.get("/{audit_id}/findings/{finding_id}/fix", response_model=SuggestedFix)
+async def suggest_fix(audit_id: uuid.UUID, finding_id: uuid.UUID, db: DbSession, user: CurrentUser):
+    """A deterministic, verified patch for this one finding (ADR-013), if one exists. Most finding
+    types have none -- the response says so rather than inventing a snippet."""
+    from app.analysis.fixes import suggest_fix_for
+
+    audit = await _owned_audit(db, user, audit_id)
+    if audit.status is not AuditStatus.COMPLETED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Fixes are available once the audit is done.")
+    row = await db.scalar(
+        select(Vulnerability).where(
+            Vulnerability.id == finding_id, Vulnerability.audit_id == audit.id
+        )
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Finding not found")
+    if not audit.source_path:
+        return SuggestedFix(available=False)
+    patch = suggest_fix_for(audit.source_path, row.endpoint, row.type)
+    if patch is None or not patch.changes:
+        return SuggestedFix(available=False)
+    change = patch.changes[0]
+    return SuggestedFix(
+        available=True,
+        verified=patch.verified,
+        diff=patch.diff,
+        description=change.description,
+        caveat=change.caveat,
+        note=patch.note,
+    )
 
 
 @router.get("/{audit_id}/logs", response_model=list[LogOut])

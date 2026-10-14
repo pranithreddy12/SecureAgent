@@ -121,6 +121,15 @@ export interface Finding {
   ai_review: AiReview | null;
 }
 
+export interface SuggestedFix {
+  available: boolean;
+  verified: boolean;
+  diff: string | null;
+  description: string | null;
+  caveat: string | null;
+  note: string | null;
+}
+
 export interface AuditLogEntry {
   id: string;
   agent: string;

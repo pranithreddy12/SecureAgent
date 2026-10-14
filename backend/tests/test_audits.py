@@ -279,6 +279,36 @@ async def test_triage_marks_and_restores_a_finding(
     assert other.status_code == 404
 
 
+async def test_suggest_fix_for_a_fixable_type_and_none_for_an_unfixable_one(
+    client: AsyncClient, workspace: Path, inline_runner: None
+) -> None:
+    await register_login(client, "fix@example.com")
+    res = await client.post("/api/audits/source", json=create_body(workspace / "shop"))
+    audit_id = res.json()["id"]
+    findings = (await client.get(f"/api/audits/{audit_id}/findings")).json()
+
+    weak_hash = next(f for f in findings if f["type"] == "weak_hash")
+    fix = await client.get(f"/api/audits/{audit_id}/findings/{weak_hash['id']}/fix")
+    assert fix.status_code == 200
+    body = fix.json()
+    assert body["available"] and body["verified"]
+    assert "-" in body["diff"] and "sha256" in body["diff"]
+
+    sqli = next(f for f in findings if f["type"] == "sql_injection")
+    none_fix = await client.get(f"/api/audits/{audit_id}/findings/{sqli['id']}/fix")
+    assert none_fix.json() == {
+        "available": False,
+        "verified": False,
+        "diff": None,
+        "description": None,
+        "caveat": None,
+        "note": None,
+    }
+
+    missing = await client.get(f"/api/audits/{audit_id}/findings/{uuid.uuid4()}/fix")
+    assert missing.status_code == 404
+
+
 async def test_unread_files_are_disclosed_not_hidden(
     client: AsyncClient, workspace: Path, inline_runner: None
 ) -> None:

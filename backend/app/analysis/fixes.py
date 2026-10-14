@@ -23,6 +23,7 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 from app.analysis.reporting import scan_to_report_context
 from app.analysis.scanner import scan_repo
@@ -242,6 +243,16 @@ def _verify(patch: FilePatch) -> None:
         return
     patch.verified = True
     patch.note = "parses; re-scan shows the findings gone and nothing new"
+
+
+def suggest_fix_for(root: str, endpoint: str, finding_type: str) -> FilePatch | None:
+    """``propose_fixes`` for exactly one finding (by its ``file:line`` and type), for a UI that
+    shows one finding at a time -- the web app's "suggested fix" panel, say. ``None`` means either
+    the type has no deterministic fixer (most types: see ``FIXERS``) or nothing changed at that
+    line. Duck-types the one finding instead of requiring a full ``ReportFinding``."""
+    fake = SimpleNamespace(endpoint=endpoint, type=finding_type)
+    patches = propose_fixes(root, [fake])
+    return patches[0] if patches else None
 
 
 def propose_fixes(root: str, findings: Sequence[ReportFinding]) -> list[FilePatch]:

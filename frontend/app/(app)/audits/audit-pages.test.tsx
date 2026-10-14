@@ -25,6 +25,7 @@ const service = vi.hoisted(() => ({
   createSource: vi.fn(),
   retry: vi.fn(),
   triage: vi.fn(),
+  suggestFix: vi.fn(),
   reportUrl: (id: string) => `/api/audits/${id}/report`,
 }));
 vi.mock("@/services/audits", () => ({ auditService: service }));
@@ -81,6 +82,7 @@ beforeEach(() => {
   service.list.mockResolvedValue([]);
   service.findings.mockResolvedValue([finding]);
   service.logs.mockResolvedValue([]);
+  service.suggestFix.mockReset();
 });
 
 describe("AuditDetailPage", () => {
@@ -120,6 +122,41 @@ describe("AuditDetailPage", () => {
       reason: undefined,
     });
     expect(await screen.findByRole("button", { name: "Mark as false positive" })).toBeInTheDocument();
+  });
+
+  it("fetches a suggested fix on demand and shows an honest message when none exists", async () => {
+    service.get.mockResolvedValue(base);
+    service.suggestFix.mockResolvedValue({
+      available: false,
+      verified: false,
+      diff: null,
+      description: null,
+      caveat: null,
+      note: null,
+    });
+    render(<AuditDetailPage />);
+    await userEvent.click(await screen.findByText(/SQL injection/));
+    await userEvent.click(screen.getByRole("button", { name: "Suggest a fix" }));
+    expect(service.suggestFix).toHaveBeenCalledWith("audit-1", "f1");
+    expect(await screen.findByText(/No automatic fix for this finding type yet/)).toBeInTheDocument();
+  });
+
+  it("shows a verified fix's diff when one exists", async () => {
+    service.get.mockResolvedValue(base);
+    service.suggestFix.mockResolvedValue({
+      available: true,
+      verified: true,
+      diff: "-old\n+new",
+      description: "Use sha256 instead.",
+      caveat: "Check nothing else relied on the old digest.",
+      note: "parses; re-scan shows the finding gone",
+    });
+    render(<AuditDetailPage />);
+    await userEvent.click(await screen.findByText(/SQL injection/));
+    await userEvent.click(screen.getByRole("button", { name: "Suggest a fix" }));
+    expect(await screen.findByText("Verified fix:")).toBeInTheDocument();
+    expect(screen.getByText("Use sha256 instead.")).toBeInTheDocument();
+    expect(screen.getByText(/-old/)).toBeInTheDocument();
   });
 
   it("shows the static reconnaissance model and the validation notes", async () => {

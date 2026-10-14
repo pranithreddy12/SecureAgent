@@ -5,6 +5,7 @@ import type {
   AuditLogEntry,
   Finding,
   SourceAuditRequest,
+  SuggestedFix,
 } from "@/types/api";
 
 export const auditService = {
@@ -19,6 +20,8 @@ export const auditService = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+  suggestFix: (auditId: string, findingId: string) =>
+    api<SuggestedFix>(`/audits/${auditId}/findings/${findingId}/fix`),
   createSource: (body: SourceAuditRequest) =>
     api<Audit>("/audits/source", { method: "POST", body: JSON.stringify(body) }),
   reportUrl: (id: string, opts: { format?: "html" | "pdf"; download?: boolean } = {}) => {

@@ -1248,3 +1248,16 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - 4 new tests in `tests/test_realworld_fp.py`. 577 passed, 2 skipped. Benchmark unchanged 97%/97%.
   Full recall re-run across all eleven untouched sets: identical to before (273/361 = 76%), zero
   regression. Re-scanned the owner's whole project: 14 findings, zero "high" severity remaining.
+
+## 2026-10-14 (guard-aware structural SQL rule, suggested-fix UI -- ADR-042)
+
+- `sinks.py`'s structural SQL rule now checks `taint._allowlist_guarded` per function and skips a
+  name already proven allow-list-validated there (same-function / one-hop cases; the
+  validated-by-caller case still needs the rule to be interprocedural, not attempted).
+- New `GET /audits/{id}/findings/{finding_id}/fix`: the existing verified-patch engine
+  (`app/analysis/fixes.py`, ADR-013), exposed per finding for the first time in the web app.
+  Returns an honest `available: false` for the many finding types with no deterministic fixer.
+  New `SuggestedFixPanel` in the audit page, fetched lazily on click.
+- Verified live: rebuilt Docker, ran a real audit, clicked "Suggest a fix" on both a weak_hash and
+  a sql_injection finding, screenshotted the real result (a genuine diff; an honest "not available").
+- 580 backend tests (2 new), 42 frontend Vitest tests (2 new). Benchmark unchanged 97%/97%.
