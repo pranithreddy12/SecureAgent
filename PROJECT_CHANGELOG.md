@@ -1235,3 +1235,16 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - 3 new tests in `tests/test_realworld_fp.py` reproducing the exact reported pattern plus its
   "no validator"/"validator doesn't abort" variants. 573 passed, 2 skipped. Benchmark unchanged
   97%/97%.
+
+## 2026-10-14 (config-derived reset and per-element tuple-return taint -- ADR-041)
+
+- Debugged directly against the owner's real project after ADR-040 left 3/8 false positives
+  (`app.py:505,512,543`): `parse_sort`'s allow-list reset read its default from `cfg` (not a
+  literal) -- `_resets_to_default` now also accepts a reset built from constants/subscripts/
+  attributes rooted in another parameter. `build_where` returns `(where, params)`; `params`
+  legitimately carries request data for bound placeholders, but the whole tuple was marked tainted
+  because of it -- `_function_tainted` now tracks tuple-return taint per element when every
+  `return` in the callee is a literal tuple of matching arity.
+- 4 new tests in `tests/test_realworld_fp.py`. 577 passed, 2 skipped. Benchmark unchanged 97%/97%.
+  Full recall re-run across all eleven untouched sets: identical to before (273/361 = 76%), zero
+  regression. Re-scanned the owner's whole project: 14 findings, zero "high" severity remaining.

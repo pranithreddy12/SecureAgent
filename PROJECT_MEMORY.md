@@ -236,6 +236,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-036 | Retracted the if/else taint gap; fixed five truth-list line errors | Accepted |
 | ADR-039 | Eleventh untouched set; two new vocabulary gaps | Accepted |
 | ADR-040 | Allow-list validation through a helper function, not just inline | Accepted |
+| ADR-041 | A config-derived allow-list reset, and per-element tuple-return taint | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
@@ -584,3 +585,11 @@ verified against a direct scan_repo run before freezing (ADR-036's lesson). Elev
 trusted) both inline and through a same-file helper call (`cfg = _cfg(name)`), one hop,
 position-insensitive. Fixed a real report's 8 false-positive SQL-injection findings; a first pass
 without the `_sa_const` gate regressed an existing mutated-dict test, fixed before landing.
+
+**Config-derived reset and tuple-return taint (2026-10-14, ADR-041):** two more gaps found by
+debugging directly against the owner's real project after ADR-040 left 3/8 false positives.
+`_resets_to_default` now accepts a reset derived from another parameter (`cfg["default_sort"][0]`),
+not just a literal. `_function_tainted` now tracks `(a, b) = f()`-style tuple returns per element
+when every return in `f` is a literal tuple of the same arity, instead of tainting the whole tuple
+because one element legitimately carries request data. Zero regression: benchmark 97%/97%, full
+recall identical (273/361), 577 backend tests passing.

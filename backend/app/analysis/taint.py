@@ -483,8 +483,11 @@ def _allowlist_guarded(func, ctx: _Ctx | None = None) -> set[str]:
 
 
 def _resets_to_default(body: list[ast.stmt], name: str, func) -> bool:
-    """``if col not in ALLOWED: col = "name"`` -- the invalid value is replaced by a constant (or
-    by a parameter whose default is a constant), so afterwards ``col`` is always an allowed one."""
+    """``if col not in ALLOWED: col = "name"`` -- the invalid value is replaced by a constant, by
+    a parameter whose default is a constant, or by a lookup rooted in one of ``func``'s other
+    parameters (``col = cfg["default_sort"][0]``: "the default from config", trusting that
+    parameter the same way a one-hop allow-list guard does) -- so afterwards ``col`` is always an
+    allowed one."""
     const_defaults: set[str] = set()
     args = func.args
     positional = [*args.posonlyargs, *args.args]
@@ -494,6 +497,7 @@ def _resets_to_default(body: list[ast.stmt], name: str, func) -> bool:
     for a, d in zip(args.kwonlyargs, args.kw_defaults, strict=True):
         if isinstance(d, ast.Constant):
             const_defaults.add(a.arg)
+    other_params = {a.arg for a in _all_params(func)} - {name}
     for stmt in body:
         if (
             isinstance(stmt, ast.Assign)
@@ -503,10 +507,26 @@ def _resets_to_default(body: list[ast.stmt], name: str, func) -> bool:
             and (
                 isinstance(stmt.value, ast.Constant)
                 or (isinstance(stmt.value, ast.Name) and stmt.value.id in const_defaults)
+                or _param_lookup(stmt.value, other_params)
             )
         ):
             return True
     return False
+
+
+def _param_lookup(node: ast.expr, params: set[str]) -> bool:
+    """``cfg["default_sort"][0]`` / ``cfg.default_sort`` -- built only from constants, subscripts
+    and attribute access, rooted in one of ``params``. Nothing dynamic (a call, an operator) is
+    allowed in between, so the value cannot itself reintroduce request data."""
+    root = node
+    while isinstance(root, (ast.Subscript, ast.Attribute)):
+        root = root.value
+    if not (isinstance(root, ast.Name) and root.id in params):
+        return False
+    return all(
+        isinstance(n, (ast.Subscript, ast.Attribute, ast.Name, ast.Constant, ast.Load))
+        for n in ast.walk(node)
+    )
 
 
 def _membership_name(test, *, negated: bool) -> str | None:
@@ -564,13 +584,51 @@ def _function_tainted(
     while changed:
         changed = False
         for targets, value, lineno in assigns:
-            if _expr_tainted(value, tainted, ctx):
-                for t in targets:
-                    if t not in tainted and t not in guarded and t not in tainted.orm_names:
-                        tainted.add(t)
-                        tainted.parents[t] = (lineno, value)
-                        changed = True
+            mask = _tuple_return_mask(value, tainted, ctx) if len(targets) > 1 else None
+            tainted_targets = (
+                [t for t, bit in zip(targets, mask, strict=False) if bit]
+                if mask is not None and len(mask) == len(targets)
+                else (targets if _expr_tainted(value, tainted, ctx) else [])
+            )
+            for t in tainted_targets:
+                if t not in tainted and t not in guarded and t not in tainted.orm_names:
+                    tainted.add(t)
+                    tainted.parents[t] = (lineno, value)
+                    changed = True
     return tainted
+
+
+def _tuple_return_mask(
+    value: ast.expr, tainted: set[str], ctx: _Ctx | None
+) -> tuple[bool, ...] | None:
+    """For ``where, params = build_where(...)``, where ``build_where`` is a same-file function
+    every ``return`` of which is a literal tuple/list of the same length: taint each target by its
+    *own* position in that tuple, rather than marking every target tainted merely because one
+    element is (``params`` legitimately carries request data for bound placeholders; ``where``,
+    the SQL text itself, does not). Returns None -- fall back to the coarser whole-value check --
+    when the callee's returns are not uniformly shaped this way."""
+    if ctx is None or not isinstance(value, ast.Call) or not isinstance(value.func, ast.Name):
+        return None
+    callee = ctx.functions.get(value.func.id)
+    if callee is None or ctx.depth >= MAX_CALL_DEPTH:
+        return None
+    returns = [n for n in ast.walk(callee) if isinstance(n, ast.Return) and n.value is not None]
+    if not returns or not all(isinstance(r.value, (ast.Tuple, ast.List)) for r in returns):
+        return None  # no returns, or a non-tuple return mixed in: stay with the coarse check
+    shapes = {len(r.value.elts) for r in returns}
+    if len(shapes) != 1:
+        return None  # different arity per return: ambiguous, stay with the coarse check
+    arity = next(iter(shapes))
+    passed = _tainted_params_for_call(value, tainted, callee, ctx)
+    cache = ctx.cache if ctx.cache is not None else {}
+    inner = _Ctx(ctx.functions, ctx.depth + 1, cache)
+    callee_tainted = _function_tainted(callee, passed, inner)
+    mask = [False] * arity
+    for r in returns:
+        for i, elt in enumerate(r.value.elts):
+            if _expr_tainted(elt, callee_tainted, inner):
+                mask[i] = True
+    return tuple(mask)
 
 
 def _collect_assignments_lined(func) -> list[tuple[list[str], ast.expr, int]]:

@@ -130,7 +130,7 @@ while the backend comes up) instead of a browser tab. See [desktop/README.md](de
 
 ```bash
 make testdb                              # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q        # 573 passed, 2 skipped
+cd backend && python -m pytest -q        # 577 passed, 2 skipped
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 40 unit tests
 cd frontend && npm run e2e               # 7 Playwright tests against the Docker stack
 ```
@@ -144,7 +144,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 | **How to run it (CLI, web app, MCP)** | [docs/MANUAL.md](docs/MANUAL.md) |
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (40 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (41 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

@@ -477,3 +477,77 @@ def test_a_validator_that_does_not_abort_does_not_guard_anything():
     # `_cfg` returns None silently instead of aborting: a bad `name` reaches the sink unchanged.
     silent = DATASET_NAME_AS_TABLE.replace("        if not cfg:\n            abort(404)\n", "")
     assert _sqli(silent)
+
+
+# Another real report (2026-10-14): the allow-list reset for an ORDER BY column read its default
+# from a validated config object (`cfg["default_sort"][0]`), not a literal -- `_resets_to_default`
+# only recognised a literal or a constant-default parameter, so `sort` stayed "tainted" and the
+# finding was reported even though every path through `parse_sort` leaves it allow-listed.
+SORT_RESET_FROM_CONFIG = """
+    import sqlite3
+    from flask import Flask, request, jsonify
+    app = Flask(__name__)
+
+    def parse_sort(cfg):
+        sortable = {"name", "price"}
+        sort = request.args.get("sort")
+        if sort not in sortable:
+            sort = cfg["default_sort"][0]
+        return sort
+
+    @app.route("/data")
+    def data():
+        cfg = {"default_sort": ["name"]}
+        sort = parse_sort(cfg)
+        rows = sqlite3.connect("x").execute(f"SELECT * FROM t ORDER BY {sort}").fetchall()
+        return jsonify(rows)
+"""
+
+
+def test_reset_to_a_value_derived_from_another_parameter_is_not_request_data():
+    assert _sqli(SORT_RESET_FROM_CONFIG) == []
+
+
+def test_reset_to_request_data_itself_is_still_reported():
+    tainted_default = SORT_RESET_FROM_CONFIG.replace(
+        'sort = cfg["default_sort"][0]', 'sort = request.args.get("fallback")'
+    )
+    assert _sqli(tainted_default)
+
+
+# Another real report (2026-10-14): a helper returning `(where, params)` where `params`
+# legitimately carries request data for bound `?` placeholders and `where` (the SQL text) is built
+# only from safe config -- the whole tuple was treated as tainted because *one* element was,
+# flagging the (safe) `where` usage.
+TUPLE_RETURN_MIXED_SAFETY = """
+    import sqlite3
+    from flask import Flask, request, jsonify
+    app = Flask(__name__)
+
+    def build_where(cfg, q):
+        where = "WHERE col = " + cfg["literal"]
+        params = []
+        if q:
+            params.append(q)
+        return where, params
+
+    @app.route("/data")
+    def data():
+        cfg = {"literal": "1"}
+        q = request.args.get("q")
+        where, params = build_where(cfg, q)
+        rows = sqlite3.connect("x").execute(f"SELECT * FROM t {where}", params).fetchall()
+        return jsonify(rows)
+"""
+
+
+def test_a_safe_element_of_a_tuple_return_is_not_tainted_by_its_sibling():
+    assert _sqli(TUPLE_RETURN_MIXED_SAFETY) == []
+
+
+def test_the_actually_tainted_element_of_the_same_tuple_is_still_reported():
+    # `where` itself now carries `q` directly: the real injection the mixed-safety case is not.
+    leaky = TUPLE_RETURN_MIXED_SAFETY.replace(
+        'where = "WHERE col = " + cfg["literal"]', 'where = "WHERE col = " + q'
+    )
+    assert _sqli(leaky)
