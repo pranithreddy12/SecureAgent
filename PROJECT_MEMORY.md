@@ -234,6 +234,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-034 | Ninth untouched set (corrected by ADR-036) | Accepted |
 | ADR-035 | Tenth untouched set (corrected by ADR-036) | Accepted |
 | ADR-036 | Retracted the if/else taint gap; fixed five truth-list line errors | Accepted |
+| ADR-039 | Eleventh untouched set; two new vocabulary gaps | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
@@ -571,3 +572,8 @@ loads `http://localhost:3000` in a native BrowserWindow (no Node integration exp
 Verified against the real window (screenshotted, not dev-tools): stack-already-running path, and
 stopped-containers auto-recovery path, both reach the login screen unattended. Electron over Tauri:
 no Rust toolchain on the machine. Not bundling backend/db into the app -- Docker stays the runtime.
+
+**Eleventh untouched set (2026-10-14, ADR-039):** 65% (11/17), no detector changed; every truth-list line
+verified against a direct scan_repo run before freezing (ADR-036's lesson). Eleven untouched:
+52/49/41/46/58/68/75/53/93/58/65%, pooled 55%. Two new vocabulary gaps: secrets fallback rule misses
+`os.getenv(x) or "literal"`; JS structural SQL sink list is missing pg-promise's `db.one`/`db.many`.

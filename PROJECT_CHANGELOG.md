@@ -1210,3 +1210,13 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   already-running path and a stopped-containers auto-recovery path against the real window. Linked
   from README and `docs/MANUAL.md` (new §3); `docs/deployment.md`'s AI-provider anchor link fixed
   to match the manual's renumbered sections.
+
+## 2026-10-14 (eleventh untouched set -- ADR-039)
+
+- Truth frozen (`d92dc17`), every line checked against a direct scan_repo run first (ADR-036's lesson),
+  scanner unchanged: 11/17 (65%): leaky-flask 4/5, szelaya8/vulnerable-node 2/5, swiss-cheese 5/7. Pooled
+  untouched over eleven sets 199/361 (55%).
+- Two new vocabulary gaps: secrets fallback rule misses `os.getenv(x) or "literal"` (only the
+  default-argument form); JS structural SQL rule's sink list is missing pg-promise's `db.one`/`db.many`.
+  Confirmed the structural command_injection/sql_injection rules fire even when the tainted value comes
+  from `input()`, not a web request -- provenance-agnostic by design, not a bug.

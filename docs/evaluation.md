@@ -495,3 +495,39 @@ an artifact of which classes happen to have a structural rule, not a single tain
 comment in a module-level list in one request handler and renders it with `|safe` in a different one. No
 single-pass, per-request taint analysis sees this without modelling mutable global state across handlers --
 a materially larger feature than anything else in this list.
+
+## Eleventh untouched set: leaky-flask, szelaya8/vulnerable-node, swiss-cheese (2026-10-14)
+
+17 in-taxonomy planted flaws were committed before scoring (`d92dc17`); the scanner was the post-ADR-036
+version, **unchanged**. Following ADR-036's lesson, every line in this set's truth list was checked
+against a direct `scan_repo` run before freezing, not read off the source and guessed.
+
+| Application | Planted | Found | Missed |
+|---|---|---|---|
+| leaky-flask (Ayodub, Flask) | 5 | 4 | a `SECRET_KEY` fallback written as `os.getenv(x) or 'literal'` rather than `os.getenv(x, 'literal')` |
+| szelaya8/vulnerable-node (Express) | 5 | 2 | three SQL injections built in `model/` files and executed with pg-promise's `db.one`/`db.many` -- a sink-call vocabulary the structural SQL rule doesn't list |
+| swiss-cheese (austimkelly, five single-file labs) | 7 | 5 | `app.secret_key = b'secret_key'` (a bytes literal, not a plain string); a template-level `|safe` XSS (the vulnerable line lives in the `.html` file, not the `.py`) |
+| **Total** | **17** | **11 (65%)** | |
+
+Eleven untouched measurements: **52%, 49%, 41%, 46%, 58%, 68%, 75%, 53%, 93%, 58%, 65%; pooled 199/361 = 55%.**
+
+**Two genuinely new, narrow gaps, both vocabulary rather than taint:**
+- The secrets fallback-literal rule recognises `os.getenv(KEY, "literal")` (the default-argument form) but
+  not `os.getenv(KEY) or "literal"` (the `or` form) -- same intent, different syntax.
+- The structural SQL rule's JS call list (`` `_JS_SQL_CALL`: `.query`/`.execute`/`.raw`/`db.get`/`db.all`/
+  `db.run`/`db.exec` ``) does not include pg-promise's `db.one`/`db.many`/`db.any`, so three otherwise
+  plain string-concat SQL injections in a pg-promise app were invisible -- not a cross-file problem this
+  time (the structural rule doesn't need one), just a missing method name.
+
+**A useful negative result, caught by verifying first:** `command-injection/command-injection.py` and
+`sqli/sqli.py` in swiss-cheese read their tainted value from `input()` (a CLI script, not a web request) and
+were still flagged. The structural `command_injection` and `sql_injection` rules fire on the shape of the
+sink call, not on proof that the value came from `request`/`req` -- consistent with ADR-035/036's finding
+that several "taint-engine" gaps in earlier sets were really about which classes have a structural,
+provenance-agnostic rule.
+
+**Repeat of an known gap:** swiss-cheese's `xss/xss.py` passes `user_input` to a template that renders it
+with `{{ user_input|safe|replace(...) }}` (mislabelled in the template's own comment as "properly
+sanitized" -- `|safe` does the opposite). The vulnerable line lives in `templates/index.html`, which the
+scanner does not parse; the same class of miss as `testing-sites/level1` (ADR-036) and the `|safe` XSS
+missed in the sixth set (ADR-029).

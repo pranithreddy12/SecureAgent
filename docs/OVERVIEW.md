@@ -141,6 +141,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 034 | Ninth untouched set (corrected by ADR-036) |
 | 035 | Tenth untouched set (corrected by ADR-036) |
 | 036 | Retracted the if/else taint gap; fixed five truth-list line errors |
+| 039 | Eleventh untouched set; two new vocabulary gaps |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 | 037 | Classic, ledger-style design instead of the default dark-dashboard look |

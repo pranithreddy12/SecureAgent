@@ -97,6 +97,7 @@ Status: Planned → In Progress → Implemented → Tested.
 | R88 | Ninth untouched set measured without changing detectors | ADR-034 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 93% (13/14, corrected by ADR-036); originally reported 79% |
 | R89 | Tenth untouched set measured without changing detectors | ADR-035 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 58% (7/12, corrected by ADR-036); originally reported 50% |
 | R90 | Retracted the if/else taint gap; fixed five truth-list line errors | ADR-036 | benchmark/known_vulnerable.json, docs/evaluation.md, docs/adr/ADR-036-if-else-gap-did-not-exist.md | No detector changed; pooled untouched over ten sets corrected to 55% (188/344) |
+| R91 | Eleventh untouched set measured without changing detectors | ADR-039 | benchmark/known_vulnerable.json, docs/evaluation.md | Measured: 65% (11/17); pooled untouched 55% (199/361); truth list verified against scan_repo before freezing |
 | R29 | Continuous / scheduled testing | SPEC §14 | — (architecture extensible only) | Deferred |
 
 Note (2026-10-11): rows marked *Deferred (ADR-014)* belong to the live multi-agent pipeline, which the owner chose not to deliver (Option 1). They are not met and are not reinterpreted. Rows R2-R12 and R17 are implemented **for source files only** (ADR-016); their live-target counterparts remain Deferred.
