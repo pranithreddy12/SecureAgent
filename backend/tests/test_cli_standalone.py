@@ -60,3 +60,16 @@ def test_report_and_demo_work_without_the_web_stack(tmp_path: Path) -> None:
     res = run_cli(["demo", "--no-color", "--report", str(out)])
     assert "Error" not in res.stderr, res.stderr
     assert res.returncode == 0 and "DEMO / SIMULATED SECURITY AUDIT" in out.read_text("utf-8")
+
+
+def test_sbom_works_without_the_web_stack(vulnerable_dir: Path) -> None:
+    out = vulnerable_dir / "sbom.json"
+    (vulnerable_dir / "requirements.txt").write_text("requests==2.31.0\n", encoding="utf-8")
+    res = run_cli(["scan", str(vulnerable_dir), "--no-osv", "--sbom", str(out), "--exit-zero"])
+    assert "Error" not in res.stderr, res.stderr
+    import json
+
+    doc = json.loads(out.read_text("utf-8"))
+    assert doc["bomFormat"] == "CycloneDX"
+    assert doc["components"][0]["name"] == "requests"
+    assert doc["components"][0]["version"] == "2.31.0"

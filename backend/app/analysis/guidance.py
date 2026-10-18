@@ -259,6 +259,30 @@ GUIDANCE: dict[str, Guidance] = {
         "That the cookie holds a session or credential.",
         "Does the cookie carry authentication state? Is HTTPS enforced in front of the app?",
     ),
+    "k8s_host_namespace": _g(
+        "A compromised pod sees host-level network traffic or processes, not just its own.",
+        "That the pod is reachable and that the host namespace was actually used to pivot.",
+        "Does the workload genuinely need the host's network/PID/IPC namespace?",
+    ),
+    "tf_public_bucket": _g(
+        "Anyone on the internet can read (or write) the bucket's contents.",
+        "That the bucket holds anything sensitive, and that it is actually deployed this way.",
+        "Does the bucket need to be public at all? Would a bucket policy scoped to specific "
+        "principals, or CloudFront with OAC, serve the same purpose?",
+    ),
+    "tf_open_ingress": _g(
+        "Any host on the internet can reach the port the security group opens.",
+        "That the port is reachable and that nothing else restricts access upstream (a "
+        "load balancer, a VPN, a WAF).",
+        "Is the port meant to be public (80/443 on a public LB) or should it be scoped?",
+    ),
+    "tf_hardcoded_credential": _g(
+        "The credential is readable by anyone with repo access, and persists in git history "
+        "and the Terraform state file even after rotation.",
+        "That the literal is a real, live credential rather than a placeholder.",
+        "Is this a real secret? Where should it come from instead (env var, secrets manager, "
+        "a `TF_VAR_` input)?",
+    ),
 }
 
 DEFAULT: Guidance = _g(

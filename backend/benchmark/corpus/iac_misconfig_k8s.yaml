@@ -1,0 +1,22 @@
+# Benchmark corpus: Kubernetes manifest misconfigurations.
+# `VULN:<type>` marks a flaw expected on that line; findings elsewhere are false positives.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  template:
+    spec:
+      hostNetwork: true # VULN:k8s_host_namespace
+      containers:
+        - name: web
+          image: web:latest
+          securityContext:
+            privileged: true # VULN:privileged_container
+            runAsUser: 0 # VULN:container_runs_as_root
+            allowPrivilegeEscalation: true # VULN:privileged_container
+        - name: sidecar
+          image: sidecar:latest
+          securityContext:
+            runAsUser: 1000
+            allowPrivilegeEscalation: false

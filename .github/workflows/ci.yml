@@ -68,6 +68,10 @@ jobs:
     name: SecureAgent scans itself
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # SARIF -> the Security tab
+      pull-requests: write # the action's PR-comment step
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -78,14 +82,12 @@ jobs:
         run: secureagent demo --no-color > /dev/null
       # Accepted findings live in .secureagent-baseline.json (see docs/PROJECT_CLOSEOUT.md);
       # the gate fails only on NEW high/critical findings. Test fixtures: .secureagentignore.
-      - name: Scan this repository
-        run: secureagent scan . --baseline .secureagent-baseline.json --fail-on high --format sarif --output secureagent.sarif
-      - name: Upload SARIF as an artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+      # Dogfoods the repo's own action.yml -- the same thing a consuming repo would use.
+      - name: Scan this repository with our own GitHub Action
+        uses: ./
         with:
-          name: secureagent-sarif
-          path: secureagent.sarif
+          baseline: .secureagent-baseline.json
+          fail-on: high
 
   e2e:
     name: End-to-end (Playwright + Docker Compose)

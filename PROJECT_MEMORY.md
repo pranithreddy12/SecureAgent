@@ -238,6 +238,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-040 | Allow-list validation through a helper function, not just inline | Accepted |
 | ADR-041 | A config-derived allow-list reset, and per-element tuple-return taint | Accepted |
 | ADR-042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI | Accepted |
+| ADR-043 | Four new feature categories: IaC scanning, SBOM, GitHub Action, VS Code extension | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
@@ -601,3 +602,14 @@ recall identical (273/361), 577 backend tests passing.
 surfaces the existing verified-patch engine (ADR-013) per finding in the web UI for the first
 time, honestly returning `available: false` for the many finding types with no deterministic
 fixer. Verified live in the rebuilt Docker stack with screenshots, not just unit tests.
+
+**Four new feature categories (2026-10-18, ADR-043):** owner said the project wasn't impressive
+enough for their (features-graded) faculty. Added, each reusing an existing module: IaC scanning
+(Kubernetes + Terraform, in misconfig.py's existing _infra_findings); CycloneDX SBOM (sbom.py, a
+pure formatter over already-parsed dependencies + OSV results, scan --sbom F); a composite
+GitHub Action (root action.yml: installs from github.action_path, SARIF to the Security tab, SBOM
+artifact, one PR comment updated not duplicated, gate applied last so uploads still happen) now
+dogfooded by the self-scan CI job (uses: ./ instead of three manual steps); a VS Code extension
+(vscode-extension/, plain JS, no build step, runs on save via --format sarif --exit-zero,
+groupSarifByFile kept vscode-free and unit-tested with plain Node). Benchmark 98%/98% (was
+97%/97%). Not done: no VS Code Marketplace listing, Action not tried from another repo yet.

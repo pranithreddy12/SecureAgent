@@ -93,6 +93,37 @@ CATEGORY = {
         "low",
         0.7,
     ),
+    "k8s_host_namespace": (
+        "CWE-250",
+        "A05:2021 Security Misconfiguration",
+        "Remove hostNetwork/hostPID/hostIPC unless the workload genuinely needs the host's "
+        "namespace; it lets a compromised pod see host-level traffic or processes.",
+        "medium",
+        0.6,
+    ),
+    "tf_public_bucket": (
+        "CWE-284",
+        "A01:2021 Broken Access Control",
+        "Remove the public ACL; use a bucket policy scoped to specific principals, or "
+        "aws_s3_bucket_public_access_block to block public ACLs outright.",
+        "high",
+        0.75,
+    ),
+    "tf_open_ingress": (
+        "CWE-284",
+        "A05:2021 Security Misconfiguration",
+        "Scope the ingress cidr_blocks to known ranges instead of 0.0.0.0/0.",
+        "medium",
+        0.55,
+    ),
+    "tf_hardcoded_credential": (
+        "CWE-798",
+        "A07:2021 Identification and Authentication Failures",
+        "Pass credentials via a variable, environment, or a secrets manager -- never a literal "
+        "in a .tf file (it ends up in the state file and version history too).",
+        "high",
+        0.7,
+    ),
 }
 
 
@@ -128,6 +159,19 @@ _COMPOSE = re.compile(r"(?i)(^|/)(docker-)?compose[^/]*\.ya?ml$")
 _ROOT_USER = re.compile(r"""(?i)^\s*user\s*:\s*["']?(root|0)(?:[:"'\s]|$)""")
 _PRIVILEGED = re.compile(r"(?i)^\s*privileged\s*:\s*[\"']?true\b")
 _CSP_INLINE = re.compile(r"(?i)(script-src|default-src)[^;]*unsafe-inline")
+_K8S_MANIFEST = re.compile(r"(?m)^\s*apiVersion\s*:")
+_K8S_KIND = re.compile(r"(?m)^\s*kind\s*:")
+_K8S_RUN_AS_ROOT = re.compile(r"(?i)^\s*runAsUser\s*:\s*0\b")
+_K8S_ESCALATION = re.compile(r"(?i)^\s*allowPrivilegeEscalation\s*:\s*true\b")
+_K8S_HOST_NS = re.compile(r"(?i)^\s*(hostNetwork|hostPID|hostIPC)\s*:\s*true\b")
+_TF_FILE = re.compile(r"(?i)\.tf$")
+_TF_PUBLIC_ACL = re.compile(r"""(?i)^\s*acl\s*=\s*["'](public-read(-write)?|authenticated-read)["']""")
+_TF_OPEN_CIDR = re.compile(r'0\.0\.0\.0/0')
+_TF_INGRESS_BLOCK = re.compile(r"(?i)^\s*ingress\s*\{")
+_TF_BLOCK_END = re.compile(r"^\s*\}")
+_TF_CREDENTIAL = re.compile(
+    r"""(?i)^\s*(access_key|secret_key|secret_access_key|password|api_key|api_token)\s*=\s*["'][^"'$]{8,}["']"""
+)
 _BULK_NAME = re.compile(r"(?i)export|download|dump|backup|csv|(?:^|[_/.-])all(?:$|[_/.-])")
 _LIMIT_HINT = re.compile(
     r"(?i)\blimit\b|paginat|per_page|page_size|max_rows|fetchmany|\.first\(|islice|\[:\s*\w+\]|\.slice"
@@ -176,6 +220,31 @@ def _infra_findings(relpath: str, text: str) -> list[MisconfigFinding]:
                 add("container_runs_as_root", "compose: service runs as root", i)
             elif _PRIVILEGED.match(raw):
                 add("privileged_container", "compose: privileged container", i)
+    if relpath.lower().endswith((".yml", ".yaml")) and _K8S_MANIFEST.search(text) and _K8S_KIND.search(text):
+        for i, raw in enumerate(lines, start=1):
+            if _PRIVILEGED.match(raw):
+                add("privileged_container", "k8s: securityContext.privileged: true", i)
+            elif _K8S_RUN_AS_ROOT.match(raw):
+                add("container_runs_as_root", "k8s: runAsUser: 0", i)
+            elif _K8S_ESCALATION.match(raw):
+                add("privileged_container", "k8s: allowPrivilegeEscalation: true", i)
+            elif _K8S_HOST_NS.match(raw):
+                add("k8s_host_namespace", f"k8s: {raw.strip().split(':')[0].strip()}: true", i)
+    if _TF_FILE.search(relpath):
+        ingress_depth = None
+        for i, raw in enumerate(lines, start=1):
+            if _TF_INGRESS_BLOCK.search(raw):
+                ingress_depth = 0
+            elif ingress_depth is not None:
+                ingress_depth += raw.count("{") - raw.count("}")
+                if ingress_depth < 0:
+                    ingress_depth = None
+            if _TF_PUBLIC_ACL.match(raw):
+                add("tf_public_bucket", "terraform: public bucket ACL", i)
+            elif ingress_depth is not None and _TF_OPEN_CIDR.search(raw):
+                add("tf_open_ingress", "terraform: ingress cidr_blocks allows 0.0.0.0/0", i)
+            elif _TF_CREDENTIAL.match(raw):
+                add("tf_hardcoded_credential", "terraform: literal credential", i)
     if relpath.lower().endswith(_TEXT_SUFFIXES):
         for i, raw in enumerate(lines, start=1):
             if "unsafe-inline" in raw and _CSP_INLINE.search(raw):

@@ -770,6 +770,9 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--report", help="Write a professional HTML report to this path.")
     scan.add_argument("--pdf", help="Write a PDF report to this path (needs WeasyPrint libs).")
     scan.add_argument(
+        "--sbom", help="Write a CycloneDX 1.5 JSON software bill of materials to this path."
+    )
+    scan.add_argument(
         "--max-files", type=int, default=None, help="Cap the number of files scanned."
     )
     scan.add_argument(
@@ -961,6 +964,12 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ImportError) as exc:
             print(f"error: could not render report: {exc}", file=sys.stderr)
             return 2
+    if args.sbom:
+        from app.analysis.sbom import to_cyclonedx
+
+        with open(args.sbom, "w", encoding="utf-8") as fh:
+            json.dump(to_cyclonedx(result), fh, indent=2)
+        print(f"Wrote SBOM ({len(result.dependencies)} components) to {args.sbom}", file=sys.stderr)
     if args.open:
         if not _open_report(result, args.path, args.report):
             return 2

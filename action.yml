@@ -1,0 +1,127 @@
+name: "SecureAgent Scan"
+description: "Static application-security scan (SAST + SCA + IaC): SARIF to the Security tab, an SBOM artifact, and an optional PR comment."
+author: "SecureAgent"
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  path:
+    description: "Directory to scan, relative to the workspace."
+    required: false
+    default: "."
+  fail-on:
+    description: "Fail the step on a new finding at or above this severity (critical|high|medium|low). Empty = never fail."
+    required: false
+    default: ""
+  baseline:
+    description: "Path to a baseline file (findings already accepted) to suppress from the gate."
+    required: false
+    default: ""
+  comment-pr:
+    description: "On a pull_request event, post a summary comment with the finding counts."
+    required: false
+    default: "true"
+  sbom:
+    description: "Also generate a CycloneDX SBOM artifact."
+    required: false
+    default: "true"
+
+outputs:
+  sarif-path:
+    description: "Path to the SARIF results file."
+    value: ${{ steps.scan.outputs.sarif-path }}
+  finding-count:
+    description: "Total findings reported (after the baseline, before any status filtering)."
+    value: ${{ steps.scan.outputs.finding-count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install secureagent
+      shell: bash
+      run: pip install "${{ github.action_path }}/backend"
+
+    - name: Scan
+      id: scan
+      shell: bash
+      run: |
+        set -u
+        ARGS=(scan "${{ inputs.path }}" --format sarif --output secureagent-results.sarif --no-color)
+        if [ -n "${{ inputs.baseline }}" ]; then ARGS+=(--baseline "${{ inputs.baseline }}"); fi
+        if [ -n "${{ inputs.fail-on }}" ]; then ARGS+=(--fail-on "${{ inputs.fail-on }}"); fi
+        if [ "${{ inputs.sbom }}" = "true" ]; then ARGS+=(--sbom secureagent-sbom.json); fi
+        # Capture the gate's exit code but don't stop here: the SARIF/SBOM must still be
+        # uploaded and the PR commented on even when the gate fails. We exit with it last.
+        secureagent "${ARGS[@]}"; GATE=$?
+        echo "gate-exit-code=$GATE" >> "$GITHUB_OUTPUT"
+        echo "sarif-path=secureagent-results.sarif" >> "$GITHUB_OUTPUT"
+        COUNT=$(python3 -c "import json;print(len(json.load(open('secureagent-results.sarif'))['runs'][0]['results']))")
+        echo "finding-count=$COUNT" >> "$GITHUB_OUTPUT"
+        echo "## SecureAgent scan" >> "$GITHUB_STEP_SUMMARY"
+        echo "$COUNT finding(s). Full detail in the Security tab (SARIF) and the uploaded artifacts." >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload SARIF to the Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: secureagent-results.sarif
+
+    - name: Upload SARIF and SBOM as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: secureagent-results
+        path: |
+          secureagent-results.sarif
+          secureagent-sbom.json
+        if-no-files-found: ignore
+
+    - name: Comment on the pull request
+      if: github.event_name == 'pull_request' && inputs.comment-pr == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const sarif = JSON.parse(fs.readFileSync('secureagent-results.sarif', 'utf8'));
+          const results = sarif.runs[0].results || [];
+          const byLevel = {};
+          for (const r of results) byLevel[r.level] = (byLevel[r.level] || 0) + 1;
+          const order = ['error', 'warning', 'note'];
+          const label = { error: 'high/critical', warning: 'medium', note: 'low/informational' };
+          const lines = order
+            .filter((l) => byLevel[l])
+            .map((l) => `- **${byLevel[l]}** ${label[l]}`);
+          const body = results.length
+            ? `### 🛡️ SecureAgent found ${results.length} finding(s)\n\n${lines.join('\n')}\n\nFull detail: the **Security** tab (SARIF) and the \`secureagent-results\` artifact on this run.`
+            : '### 🛡️ SecureAgent: no findings';
+          const marker = '<!-- secureagent-scan-comment -->';
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find((c) => c.body.includes(marker));
+          const text = `${marker}\n${body}`;
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body: text,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: text,
+            });
+          }
+
+    - name: Apply the severity gate
+      shell: bash
+      run: exit ${{ steps.scan.outputs.gate-exit-code }}

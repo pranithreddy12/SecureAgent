@@ -1,0 +1,38 @@
+{
+  "name": "secureagent-vscode",
+  "displayName": "SecureAgent",
+  "description": "Inline security findings from the SecureAgent static scanner: SQL/command injection, secrets, IDOR, misconfiguration, IaC and more, underlined where they live in your code.",
+  "version": "0.1.0",
+  "publisher": "secureagent",
+  "license": "MIT",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Linters"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "secureagent.scanWorkspace", "title": "SecureAgent: Scan Workspace" },
+      { "command": "secureagent.clear", "title": "SecureAgent: Clear Findings" }
+    ],
+    "configuration": {
+      "title": "SecureAgent",
+      "properties": {
+        "secureagent.executable": {
+          "type": "string",
+          "default": "secureagent",
+          "description": "Path to the secureagent CLI (pip install secureagent, or point this at backend/ in a checkout)."
+        },
+        "secureagent.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-scan the saved file's workspace folder on every save."
+        },
+        "secureagent.excludeOsv": {
+          "type": "boolean",
+          "default": true,
+          "description": "Skip the OSV (dependency CVE) network lookup for a fast, offline scan on save."
+        }
+      }
+    }
+  }
+}

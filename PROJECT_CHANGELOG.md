@@ -1261,3 +1261,16 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Verified live: rebuilt Docker, ran a real audit, clicked "Suggest a fix" on both a weak_hash and
   a sql_injection finding, screenshotted the real result (a genuine diff; an honest "not available").
 - 580 backend tests (2 new), 42 frontend Vitest tests (2 new). Benchmark unchanged 97%/97%.
+## 2026-10-18 (four new feature categories -- ADR-043)
+
+- IaC scanning: Kubernetes (privileged/root/host-namespace containers) and Terraform (public S3
+  ACLs, open security-group ingress, hardcoded credentials), extending misconfig.py's existing
+  _infra_findings rather than a new analyser. Fixtures: iac_misconfig.tf, iac_misconfig_k8s.yaml.
+- CycloneDX 1.5 SBOM (sbom.py, scan --sbom F): a pure formatter over the dependency inventory and
+  OSV results the scanner already computes.
+- A composite GitHub Action (root action.yml): SARIF to the Security tab, SBOM artifact, one PR
+  comment (updated, not duplicated) with counts by severity, gate applied last. The self-scan CI
+  job now uses it (uses: ./) instead of three manual steps.
+- A VS Code extension (vscode-extension/): plain JS, no build step, inline diagnostics from
+  --format sarif on save. groupSarifByFile is vscode-free and unit-tested with plain Node.
+- Benchmark 98%/98% (was 97%/97%) with the new IaC fixtures; backend test suite +9.

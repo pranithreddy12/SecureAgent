@@ -44,7 +44,17 @@ never `confirmed`, and CVE/CVSS appear only from real advisory data.
 | Business logic | mass assignment, client-trusted prices/roles, workflow-order gaps, your own rules via an **intent spec** |
 | Correlation | **attack chains**: an unguarded route that reaches an injection, credentialed CORS + CSRF off |
 | Misconfiguration | debug mode, CORS, JWT verification, CSRF, cookies; secrets in logs, swallowed exceptions; root containers, CSP `unsafe-inline`, unbounded exports |
+| Infrastructure as code | Kubernetes privileged/root/host-namespace containers; Terraform public S3 ACLs, open security-group ingress, hardcoded credentials |
 | More classes | template / XPath / NoSQL injection, reflected XSS, unsigned session cookies, plaintext passwords, JavaScript IDOR (heuristic, see `docs/evaluation.md`) |
+
+## Beyond the scanner
+
+| | |
+|---|---|
+| **SBOM** | `secureagent scan . --sbom sbom.json` — CycloneDX 1.5 JSON, with known vulnerabilities attached |
+| **GitHub Action** | `uses: pranithreddy12/SecureAgent@main` — SARIF to the Security tab, SBOM artifact, a PR comment with finding counts (`action.yml`) |
+| **VS Code extension** | inline diagnostics on save, no build step (`vscode-extension/`) |
+| **MCP server** | `secureagent-mcp` for Claude Code / Claude Desktop |
 
 ## The commands
 
@@ -144,7 +154,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 | **How to run it (CLI, web app, MCP)** | [docs/MANUAL.md](docs/MANUAL.md) |
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (42 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (43 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |

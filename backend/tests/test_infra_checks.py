@@ -57,6 +57,56 @@ def test_unbounded_bulk_endpoint_flagged_but_bounded_or_ordinary_is_not():
     assert cats("app.py", not_a_route) == []
 
 
+def test_k8s_privileged_root_and_host_namespace():
+    manifest = (
+        "apiVersion: apps/v1\n"
+        "kind: Deployment\n"
+        "spec:\n"
+        "  template:\n"
+        "    spec:\n"
+        "      hostNetwork: true\n"
+        "      containers:\n"
+        "        - securityContext:\n"
+        "            privileged: true\n"
+        "            runAsUser: 0\n"
+        "            allowPrivilegeEscalation: true\n"
+    )
+    found = sorted(cats("deploy.yaml", manifest))
+    assert found == [
+        "container_runs_as_root",
+        "k8s_host_namespace",
+        "privileged_container",
+        "privileged_container",
+    ]
+    # not a k8s manifest (no apiVersion/kind) -- a plain compose-shaped line is ignored here
+    assert cats("settings.yaml", "privileged: true\n") == []
+
+
+def test_terraform_public_bucket_open_ingress_and_credential():
+    tf = (
+        'resource "aws_s3_bucket" "data" {\n'
+        '  acl = "public-read"\n'
+        "}\n"
+        'resource "aws_security_group" "web" {\n'
+        "  ingress {\n"
+        '    cidr_blocks = ["0.0.0.0/0"]\n'
+        "  }\n"
+        "  egress {\n"
+        '    cidr_blocks = ["0.0.0.0/0"]\n'
+        "  }\n"
+        "}\n"
+        'provider "aws" {\n'
+        '  secret_key = "wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY"\n'
+        "}\n"
+    )
+    found = cats("main.tf", tf)
+    assert found.count("tf_public_bucket") == 1
+    assert found.count("tf_open_ingress") == 1  # not the egress block
+    assert found.count("tf_hardcoded_credential") == 1
+    # a reference, not a literal, is not a credential finding
+    assert cats("main.tf", 'secret_key = "${var.secret_key}"\n') == []
+
+
 def test_every_misconfig_category_has_guidance():
     for category in CATEGORY:
         assert guidance_for(category) is not DEFAULT, category

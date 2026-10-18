@@ -18,8 +18,10 @@ persisted audits. An opt-in LLM layer gives second opinions but never has author
 | Interface | Command / entry | For |
 |---|---|---|
 | **CLI, one command** | `secureagent` (scans `.` and opens the report) / `secureagent PATH` | trying it on a project |
-| CLI, explicit | `secureagent scan PATH [--format text/json/sarif] [--report F] [--pdf F] [--matrix] [--recon] [--intent F] [--exclude P] [--no-osv]` | scripting |
+| CLI, explicit | `secureagent scan PATH [--format text/json/sarif] [--report F] [--pdf F] [--sbom F] [--matrix] [--recon] [--intent F] [--exclude P] [--no-osv]` | scripting |
 | CI gate | `scan --baseline B --fail-on high`, `--write-baseline`, `--since REF`, SARIF output | pull requests, pipelines |
+| **GitHub Action** | `action.yml` (composite) -- SARIF to the Security tab, an SBOM artifact, a PR summary comment | drop-in CI/CD for any consuming repo, no local install |
+| **SBOM** | `--sbom F` -- CycloneDX 1.5 JSON, one component per lockfile dependency, with OSV vulnerabilities attached | supply-chain / compliance |
 | Fixes | `secureagent fix PATH [--apply]` | verified one-line patches |
 | Triage | `secureagent suppress PATH --list` / `--id ID --reason ... [--expires D]` | recording false positives |
 | LLM second opinion | `secureagent review PATH [--dry-run] [--yes] [--report F]` (needs `ANTHROPIC_API_KEY`) | judging noisy findings |
@@ -43,6 +45,7 @@ persisted audits. An opt-in LLM layer gives second opinions but never has author
 | Authorization matrix | route x guard grid; unguarded outliers among guarded siblings | public reads with guarded writes are not flagged |
 | **Attack chains** | unguarded route + injection/IDOR/privilege fields; credentialed CORS + CSRF off | severity = worst member, never escalated |
 | Misconfiguration / logging | debug, CORS, JWT, CSRF, cookies; secrets in logs, swallowed exceptions | |
+| **Infrastructure as code** | Dockerfile/compose root & privileged containers, CSP; Kubernetes privileged/root/host-namespace containers; Terraform public S3 ACLs, open security-group ingress, hardcoded credentials | regex-based on the manifest text, same honesty model as everything else |
 | Reconnaissance | technologies, inputs read, outbound hosts, env vars | source only; **not** live recon |
 
 ## 4. Trust and honesty mechanisms
@@ -145,6 +148,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 040 | Allow-list validation through a helper function, not just inline |
 | 041 | A config-derived allow-list reset, and per-element tuple-return taint |
 | 042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI |
+| 043 | Four new feature categories: IaC scanning, SBOM, GitHub Action, VS Code extension |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 | 037 | Classic, ledger-style design instead of the default dark-dashboard look |
