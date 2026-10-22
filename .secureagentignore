@@ -6,3 +6,4 @@ backend/tests/
 backend/benchmark/
 workspace/
 vscode-extension/test/fixture/
+frontend/e2e/
