@@ -34,5 +34,13 @@
         }
       }
     }
+  },
+  "scripts": {
+    "test": "node extension.test.js && node ./test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@vscode/test-electron": "^2.4.1",
+    "mocha": "^10.7.3"
   }
 }

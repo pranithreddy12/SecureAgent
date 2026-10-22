@@ -35,6 +35,19 @@ applies here too); `extension.js` is the whole extension.
 Open this folder in VS Code and press F5 (`Run Extension`) to launch an Extension
 Development Host with it loaded. There is no marketplace listing yet.
 
+## Tests
+
+```bash
+npm install
+npm test        # node extension.test.js (pure logic) + node test/runTest.js (real Extension Development Host)
+```
+
+`test/runTest.js` downloads a pinned, isolated VS Code (1.142.0) into the OS temp dir and runs
+`test/suite/` inside it against `test/fixture/app.py`, using throwaway user-data/extensions dirs, so
+it never touches your own VS Code windows or profile. VS Code mishandles install/extension paths
+containing a space on Windows, so the runner caches the download under the temp dir and stages a copy
+of the extension there when the checkout path has a space. Needs `secureagent` on PATH.
+
 ## Self-check
 
 `groupSarifByFile`, the pure SARIF-to-per-file-findings step, has a plain-Node test with no

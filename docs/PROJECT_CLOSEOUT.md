@@ -1,6 +1,8 @@
 # SecureAgent – Project Close-out
 
 Date: 2026-10-11 · Repository: `main` (CI green on all four jobs: backend, frontend, self-scan, end-to-end)
+**Updated 2026-10-22** -- see section 3b for what changed since; the numbers in the evidence line just below are the
+2026-10-11 snapshot and are superseded by section 3b.
 
 Evidence at close-out: **463 backend tests pass (2 skipped: PDF, which CI runs, and a Windows-only symlink case), 93% line coverage ·
 33 frontend unit tests · 7 Playwright browser tests · 16 ADRs · detector benchmark 97% precision / 95%
@@ -67,6 +69,25 @@ Legend: ✅ done · ✅s done for **source audits** only (live-target form block
 | Product | Persisted source audits end to end: API, runner, migration, UI, report download (ADR-011); login throttling; interrupted-audit sweep; admin bootstrap |
 | Developer workflow | MCP server (`scan_snippet`, `scan_path`, `suggest_fixes`, `authorization_matrix`); verified fix patches (ADR-013) |
 | Quality | 470 backend (2 skipped) / 36 unit / 7 browser tests; four-job CI |
+
+## 3b. Delivered since 2026-10-11 (updated 2026-10-22)
+
+| Area | Delivered |
+|---|---|
+| Measured accuracy | **Eleven untouched evaluation sets** (48 apps/labs, 361 planted flaws), each truth list frozen and committed *before* scoring. Pooled recall on apps the scanner was never tuned on: **55% (199/361)**; per-set range 41-93%. A wrong causal claim (the "if/else taint gap") was found, retracted and corrected on the record (ADR-036). Precision samples: 28% -> ~82% (dev), ~83% (holdout), 48% -> 56% (third set); labels are a model's first pass -- the human labelling sheet is still unfilled. See `docs/evaluation.md`. |
+| Detection | Template/XPath/NoSQL injection, reflected XSS, mass assignment, unsigned session cookies, plaintext passwords, Django `urls.py` and OpenAPI/connexion handler discovery, allow-list guards recognised through helpers (ADR-019 to 028, 040-042). **Infrastructure as code**: Kubernetes (privileged/root/host-namespace) and Terraform (public S3 ACL, open ingress, literal credentials) -- ADR-043. |
+| Supply chain / CI | **CycloneDX 1.5 SBOM** (`scan --sbom`); a **GitHub Action** (`action.yml`: SARIF to the Security tab, SBOM artifact, one updated PR comment) that the repo's own CI runs on itself. |
+| Developer tools | **VS Code extension** (`vscode-extension/`, inline diagnostics on save) tested inside a real, isolated Extension Development Host (3/3 passing). MCP server grew per-finding `explain_finding`, paging, caching, OpenCode support (`docs/mcp.md`). |
+| Web app | Zip upload for source audits (safe extraction), owner-scoped false-positive triage, a unified Run page, a "suggest a fix" panel (ADR-042), a classic redesign (ADR-037), an Electron desktop shell (ADR-038). |
+| AI | A second provider (Mistral, ADR-033); first live audit run with AI review through the real pipeline, recorded in `PROJECT_MEMORY.md`. Precision gain and hallucination rate remain **unmeasured**. |
+| Quality | ~500 backend tests passing locally (the DB-backed files need the Docker Postgres stack and error here on a missing `asyncpg`/`jwt`), author-written benchmark **98% / 98%**, 43 ADRs, traceability R1-R95. |
+
+**Known limits that matter if you are questioned on this:** the live-target pipeline is still not built (ADR-014 stands);
+detection finds about half of planted flaws in unseen apps; JavaScript is regex-based; taint tracking does not follow a
+value across files (ADR-031); a page templated from an external `.html` file is invisible to the XSS check; the VS Code
+extension has no marketplace listing and the GitHub Action has only been exercised on this repository. Uncommitted,
+unwired experimental work toward the live pipeline exists in `backend/app/{agents,tools,workflows,security}` and is
+**not** part of the delivered scope above.
 
 ## 4. Bugs the project's own tooling found in its own code
 

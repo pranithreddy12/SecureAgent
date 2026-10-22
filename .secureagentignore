@@ -5,3 +5,4 @@
 backend/tests/
 backend/benchmark/
 workspace/
+vscode-extension/test/fixture/

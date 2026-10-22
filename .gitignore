@@ -42,3 +42,6 @@ frontend/CLAUDE.md
 
 # Source code mounted for audits
 /workspace/
+
+# vscode extension test harness: downloaded VS Code build
+vscode-extension/.vscode-test/
