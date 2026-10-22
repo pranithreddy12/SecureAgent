@@ -225,9 +225,15 @@ async def suggest_fix(audit_id: uuid.UUID, finding_id: uuid.UUID, db: DbSession,
     audit = await _owned_audit(db, user, audit_id)
     if audit.status is not AuditStatus.COMPLETED:
         raise HTTPException(status.HTTP_409_CONFLICT, "Fixes are available once the audit is done.")
+    # Same owner-scoped query as the triage endpoint: ownership is also enforced in the lookup
+    # itself (defence in depth), not only by the _owned_audit() call above.
     row = await db.scalar(
-        select(Vulnerability).where(
-            Vulnerability.id == finding_id, Vulnerability.audit_id == audit.id
+        select(Vulnerability)
+        .join(SecurityAudit, SecurityAudit.id == Vulnerability.audit_id)
+        .where(
+            Vulnerability.id == finding_id,
+            Vulnerability.audit_id == audit.id,
+            SecurityAudit.user_id == user.id,
         )
     )
     if row is None:
