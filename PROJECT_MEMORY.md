@@ -239,6 +239,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-041 | A config-derived allow-list reset, and per-element tuple-return taint | Accepted |
 | ADR-042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI | Accepted |
 | ADR-043 | Four new feature categories: IaC scanning, SBOM, GitHub Action, VS Code extension | Accepted |
+| ADR-044 | Option 2 resumed -- the live-target pipeline, day 1 | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
@@ -613,3 +614,12 @@ dogfooded by the self-scan CI job (uses: ./ instead of three manual steps); a VS
 (vscode-extension/, plain JS, no build step, runs on save via --format sarif --exit-zero,
 groupSarifByFile kept vscode-free and unit-tested with plain Node). Benchmark 98%/98% (was
 97%/97%). Not done: no VS Code Marketplace listing, Action not tried from another repo yet.
+
+**Live-target pipeline resumed, day 1 of 3 (2026-10-24, ADR-044):** owner lifted the restriction
+on the 19 untracked Option-2 files; assessed as nearly complete and safety-conscious, not
+abandoned scaffolding. Wired end to end: live_audit_service.py (per-stage DB persistence,
+mirroring pipeline/graph.py), api/targets.py, launcher dispatch by audit_type, findings reuse the
+existing Vulnerability table so the findings UI needs no changes. Fixed one real bug
+(validator_agent.py duplicate confidence kwarg) found by the first real run of this code. 6 new
+tests incl. a real live audit against a real local HTTP server producing a genuinely 'confirmed'
+finding. 591 backend tests. Day 2: frontend Target pages. Day 3: real ZAP, docs.

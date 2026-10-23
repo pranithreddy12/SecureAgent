@@ -1274,3 +1274,23 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - A VS Code extension (vscode-extension/): plain JS, no build step, inline diagnostics from
   --format sarif on save. groupSarifByFile is vscode-free and unit-tested with plain Node.
 - Benchmark 98%/98% (was 97%/97%) with the new IaC fixtures; backend test suite +9.
+
+## 2026-10-24 (live-target pipeline resumed, day 1 -- ADR-044)
+
+- Owner lifted the standing restriction on 19 untracked files from a concurrent session's earlier
+  attempt at the live pipeline (app/agents/, app/tools/, app/workflows/,
+  security/target_validation.py, services/target_service.py, services/authorization_service.py,
+  schemas/pipeline.py, demo/adapters.py). Read and assessed: a nearly complete, safety-conscious
+  implementation (real SSRF defenses, a defence-in-depth per-request policy gate, ZAP via its REST
+  API, Nuclei via subprocess with shell=False and an argv list, non-destructive evidence
+  collection, an offline demo mode) -- only the API layer, a persisting runner and tests were
+  missing.
+- New: app/services/live_audit_service.py (per-stage DB persistence, mirroring the source
+  pipeline's pattern), app/api/targets.py (mirrors projects.py), audits.py's launcher now
+  dispatches on audit_type. Live findings land in the same Vulnerability/SecurityReport tables
+  the source pipeline uses, so the existing findings UI works unchanged.
+- Fixed one real bug the first real exercise of this code found (validator_agent.py: duplicate
+  'confidence' kwarg, a TypeError on every finding -- this code had never been run before).
+- tests/test_targets.py: 6 new tests including a real end-to-end run against a live
+  ThreadingHTTPServer producing a genuinely 'confirmed' finding (non-destructive re-validation) --
+  the first honestly-confirmed finding this project has produced. 591 backend tests passing.

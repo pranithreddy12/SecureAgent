@@ -1,0 +1,21 @@
+{
+  "target": "https://demo.secureagent.example/",
+  "technologies": ["server: nginx", "x-powered-by: Express"],
+  "endpoints": [
+    {"url": "https://demo.secureagent.example/", "method": "GET", "status": 200},
+    {"url": "https://demo.secureagent.example/login", "method": "GET", "status": 200},
+    {"url": "https://demo.secureagent.example/api/items", "method": "GET", "status": 200}
+  ],
+  "api_endpoints": ["https://demo.secureagent.example/openapi.json"],
+  "forms": [
+    {"action": "https://demo.secureagent.example/login", "method": "POST", "fields": ["username", "password"]}
+  ],
+  "parameters": ["q", "id", "username"],
+  "headers": {
+    "server": "nginx/1.24.0",
+    "content-type": "text/html",
+    "set-cookie": "sid=demo"
+  },
+  "interesting_paths": ["/robots.txt (200)", "/openapi.json (200)"],
+  "notes": ["DEMO / SIMULATED SECURITY AUDIT — no network traffic was sent."]
+}

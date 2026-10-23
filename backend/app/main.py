@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import audits, auth, health, projects
+from app.api import audits, auth, health, projects, targets
 from app.core.config import get_settings
 from app.core.database import get_sessionmaker
-from app.services import audit_service
+from app.services import audit_service, live_audit_service
 
 logger = logging.getLogger("secureagent.api")
 
@@ -18,6 +18,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     try:
         async with get_sessionmaker()() as db:
             swept = await audit_service.fail_interrupted(db)
+            swept += await live_audit_service.fail_interrupted(db)
         if swept:
             logger.warning("marked %d interrupted audit(s) as failed", swept)
     except Exception:  # noqa: BLE001 - never block startup on the sweep (e.g. DB not ready)
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(audits.router, prefix="/api")
     app.include_router(projects.router, prefix="/api")
+    app.include_router(targets.router, prefix="/api")
     return app
 
 

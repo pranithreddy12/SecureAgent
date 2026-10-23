@@ -39,8 +39,14 @@ _REPORT_HEADERS = {
 
 
 async def _run_with_own_session(audit_id: uuid.UUID) -> None:
+    from app.services import live_audit_service
+
     async with get_sessionmaker()() as session:
-        await audit_service.run_source_audit(session, audit_id)
+        audit = await session.get(SecurityAudit, audit_id)
+        if audit is not None and audit.audit_type == "live":
+            await live_audit_service.run_live_audit(session, audit_id)
+        else:
+            await audit_service.run_source_audit(session, audit_id)
 
 
 async def _launch_in_background(audit_id: uuid.UUID) -> None:

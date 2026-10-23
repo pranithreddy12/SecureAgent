@@ -88,7 +88,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 580 passed, 2 skipped (PDF locally, Windows symlink) |
+| Backend tests | 591 passed, 2 skipped (PDF locally, Windows symlink) |
 | Frontend | 42 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
@@ -149,6 +149,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 041 | A config-derived allow-list reset, and per-element tuple-return taint |
 | 042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI |
 | 043 | Four new feature categories: IaC scanning, SBOM, GitHub Action, VS Code extension |
+| 044 | Option 2 resumed -- the live-target pipeline, day 1 |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 | 037 | Classic, ledger-style design instead of the default dark-dashboard look |

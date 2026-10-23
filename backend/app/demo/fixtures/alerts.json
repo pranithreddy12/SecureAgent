@@ -1,0 +1,41 @@
+[
+  {
+    "source": "zap",
+    "name": "Missing Anti-clickjacking Header",
+    "url": "https://demo.secureagent.example/",
+    "parameter": null,
+    "severity": "medium",
+    "description": "The response does not include X-Frame-Options or a CSP frame-ancestors directive.",
+    "evidence": "(demo fixture)",
+    "cwe": "CWE-1021",
+    "cve": null,
+    "cvss": null,
+    "extra": {"owasp": "A05:2021 Security Misconfiguration", "pluginId": "10020"}
+  },
+  {
+    "source": "nuclei",
+    "name": "Missing Strict-Transport-Security header",
+    "url": "https://demo.secureagent.example/",
+    "parameter": null,
+    "severity": "low",
+    "description": "HSTS is not set on the HTTPS response.",
+    "evidence": "(demo fixture)",
+    "cwe": "CWE-319",
+    "cve": null,
+    "cvss": null,
+    "extra": {"template": "http-missing-security-headers"}
+  },
+  {
+    "source": "zap",
+    "name": "Reflected Cross Site Scripting",
+    "url": "https://demo.secureagent.example/",
+    "parameter": "q",
+    "severity": "high",
+    "description": "The q parameter is reflected in the response. Demo fixture only.",
+    "evidence": "q=test",
+    "cwe": "CWE-79",
+    "cve": null,
+    "cvss": null,
+    "extra": {"pluginId": "40012"}
+  }
+]
