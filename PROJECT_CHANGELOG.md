@@ -1294,3 +1294,17 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - tests/test_targets.py: 6 new tests including a real end-to-end run against a live
   ThreadingHTTPServer producing a genuinely 'confirmed' finding (non-destructive re-validation) --
   the first honestly-confirmed finding this project has produced. 591 backend tests passing.
+
+## 2026-10-24 (live-target pipeline resumed, day 2 -- ADR-044)
+
+- New: /targets (register, list) and /targets/{id} (safety status, revalidate, authorization
+  checkbox, start audit, audits list, delete) pages, frontend/services/targets.ts. The audit
+  detail page now renders the live pipeline's own 8-stage list instead of the source pipeline's
+  9 when audit_type is "live". Findings/triage/suggest-fix panels needed no changes.
+- Fixed a bug the first live click-through found: live_audit_service._wrap() never wrote
+  audit.stage_state on a completed stage, so the frontend's per-stage checkmark never lit up for
+  live audits even though the stage had finished.
+- Verified live end-to-end through the browser against a real local target reachable via
+  host.docker.internal: all 8 stages completed, 3 findings landed with status=confirmed, and
+  Mark as false positive / Suggest a fix both worked unmodified. No new tests needed (endpoints
+  already covered by test_targets.py); frontend suite stayed at 42 passed.

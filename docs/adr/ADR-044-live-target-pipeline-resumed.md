@@ -70,10 +70,33 @@ pipeline has correctly never claimed it. 6 new tests (auth required, private-tar
 credentials-in-URL rejection, authorization gating, the end-to-end run, owner isolation). Full
 backend suite: 591 passed, 2 skipped.
 
+## Day 2: frontend
+
+`/targets` (register, list) and `/targets/{id}` (safety status, revalidate, authorization
+checkbox, "Start live audit", audits list, delete) -- new pages, mirroring the existing
+Projects pages' shape. `frontend/services/targets.ts` is a thin wrapper matching
+`frontend/services/projects.ts`'s pattern. The audit detail page (`/audits/[id]`) now renders
+`LIVE_STAGES` (the 8 live-pipeline stage names) instead of the source pipeline's 9 when
+`audit.audit_type === "live"`; the findings/triage/suggest-fix panels needed zero changes since
+live findings are already `Vulnerability` rows.
+
+Fixed one more real bug surfaced by actually clicking through a live run: `_wrap()`'s success
+branch logged the "completed" audit log but never wrote `audit.stage_state[stage]`, so the
+frontend's per-stage checkmark (which reads `stage_state[key].completed_at`, the same field the
+source pipeline writes) never lit up for live audits even though the stage had, in fact,
+finished. One-line fix in `live_audit_service.py`.
+
+Verified live, manually, end-to-end: registered a target at `http://host.docker.internal:8899/`
+(a throwaway local HTTP server, cleaned up afterward), authorized it, started an audit, watched
+all 8 stages complete in the UI in real time, and got 3 findings with `status: confirmed` --
+"Mark as false positive" and "Suggest a fix" both worked unmodified. No new automated tests were
+needed (the UI calls endpoints already covered by `test_targets.py`); frontend suite stayed at
+42 passed, `tsc`/`eslint`/`next build` all clean.
+
 ## Not claimed
 
-Frontend (day 2), real ZAP verified live (day 3; only degraded-path tested so far, since ZAP needs
-its own container), resume-from-failed-stage for live audits (not attempted -- source audits have
-it, live audits restart from scratch on retry), and the remaining untracked pieces
+Real ZAP verified live (day 3; only degraded-path tested so far, since ZAP needs its own
+container), resume-from-failed-stage for live audits (not attempted -- source audits have it,
+live audits restart from scratch on retry), and the remaining untracked pieces
 (`workflows/audit_graph.py`'s own `build_graph()`/`PROGRESS`-in-state design, superseded by this
 ADR's per-node persistence approach) are not deleted, just unused by the wiring above.

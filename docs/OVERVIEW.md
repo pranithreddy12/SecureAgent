@@ -99,9 +99,12 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 ## 8. What does **not** exist
 
-- Live-target auditing: URL targets, network-safety validation, live reconnaissance, ZAP, Nuclei,
-  exploit-style validation (ADR-014, ADR-015). Acceptance criteria are tracked honestly in
-  `docs/PROJECT_CLOSEOUT.md`.
+- Real ZAP/Nuclei verified live end-to-end (ADR-044, day 3) -- the live-target pipeline itself
+  (target CRUD, authorization, SSRF-safe validation, recon, ZAP/Nuclei with graceful degradation,
+  non-destructive re-validation, the `/targets` UI) is wired and verified end-to-end against a
+  real HTTP target; only a live run with the real ZAP/Nuclei containers up is still pending.
+- Resume-from-failed-stage for live audits (source audits have it; live audits restart from
+  scratch on retry).
 - Languages other than Python (deep) and JS/TS (shallow, regex-based).
 - Any measured real-world detection rate or LLM accuracy.
 - Per-user LLM keys in the web app (one operator key).

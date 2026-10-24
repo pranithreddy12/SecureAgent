@@ -23,9 +23,12 @@ The report is written to your temp directory, not into your project.
 
 ## What it is (and is not)
 
-**Delivered as a grey-box static security auditor** (owner decision, ADR-014): a deterministic engine
-plus optional, advisory AI layers. The original brief's *live-target* pipeline (URL targets, live
-reconnaissance, OWASP ZAP, Nuclei, exploit-style validation) is designed but deliberately **not** built.
+**Delivered as a grey-box static security auditor** (owner decision, ADR-014), later extended with a
+live-target pipeline (ADR-044): target CRUD, SSRF-safe validation, authorization, live
+reconnaissance, OWASP ZAP + Nuclei (degrading gracefully when unavailable), and non-destructive
+re-validation -- the only path in this project that can honestly mark a finding `confirmed` rather
+than `likely`. Wired and verified end-to-end against a real HTTP target; a run against the real
+ZAP/Nuclei containers is the one piece still pending.
 The complete inventory, with evidence and limits, is in [docs/OVERVIEW.md](docs/OVERVIEW.md); the verdict
 against the original 28 acceptance criteria (15 done, 7 done for source audits only, 6 partial, 0 not
 built) is in [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md).

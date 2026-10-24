@@ -623,3 +623,10 @@ existing Vulnerability table so the findings UI needs no changes. Fixed one real
 (validator_agent.py duplicate confidence kwarg) found by the first real run of this code. 6 new
 tests incl. a real live audit against a real local HTTP server producing a genuinely 'confirmed'
 finding. 591 backend tests. Day 2: frontend Target pages. Day 3: real ZAP, docs.
+
+**Live-target pipeline, day 2 of 3 (2026-10-24, ADR-044):** /targets and /targets/{id} pages,
+frontend/services/targets.ts, audit detail page now shows the live pipeline's own 8-stage list.
+Fixed a second bug (live_audit_service._wrap() wasn't writing stage_state on completion, so the
+frontend checklist never ticked for live audits). Verified live end-to-end through the browser
+(real target via host.docker.internal, all 8 stages, 3 confirmed findings, triage buttons both
+worked unmodified). Frontend suite unchanged at 42 passed. Day 3: real ZAP, docs.
