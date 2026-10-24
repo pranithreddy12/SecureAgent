@@ -27,8 +27,8 @@ The report is written to your temp directory, not into your project.
 live-target pipeline (ADR-044): target CRUD, SSRF-safe validation, authorization, live
 reconnaissance, OWASP ZAP + Nuclei (degrading gracefully when unavailable), and non-destructive
 re-validation -- the only path in this project that can honestly mark a finding `confirmed` rather
-than `likely`. Wired and verified end-to-end against a real HTTP target; a run against the real
-ZAP/Nuclei containers is the one piece still pending.
+than `likely`. Wired and verified end-to-end, including a real scan against a real OWASP ZAP
+container (Nuclei's graceful-degradation path only, for lack of a `nuclei` binary in the dev image).
 The complete inventory, with evidence and limits, is in [docs/OVERVIEW.md](docs/OVERVIEW.md); the verdict
 against the original 28 acceptance criteria (15 done, 7 done for source audits only, 6 partial, 0 not
 built) is in [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md).

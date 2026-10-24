@@ -99,10 +99,10 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 ## 8. What does **not** exist
 
-- Real ZAP/Nuclei verified live end-to-end (ADR-044, day 3) -- the live-target pipeline itself
-  (target CRUD, authorization, SSRF-safe validation, recon, ZAP/Nuclei with graceful degradation,
-  non-destructive re-validation, the `/targets` UI) is wired and verified end-to-end against a
-  real HTTP target; only a live run with the real ZAP/Nuclei containers up is still pending.
+- Real Nuclei verified live end-to-end (ADR-044) -- ZAP has been (a real scan against a live
+  target, 200 genuine alerts); no `nuclei` binary was available in the dev image to do the same
+  for it, so only its graceful-degradation path (`NucleiUnavailable`, logged, audit continues)
+  has been exercised.
 - Resume-from-failed-stage for live audits (source audits have it; live audits restart from
   scratch on retry).
 - Languages other than Python (deep) and JS/TS (shallow, regex-based).

@@ -59,6 +59,31 @@ def run_zap(target_url: str, ctx: RequestContext) -> list[RawToolAlert]:
             {"scanId": str(scan_id)},
             timeout=min(120, settings.max_scan_duration),
         )
+        # Attack strength must be lowered *before* the scan starts -- ZAP applies the
+        # active policy's strength to each rule as it's scheduled, so setting it after
+        # ascan/action/scan/ leaves already-queued rules running at the default MEDIUM
+        # strength. The "Client Browser" category (DOM XSS and friends) launches a
+        # headless browser per rule -- too heavy for a non-destructive scan and the
+        # thing that was OOM-killing the ZAP container -- so it's turned off outright
+        # rather than just throttled.
+        try:
+            policies = _zap("/JSON/ascan/view/policies/", {}).get("policies") or []
+            for policy in policies:
+                policy_id = policy.get("id")
+                if policy_id is None:
+                    continue
+                if str(policy.get("name", "")).strip().lower() == "client browser":
+                    _zap(
+                        "/JSON/ascan/action/setPolicyAlertThreshold/",
+                        {"id": str(policy_id), "alertThreshold": "OFF", "scanPolicyName": ""},
+                    )
+                    continue
+                _zap(
+                    "/JSON/ascan/action/setPolicyAttackStrength/",
+                    {"id": str(policy_id), "attackStrength": "LOW", "scanPolicyName": ""},
+                )
+        except ZapUnavailable:
+            pass
         ascan = _zap(
             "/JSON/ascan/action/scan/",
             {
@@ -68,14 +93,6 @@ def run_zap(target_url: str, ctx: RequestContext) -> list[RawToolAlert]:
                 "scanPolicyName": "",
             },
         ).get("scan", "0")
-        # Best-effort: lower attack strength if the endpoint exists.
-        try:
-            _zap(
-                "/JSON/ascan/action/setPolicyAttackStrength/",
-                {"id": "0", "attackStrength": "LOW", "scanPolicyName": ""},
-            )
-        except ZapUnavailable:
-            pass
         _wait(
             "/JSON/ascan/view/status/",
             {"scanId": str(ascan)},
@@ -112,7 +129,7 @@ def run_zap(target_url: str, ctx: RequestContext) -> list[RawToolAlert]:
 
 def _include_regex(scope: TargetScope) -> str:
     hosts = "|".join(_escape(h) for h in scope.allowed_hosts) or "localhost"
-    return rf"https?://({hosts})/.*"
+    return rf"https?://({hosts})(:\d+)?/.*"
 
 
 def _escape(host: str) -> str:

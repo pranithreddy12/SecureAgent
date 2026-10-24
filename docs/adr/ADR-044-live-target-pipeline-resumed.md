@@ -93,10 +93,41 @@ all 8 stages complete in the UI in real time, and got 3 findings with `status: c
 needed (the UI calls endpoints already covered by `test_targets.py`); frontend suite stayed at
 42 passed, `tsc`/`eslint`/`next build` all clean.
 
+## Day 3: real ZAP, two real bugs
+
+Brought up the `pipeline` and `lab` compose profiles (`zap`, and OWASP Juice Shop as a throwaway,
+deliberately-vulnerable local target allow-listed just for this) and ran `run_zap()` for real for
+the first time. It failed twice, both genuine bugs in the untracked code, not environment issues:
+
+1. **`_include_regex()` didn't allow a port.** ZAP's spider needs the target URL to match the
+   scan's context include-regex or it refuses with `url_not_in_context`. The regex was built from
+   `scope.allowed_hosts` (port-stripped, correctly, for the *authorization* scope check) but reused
+   verbatim for ZAP's own URL-matching regex, which needs the literal URL including its port.
+   `http://juice-shop:3000/` never matched `https?://(juice-shop)/.*`. Fixed by adding an optional
+   `(:\d+)?` group.
+2. **Attack strength was set *after* the scan started.** `run_zap()` called
+   `ascan/action/scan/` and only then tried to lower the attack strength to LOW -- by which point
+   ZAP had already queued every rule at its policy default (MEDIUM). One of those rules,
+   `DomXssScanRule` (ZAP's "Client Browser" policy category), launches a headless browser per
+   scan and OOM-killed the ZAP container outright (exit 137) -- twice, reproduced both times.
+   Fixed by moving the attack-strength call before `ascan/action/scan/`, and, since a
+   non-destructive low-strength scan has no business launching a browser at all, by turning the
+   "Client Browser" category off entirely (`setPolicyAlertThreshold=OFF`) rather than just
+   throttling it.
+
+Verified clean after both fixes: a real low-strength ZAP scan (spider + active scan, LOW
+strength, no browser rules) against Juice Shop completed in 131s with 200 genuine alerts (Cross-
+Domain Misconfiguration, missing CSP, etc.), ZAP container stayed up the whole time. New
+`tests/test_zap_tool.py::test_include_regex_matches_a_host_with_a_port` locks in fix #1 as a
+regression guard (fix #2 isn't unit-testable without a real ZAP instance; it's covered by this
+manual verification, consistent with how Nuclei's subprocess invocation is handled elsewhere in
+this codebase). Full backend suite: 592 passed, 2 skipped.
+
 ## Not claimed
 
-Real ZAP verified live (day 3; only degraded-path tested so far, since ZAP needs its own
-container), resume-from-failed-stage for live audits (not attempted -- source audits have it,
-live audits restart from scratch on retry), and the remaining untracked pieces
-(`workflows/audit_graph.py`'s own `build_graph()`/`PROGRESS`-in-state design, superseded by this
-ADR's per-node persistence approach) are not deleted, just unused by the wiring above.
+Resume-from-failed-stage for live audits (not attempted -- source audits have it, live audits
+restart from scratch on retry), and the remaining untracked pieces (`workflows/audit_graph.py`'s
+own `build_graph()`/`PROGRESS`-in-state design, superseded by this ADR's per-node persistence
+approach) are not deleted, just unused by the wiring above. Nuclei was not exercised against a
+real binary this session (no `nuclei` installed in the dev image); its `NucleiUnavailable`
+graceful-degrade path was exercised instead, same as day 1.

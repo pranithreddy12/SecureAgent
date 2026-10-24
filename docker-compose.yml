@@ -12,7 +12,7 @@ services:
       interval: 5s
       retries: 10
 
-  # Not part of the delivered scope (ADR-014): only for the deferred live-audit pipeline.
+  # Live-audit pipeline only (ADR-044); not needed for static source audits.
   #   docker compose --profile pipeline up
   zap:
     profiles: ["pipeline"]

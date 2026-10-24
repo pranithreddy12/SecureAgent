@@ -1308,3 +1308,16 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   host.docker.internal: all 8 stages completed, 3 findings landed with status=confirmed, and
   Mark as false positive / Suggest a fix both worked unmodified. No new tests needed (endpoints
   already covered by test_targets.py); frontend suite stayed at 42 passed.
+
+## 2026-10-24 (live-target pipeline resumed, day 3 -- ADR-044)
+
+- Real ZAP, for the first time: brought up the pipeline/lab compose profiles (zap + OWASP Juice
+  Shop as a throwaway allow-listed local target) and ran run_zap() against a live service.
+- Found and fixed two real bugs: (1) the ZAP context include-regex didn't allow a port, so every
+  scan failed with url_not_in_context; (2) attack strength was lowered after the scan started,
+  so the browser-driven DomXssScanRule ran at full MEDIUM strength and OOM-killed the ZAP
+  container (reproduced twice) -- fixed by reordering and turning the browser-dependent "Client
+  Browser" policy category off entirely for this non-destructive scan.
+- Verified clean: a real low-strength ZAP scan against Juice Shop completed in 131s with 200
+  genuine alerts, ZAP stayed up throughout. New tests/test_zap_tool.py regression-guards fix #1.
+  592 backend tests passing (was 591).

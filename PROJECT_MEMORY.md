@@ -630,3 +630,13 @@ Fixed a second bug (live_audit_service._wrap() wasn't writing stage_state on com
 frontend checklist never ticked for live audits). Verified live end-to-end through the browser
 (real target via host.docker.internal, all 8 stages, 3 confirmed findings, triage buttons both
 worked unmodified). Frontend suite unchanged at 42 passed. Day 3: real ZAP, docs.
+
+**Live-target pipeline, day 3 of 3 (2026-10-24, ADR-044):** ran the real ZAP container against
+OWASP Juice Shop (lab profile, allow-listed) for the first time and found two real bugs: the
+scan-scope include-regex rejected any host with a port (url_not_in_context on every scan), and
+attack strength was set after the scan started, so the browser-driven DOM XSS rule ran at full
+strength and OOM-killed the ZAP container twice. Fixed both (regex now allows :port; attack
+strength set before the scan starts; the browser-dependent "Client Browser" category turned off
+outright since a non-destructive scan has no business launching a headless browser). Verified: a
+real scan completed in 131s with 200 genuine alerts, no crash. 592 backend tests passing. This
+closes out the 3-day live-target pipeline resumption.
