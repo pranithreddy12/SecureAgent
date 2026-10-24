@@ -161,6 +161,38 @@ export interface ProjectDetail extends Project {
   audit_count: number;
 }
 
+export type TargetStatus = "pending" | "validated" | "rejected" | "archived";
+
+export interface Target {
+  id: string;
+  user_id: string;
+  name: string;
+  url: string;
+  description: string | null;
+  status: TargetStatus;
+  scope: { allowed_hosts: string[]; path_prefixes: string[] };
+  validation_message: string | null;
+  authorization_confirmed: boolean;
+  authorization_timestamp: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TargetAuthorization {
+  id: string;
+  target_id: string;
+  user_id: string;
+  confirmed: boolean;
+  statement: string;
+  timestamp: string;
+  scope: { allowed_hosts: string[]; path_prefixes: string[] };
+}
+
+export interface AuditReadiness {
+  auditable: boolean;
+  reasons: string[];
+}
+
 export interface SourceAuditRequest {
   path: string;
   label?: string;

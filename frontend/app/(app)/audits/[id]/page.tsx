@@ -16,7 +16,7 @@ import { auditService } from "@/services/audits";
 import type { AuditDetail, AuditLogEntry, Finding, Severity, SuggestedFix } from "@/types/api";
 
 const POLL_MS = 2000;
-const STAGES = [
+const SOURCE_STAGES = [
   { key: "authorization", label: "Check authorization and scope" },
   { key: "reconnaissance", label: "Map the application" },
   { key: "scanner", label: "Analyse source" },
@@ -26,6 +26,16 @@ const STAGES = [
   { key: "correlation", label: "Correlate attack chains" },
   { key: "ai_narrative", label: "AI summary (opt-in)" },
   { key: "report", label: "Generate report" },
+];
+const LIVE_STAGES = [
+  { key: "authorization_check", label: "Check authorization" },
+  { key: "target_validation", label: "Validate target safety" },
+  { key: "reconnaissance", label: "Map the live application" },
+  { key: "attack_surface_processing", label: "Process the attack surface" },
+  { key: "vulnerability_scanning", label: "Scan (ZAP + Nuclei + passive)" },
+  { key: "safe_validation", label: "Safely validate findings" },
+  { key: "validator", label: "Reduce false positives" },
+  { key: "report_generation", label: "Generate report" },
 ];
 
 function Triage({
@@ -195,7 +205,7 @@ export default function AuditDetailPage() {
         <h1 className="mt-1 text-2xl font-semibold">{audit.source_label ?? "Source audit"}</h1>
         <p className="mt-1 flex items-center gap-3 text-sm text-muted">
           <AuditStatusLabel status={audit.status} />
-          <span>Static source analysis</span>
+          <span>{audit.audit_type === "live" ? "Live target audit" : "Static source analysis"}</span>
           {audit.is_demo && <span className="text-warning">DEMO</span>}
         </p>
       </header>
@@ -214,7 +224,7 @@ export default function AuditDetailPage() {
           />
         </div>
         <ol className="mt-4 flex flex-col gap-1 text-sm">
-          {STAGES.map(({ key, label }) => {
+          {(audit.audit_type === "live" ? LIVE_STAGES : SOURCE_STAGES).map(({ key, label }) => {
             const entry = audit.stage_state[key] as { completed_at?: string | null } | undefined;
             const done = Boolean(entry?.completed_at);
             const current = audit.current_stage === key;

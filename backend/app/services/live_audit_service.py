@@ -133,6 +133,11 @@ def _wrap(db: AsyncSession, audit: SecurityAudit, stage: str, agent: str, fn):
                 agent=agent,
             )
         else:
+            # Same shape the frontend already reads for the source pipeline's stage checklist
+            # (``audit.stage_state[key].completed_at``) -- no UI change needed for this part.
+            stage_state = dict(audit.stage_state or {})
+            stage_state[stage] = {"completed_at": _now().isoformat()}
+            audit.stage_state = stage_state
             await audit_service._log(
                 db, audit.id, "completed", label, LogStatus.SUCCESS, agent=agent
             )

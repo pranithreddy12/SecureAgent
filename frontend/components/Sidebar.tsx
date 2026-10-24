@@ -11,6 +11,7 @@ const NAV: { label: string; href?: string }[] = [
   { label: "Run", href: "/run" },
   { label: "Dashboard", href: "/dashboard" },
   { label: "Projects", href: "/projects" },
+  { label: "Targets", href: "/targets" },
   { label: "Audits", href: "/audits" },
   { label: "Settings", href: "/settings" },
 ];
