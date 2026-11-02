@@ -13,9 +13,72 @@ import {
 } from "@/components/badges";
 import { Button, Card, ErrorMessage } from "@/components/ui";
 import { auditService } from "@/services/audits";
-import type { AuditDetail, AuditLogEntry, Finding, Severity, SuggestedFix } from "@/types/api";
+import type {
+  AuditDetail,
+  AuditLogEntry,
+  Finding,
+  HardeningSummary,
+  Severity,
+  SuggestedFix,
+} from "@/types/api";
 
 const POLL_MS = 2000;
+
+function HardeningCard({ hardening }: { hardening: HardeningSummary }) {
+  const more = hardening.needs_profile.length;
+  return (
+    <Card title={`Hardening recommendations (${hardening.recommendations.length})`}>
+      <p className="mb-3 text-xs text-muted">
+        Guidance, not findings: no severity, and not counted in the totals above. &ldquo;No X
+        detected&rdquo; means no evidence in source, not that X is absent.
+      </p>
+      {hardening.observed_controls.length > 0 && (
+        <p className="mb-3 text-xs text-muted">
+          Controls observed: {hardening.observed_controls.join(", ")}
+        </p>
+      )}
+      {more > 0 && (
+        <p className="mb-3 text-xs">
+          Declare an application profile in secureagent-intent.json to get {more} more.
+        </p>
+      )}
+      <ul className="flex flex-col gap-3">
+        {hardening.recommendations.map((r) => (
+          <li key={r.id} className="rounded-sm border border-border">
+            <details>
+              <summary className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-3">
+                <span className="text-xs font-semibold uppercase">{r.priority}</span>
+                <span className="text-sm font-medium">{r.title}</span>
+                <span className="font-mono text-xs text-muted">{r.id}</span>
+              </summary>
+              <div className="flex flex-col gap-2 border-t border-border px-4 py-3 text-sm">
+                <p>{r.rationale}</p>
+                <ul className="list-disc pl-5 text-muted">
+                  {r.actions.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+                <ul className="text-xs text-muted">
+                  {r.evidence.map((e) => (
+                    <li key={`${e.location}-${e.detail}`}>
+                      {e.detail} <span className="font-mono">({e.location})</span>
+                    </li>
+                  ))}
+                </ul>
+                {r.references.length > 0 && (
+                  <p className="text-xs text-muted">References: {r.references.join("; ")}</p>
+                )}
+                <p className="text-xs text-muted">
+                  Basis: {r.basis}. Could not verify: {r.cannot_verify}
+                </p>
+              </div>
+            </details>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
 const SOURCE_STAGES = [
   { key: "authorization", label: "Check authorization and scope" },
   { key: "reconnaissance", label: "Map the application" },
@@ -382,6 +445,8 @@ export default function AuditDetailPage() {
           </ul>
         </Card>
       )}
+
+      {audit.hardening && <HardeningCard hardening={audit.hardening} />}
 
       <Card title={`Findings (${audit.total_findings})`}>
         <div className="mb-4 flex flex-wrap gap-2 text-xs">

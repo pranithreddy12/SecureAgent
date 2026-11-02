@@ -192,6 +192,23 @@ TOOLS = [
         },
     },
     {
+        "name": "hardening_recommendations",
+        "description": (
+            "Context-aware hardening recommendations (guidance, not findings): controls the "
+            "application probably should have, from code signals and the optional profile in "
+            "secureagent-intent.json. Reads files only; each item cites its evidence and says "
+            "what static analysis cannot verify."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "intent": {"type": "string", "description": "Optional intent/profile file path."},
+            },
+            "required": ["path"],
+        },
+    },
+    {
         "name": "authorization_matrix",
         "description": "Route x guard grid for a source directory, grouped by resource.",
         "inputSchema": {
@@ -664,6 +681,25 @@ def tool_application_model(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def tool_hardening_recommendations(args: dict[str, Any]) -> dict[str, Any]:
+    from app.analysis.intent import IntentError
+    from app.analysis.reporting import scan_to_report_context
+    from app.analysis.scanner import scan_repo
+
+    root = confine(str(args.get("path", "")))
+    if not root.is_dir():
+        raise ToolError(f"not a directory: {root}")
+    intent = args.get("intent")
+    if intent is not None:
+        intent = str(confine(str(intent)))
+    try:
+        result = scan_repo(str(root), check_osv=False, intent=intent)
+    except IntentError as exc:
+        raise ToolError(str(exc)) from exc
+    summary = scan_to_report_context(result).hardening
+    return summary.model_dump(mode="json") if summary else {}
+
+
 HANDLERS = {
     "scan_snippet": tool_scan_snippet,
     "scan_path": tool_scan_path,
@@ -671,6 +707,7 @@ HANDLERS = {
     "scan_diff": tool_scan_diff,
     "explain_finding": tool_explain_finding,
     "application_model": tool_application_model,
+    "hardening_recommendations": tool_hardening_recommendations,
     "authorization_matrix": tool_authorization_matrix,
     "record_verdict": tool_record_verdict,
 }

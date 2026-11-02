@@ -203,6 +203,7 @@ def _render_text(
 def _render_json(result: ScanResult, items=None, baseline=None) -> str:
     from app.analysis.reporting import scan_to_report_context
 
+    context = scan_to_report_context(result)
     payload = {
         "root": result.root,
         "stats": {
@@ -263,9 +264,8 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
         ],
         "intent_rules_evaluated": result.intent_rules,
         "application_model": result.app_model.summary(),
-        "attack_chains": [
-            c.model_dump(mode="json") for c in scan_to_report_context(result).attack_chains
-        ],
+        "attack_chains": [c.model_dump(mode="json") for c in context.attack_chains],
+        "hardening": context.hardening.model_dump(mode="json") if context.hardening else None,
         "idor_findings": [
             {
                 "severity": f.severity,
@@ -622,6 +622,38 @@ def _render_recon(result: ScanResult) -> str:
     return "\n".join(lines)
 
 
+def _render_hardening(result: ScanResult) -> str:
+    from app.analysis.reporting import scan_to_report_context
+
+    h = scan_to_report_context(result).hardening
+    if h is None:
+        return "Hardening recommendations: none available."
+    declared = "; ".join(
+        f"{k}={','.join(v) if isinstance(v, list) else v}"
+        for k, v in h.profile_declared.items()
+        if k != "description"
+    )
+    lines = [
+        "Hardening recommendations (guidance, not findings; absence of evidence is not proof):",
+        f"  Profile: {declared or 'not declared'}",
+        "  Controls observed: " + (", ".join(h.observed_controls) or "none detected"),
+    ]
+    for rec in h.recommendations:
+        lines.append(f"  [{rec.priority.upper()}] {rec.id}  {rec.title}  (basis: {rec.basis})")
+        lines.append(f"      {rec.rationale}")
+        for e in rec.evidence[:2]:
+            lines.append(f"      evidence: {e.detail} ({e.location})")
+        lines.append(f"      could not verify: {rec.cannot_verify}")
+    if not h.recommendations:
+        lines.append("  none")
+    if h.needs_profile:
+        lines.append(
+            "  Declare a profile in secureagent-intent.json for more: "
+            + "; ".join(f"{n['id']} needs {', '.join(n['missing'])}" for n in h.needs_profile)
+        )
+    return "\n".join(lines)
+
+
 def _render_matrix(result: ScanResult) -> str:
     from app.analysis.authz_matrix import build_matrix
 
@@ -664,6 +696,7 @@ def _run_demo(args) -> int:
     color = (not args.no_color) and sys.stdout.isatty()
     print(DEMO_BANNER)
     print(_render_text(result, color))
+    print("\n" + _render_hardening(result))
     if args.report or args.pdf:
         try:
             _write_report(result, args.report, args.pdf, demo=True)
@@ -811,6 +844,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Also print the authorization matrix (route x guard, grouped by resource).",
     )
+    scan.add_argument(
+        "--recommend",
+        action="store_true",
+        help="Also print context-aware hardening recommendations (guidance, not findings).",
+    )
     scan.add_argument("--no-color", action="store_true", help="Disable coloured text output.")
 
     fix = sub.add_parser(
@@ -950,6 +988,8 @@ def main(argv: list[str] | None = None) -> int:
             report += "\n\n" + _render_matrix(result)
         if args.recon:
             report += "\n\n" + _render_recon(result)
+        if args.recommend:
+            report += "\n\n" + _render_hardening(result)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:

@@ -22,12 +22,13 @@ persisted audits. An opt-in LLM layer gives second opinions but never has author
 | CI gate | `scan --baseline B --fail-on high`, `--write-baseline`, `--since REF`, SARIF output | pull requests, pipelines |
 | **GitHub Action** | `action.yml` (composite) -- SARIF to the Security tab, an SBOM artifact, a PR summary comment | drop-in CI/CD for any consuming repo, no local install |
 | **SBOM** | `--sbom F` -- CycloneDX 1.5 JSON, one component per lockfile dependency, with OSV vulnerabilities attached | supply-chain / compliance |
+| Hardening advice | `scan --recommend` (JSON always has `hardening`); optional `profile` in `secureagent-intent.json` | guidance on missing protective controls; not findings |
 | Fixes | `secureagent fix PATH [--apply]` | verified one-line patches |
 | Triage | `secureagent suppress PATH --list` / `--id ID --reason ... [--expires D]` | recording false positives |
 | LLM second opinion | `secureagent review PATH [--dry-run] [--yes] [--report F]` (needs `ANTHROPIC_API_KEY`) | judging noisy findings |
 | Accuracy | `secureagent benchmark DIR` | measuring precision/recall |
 | Demo | `secureagent demo` | a labelled, deliberately vulnerable sample |
-| **MCP server** | `secureagent-mcp` -- tools `scan_snippet`, `scan_path`, `scan_diff`, `suggest_fixes`, `application_model`, `authorization_matrix`, `explain_finding` | Claude Code / Claude Desktop |
+| **MCP server** | `secureagent-mcp` -- tools `scan_snippet`, `scan_path`, `scan_diff`, `suggest_fixes`, `application_model`, `hardening_recommendations`, `authorization_matrix`, `explain_finding` | Claude Code / Claude Desktop |
 | **Web app** | Docker Compose; projects, authorization, 9-stage pipeline, history, reports | teams, persisted audits |
 | Admin | `python -m app.manage create-admin` | first administrator |
 
@@ -46,6 +47,7 @@ persisted audits. An opt-in LLM layer gives second opinions but never has author
 | **Attack chains** | unguarded route + injection/IDOR/privilege fields; credentialed CORS + CSRF off | severity = worst member, never escalated |
 | Misconfiguration / logging | debug, CORS, JWT, CSRF, cookies; secrets in logs, swallowed exceptions | |
 | **Infrastructure as code** | Dockerfile/compose root & privileged containers, CSP; Kubernetes privileged/root/host-namespace containers; Terraform public S3 ACLs, open security-group ingress, hardcoded credentials | regex-based on the manifest text, same honesty model as everything else |
+| **Hardening recommendations** | 16 rules: missing protective controls given code signals and a declared `profile` (ADR-045) | guidance, **not findings**; no severity; each states what could not be verified; usefulness not evaluated |
 | Reconnaissance | technologies, inputs read, outbound hosts, env vars | source only; **not** live recon |
 
 ## 4. Trust and honesty mechanisms
@@ -88,8 +90,8 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 | | |
 |---|---|
-| Backend tests | 591 passed, 2 skipped (PDF locally, Windows symlink) |
-| Frontend | 42 Vitest tests; lint, typecheck, build |
+| Backend tests | 661 passed, 2 skipped (PDF locally, Windows symlink) (2026-11-02) |
+| Frontend | 43 Vitest tests; lint, typecheck, build |
 | Browser e2e | 7 Playwright tests against the Docker stack (own CI job) |
 | CI | 4 jobs on every push: backend, frontend, self-scan, e2e |
 | Benchmark | 35 TP / 1 FP / 2 FN = 97% precision, 95% recall on an **author-written** corpus (a regression guard, not a real-world rate) |
@@ -153,6 +155,7 @@ gain / hallucination rate is unmeasured (paper RQ5).
 | 042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI |
 | 043 | Four new feature categories: IaC scanning, SBOM, GitHub Action, VS Code extension |
 | 044 | Option 2 resumed -- the live-target pipeline, day 1 |
+| 045 | Context-aware hardening recommendations (guidance, not findings) |
 | 032 | A single "Run" page instead of three separate forms |
 | 033 | Mistral as a second LLM provider |
 | 037 | Classic, ledger-style design instead of the default dark-dashboard look |

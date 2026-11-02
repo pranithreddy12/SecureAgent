@@ -236,6 +236,44 @@ describe("AuditDetailPage", () => {
     expect(screen.getByText(/No global middleware/)).toBeInTheDocument();
   });
 
+  it("renders hardening recommendations, the profile hint, and nothing when absent", async () => {
+    service.get.mockResolvedValue({
+      ...base,
+      hardening: {
+        profile_declared: {},
+        data_categories_detected: [],
+        observed_controls: ["mfa"],
+        needs_profile: [{ id: "HR-RATELIMIT-API", missing: ["expected_users", "exposure"] }],
+        recommendations: [
+          {
+            id: "HR-UPLOAD",
+            title: "Constrain and isolate file uploads",
+            category: "file_handling",
+            priority: "recommended",
+            basis: "code",
+            rationale: "Routes that accept uploaded files were detected.",
+            actions: ["Limit size"],
+            evidence: [{ location: "app.py:3", detail: "route POST /upload" }],
+            references: ["OWASP File Upload Cheat Sheet"],
+            cannot_verify: "Proxy limits sit outside the code.",
+            related_findings: {},
+          },
+        ],
+      },
+    });
+    const { unmount } = render(<AuditDetailPage />);
+    expect(await screen.findByText(/Hardening recommendations \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText("Constrain and isolate file uploads")).toBeInTheDocument();
+    expect(screen.getByText(/to get 1 more/)).toBeInTheDocument();
+    expect(screen.getByText(/Proxy limits sit outside the code/)).toBeInTheDocument();
+    unmount();
+
+    service.get.mockResolvedValue({ ...base, hardening: null });
+    render(<AuditDetailPage />);
+    await screen.findByText("Shop");
+    expect(screen.queryByText(/Hardening recommendations/)).not.toBeInTheDocument();
+  });
+
   it("shows the failure message and no report links for a failed audit", async () => {
     service.get.mockResolvedValue({
       ...base,

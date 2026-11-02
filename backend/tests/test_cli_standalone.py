@@ -73,3 +73,9 @@ def test_sbom_works_without_the_web_stack(vulnerable_dir: Path) -> None:
     assert doc["bomFormat"] == "CycloneDX"
     assert doc["components"][0]["name"] == "requests"
     assert doc["components"][0]["version"] == "2.31.0"
+
+
+def test_recommend_works_without_the_web_stack(vulnerable_dir: Path) -> None:
+    res = run_cli(["scan", str(vulnerable_dir), "--no-osv", "--recommend", "--exit-zero"])
+    assert "Error" not in res.stderr, res.stderr
+    assert "Hardening recommendations" in res.stdout

@@ -1,4 +1,12 @@
 {
+  "profile": {
+    "purpose": "ecommerce",
+    "expected_users": "10k-100k",
+    "data_categories": ["pii", "payment"],
+    "regions": ["IN", "EU"],
+    "exposure": "internet",
+    "description": "Demo marketplace for handmade goods"
+  },
   "rules": [
     {
       "id": "admin-requires-auth",

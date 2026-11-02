@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from app.analysis.authz_matrix import build_matrix
 from app.analysis.baseline import fingerprint
 from app.analysis.chains import find_chains
+from app.analysis.hardening import recommend
 from app.analysis.routes import PRIVILEGED_PATH
 from app.analysis.scanner import ScanResult
 from app.analysis.suppressions import apply as apply_suppressions
@@ -334,6 +335,10 @@ def scan_to_report_context(
 
     findings, validation = validate_findings(findings) if validate else (findings, {})
     findings, suppressed, expired = apply_suppressions(findings, result.suppressions, fingerprint)
+    hardening = result.hardening
+    dropped = {(f.type, f.endpoint) for f in findings if f.status is FindingStatus.FALSE_POSITIVE}
+    if dropped:  # suppressed findings must not count in related_findings
+        hardening = recommend(result, result.profile, dropped)
     endpoints = sorted({f"{r.method} {r.path}" for r in result.routes})
     model = result.app_model
     interesting = sorted(
@@ -401,6 +406,7 @@ def scan_to_report_context(
         validation_notes=validation_notes,
         findings=findings,
         attack_chains=find_chains(findings, result.routes),
+        hardening=hardening,
         authorization_matrix=_matrix_view(result),
         limitations=limitations,
     )

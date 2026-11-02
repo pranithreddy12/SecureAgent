@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.enums import AuditStatus, FindingStatus, LogStatus, Severity
-from app.schemas.report import AttackChain
+from app.schemas.report import AttackChain, HardeningSummary
 
 AUTHORIZATION_STATEMENT = (
     "I confirm that I own this source code or am explicitly authorized to analyse it, and that "
@@ -53,6 +53,7 @@ class AuditDetail(AuditOut):
     finding_counts: dict[str, int] = {}
     total_findings: int = 0
     attack_chains: list[AttackChain] = []
+    hardening: HardeningSummary | None = None
     application_model: dict[str, list[str]] = {}
     validation_notes: list[str] = []
     ai: dict[str, Any] = {}  # {enabled, model, reviewed, summary_written, notes}

@@ -243,6 +243,7 @@ async def test_resume_continues_from_the_failed_stage(
     done = (await client.get(f"/api/audits/{audit_id}")).json()
     assert done["status"] == "completed"
     assert calls["scan"] == 1  # resumed, not restarted
+    assert done["hardening"]["recommendations"]  # stored by the scanner stage, kept on resume
     logs = (await client.get(f"/api/audits/{audit_id}/logs")).json()
     scanner_starts = [
         e for e in logs if e["action"] == "started" and e["agent"] == "vulnerability-scanner-agent"
@@ -262,3 +263,28 @@ async def test_the_workflow_is_a_langgraph_graph(db_session: AsyncSession) -> No
     names = set(graph.get_graph().nodes)
     assert set(STAGE_NAMES) <= names
     assert hasattr(graph, "ainvoke")
+
+
+async def test_hardening_is_stored_reported_and_served(
+    client: AsyncClient, workspace: Path, inline_runner: None, db_session: AsyncSession
+) -> None:
+    import json
+
+    (workspace / "shop" / "secureagent-intent.json").write_text(
+        json.dumps({"profile": {"purpose": "ecommerce", "expected_users": "10k-100k"}}),
+        encoding="utf-8",
+    )
+    await login(client)
+    _, audit_id = await project_audit(client, workspace)
+
+    audit = await db_session.get(SecurityAudit, uuid.UUID(audit_id))
+    assert audit is not None and audit.stage_state["hardening"]["recommendations"]
+    detail = (await client.get(f"/api/audits/{audit_id}")).json()
+    assert detail["hardening"]["profile_declared"]["purpose"] == "ecommerce"
+    assert "HR-PAYMENT-SERVER-PRICE" in {r["id"] for r in detail["hardening"]["recommendations"]}
+    report = await db_session.scalar(
+        select(SecurityReport).where(SecurityReport.audit_id == uuid.UUID(audit_id))
+    )
+    assert report is not None and "20. Hardening Recommendations" in report.report_html
+    counts = detail["finding_counts"]
+    assert sum(counts.values()) == detail["total_findings"]  # recommendations are not findings

@@ -42,10 +42,15 @@ def _file_of(finding: ReportFinding) -> str:
     return (m["file"] if m else finding.endpoint or "").replace("\\", "/")
 
 
+def is_test_path(path: str) -> bool:
+    """True for test/fixture/example/sample/mock code (the ``test_or_example_code`` rule)."""
+    parts = path.replace("\\", "/").split("/")
+    return any(p.lower() in _TEST_DIRS for p in parts[:-1]) or bool(_TEST_FILE.match(parts[-1]))
+
+
 def _rule_for(finding: ReportFinding) -> str | None:
     path = _file_of(finding)
-    parts = path.split("/")
-    if any(p.lower() in _TEST_DIRS for p in parts[:-1]) or _TEST_FILE.match(parts[-1]):
+    if is_test_path(path):
         return RULE_TEST
     if finding.type == "debug_enabled" and _DEV_FILE.search(path):
         return RULE_DEV

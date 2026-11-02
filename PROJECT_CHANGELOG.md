@@ -1321,3 +1321,16 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Verified clean: a real low-strength ZAP scan against Juice Shop completed in 131s with 200
   genuine alerts, ZAP stayed up throughout. New tests/test_zap_tool.py regression-guards fix #1.
   592 backend tests passing (was 591).
+
+## 2026-11-02 (context-aware hardening recommendations -- ADR-045)
+
+- Implemented `docs/feature-hardening-recommendations.md`: `analysis/hardening.py` (16 rules), `profile` in
+  `secureagent-intent.json` (`load_profile`), control/data-category signals in `recon.py`, report
+  section 20, `--recommend`, `hardening` in CLI JSON, pipeline `stage_state["hardening"]`, audit detail
+  API, audit page card, MCP `hardening_recommendations`, demo profile.
+- Recommendations are not findings: totals, SARIF, baselines, gating, chains unchanged (tested).
+- Evidence: 661 backend tests passed (2 skipped; includes 3 audit regressions: token_expiry, pin_code, test-file data), 43 Vitest passed, benchmark unchanged at 98%/98%.
+  Usefulness of the recommendations is **not evaluated**.
+- Audit fixes: `expiry` counts as payment only with payment context (`card_expiry` explicit); `pin_code` is
+  not a credential; data detection skips test/fixture/example paths (`validation.is_test_path`, shared with
+  the `test_or_example_code` rule).

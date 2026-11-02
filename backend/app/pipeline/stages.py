@@ -115,7 +115,7 @@ def _recon_sync(root: str, exclude: list[str]):
     for r in routes:
         model.absorb_route_path(r.path)
     for d in deps:
-        model.absorb_dependency(d.name)
+        model.absorb_dependency(d.name, d.relpath)
     return model, routes, deps, stats
 
 
@@ -202,6 +202,10 @@ async def vulnerability_scanner(ctx: Ctx) -> None:
                 remediation=f.remediation,
             )
         )
+    audit.stage_state = {
+        **(audit.stage_state or {}),
+        "hardening": report.hardening.model_dump(mode="json") if report.hardening else None,
+    }
     await ctx.db.flush()
     ctx.notes["scan"] = f"{result.stats.files_scanned} files, {len(report.findings)} findings"
 

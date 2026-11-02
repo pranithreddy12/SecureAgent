@@ -71,11 +71,34 @@ export interface AttackChain {
   assumptions: string[];
 }
 
+export interface Recommendation {
+  id: string;
+  title: string;
+  category: string;
+  priority: "recommended" | "consider";
+  basis: "code" | "profile" | "code+profile";
+  rationale: string;
+  actions: string[];
+  evidence: { location: string; detail: string }[];
+  references: string[];
+  cannot_verify: string;
+  related_findings: Record<string, number>;
+}
+
+export interface HardeningSummary {
+  profile_declared: Record<string, unknown>;
+  data_categories_detected: string[];
+  observed_controls: string[];
+  recommendations: Recommendation[];
+  needs_profile: { id: string; missing: string[] }[];
+}
+
 export interface AuditDetail extends Audit {
   stage_state: Record<string, StageEntry | string[]>;
   finding_counts: Partial<Record<Severity, number>>;
   total_findings: number;
   attack_chains: AttackChain[];
+  hardening?: HardeningSummary | null;
   application_model: Record<string, string[]>;
   validation_notes: string[];
   ai: AiStatus;

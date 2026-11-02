@@ -13,6 +13,7 @@ from app.analysis.authz_matrix import authz_outliers
 from app.analysis.business_logic import LogicFinding, analyze_business_logic
 from app.analysis.dependencies import Dependency, is_lockfile, parse_dependencies
 from app.analysis.gitignore import GitIgnore
+from app.analysis.hardening import LOCKS, MANIFESTS, recommend
 from app.analysis.ingest import (
     IngestStats,
     SourceFile,
@@ -22,9 +23,11 @@ from app.analysis.ingest import (
 )
 from app.analysis.intent import (
     DEFAULT_FILENAME,
+    Profile,
     evaluate_intent,
     extra_fields,
     load_intent,
+    load_profile,
 )
 from app.analysis.logging_checks import LoggingFinding, scan_logging
 from app.analysis.misconfig import MisconfigFinding, scan_misconfig
@@ -52,6 +55,7 @@ from app.analysis.suppressions import Suppression
 from app.analysis.suppressions import load as load_suppressions
 from app.analysis.taint import JS_EXTENSIONS, TaintFinding, analyze_taint_project
 from app.analysis.workflow import analyze_workflow
+from app.schemas.report import HardeningSummary
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4, "informational": 5}
 
@@ -106,6 +110,10 @@ class ScanResult:
     osv_note: str | None = None
     inline_ignored: int = 0  # findings hidden by `secureagent: ignore` comments (always reported)
     stats: IngestStats = field(default_factory=IngestStats)
+    profile: Profile | None = None  # declared application profile (ADR-045)
+    hardening: HardeningSummary | None = None  # guidance, never counted as findings
+    manifests: list[str] = field(default_factory=list)  # relpaths of dependency manifests
+    lockfiles: list[str] = field(default_factory=list)  # relpaths of lockfiles / pinned lists
 
     @property
     def total_findings(self) -> int:
@@ -280,6 +288,7 @@ def _scan_repo(
     intent_path = intent or os.path.join(str(root), DEFAULT_FILENAME)
     rules = load_intent(intent_path) if (intent or os.path.isfile(intent_path)) else []
     result.intent_rules = len(rules)
+    result.profile = load_profile(intent_path) if (intent or os.path.isfile(intent_path)) else None
     custom_fields = extra_fields(rules)
     supp_path = suppressions or os.path.join(str(root), SUPPRESSIONS_FILENAME)
     if suppressions or os.path.isfile(supp_path):
@@ -313,6 +322,11 @@ def _scan_repo(
             taint_sources.append((file.relpath, text))
         if is_lockfile(file.relpath):
             result.dependencies.extend(parse_dependencies(file.relpath, text))
+        base = file.relpath.rsplit("/", 1)[-1].lower()
+        if base in MANIFESTS:
+            result.manifests.append(file.relpath)
+        if base in LOCKS or is_lockfile(file.relpath):
+            result.lockfiles.append(file.relpath)
 
     # Taint runs once over the whole project so flow can cross files.
     result.taint_findings = analyze_taint_project(taint_sources)
@@ -336,7 +350,7 @@ def _scan_repo(
     for route in result.routes:
         result.app_model.absorb_route_path(route.path)
     for dep in result.dependencies:
-        result.app_model.absorb_dependency(dep.name)
+        result.app_model.absorb_dependency(dep.name, dep.relpath)
     result.logic_findings.extend(authz_outliers(result.routes))
     result.logic_findings.extend(evaluate_intent(rules, result.routes, result.idor_findings))
     _dedupe_sinks_superseded_by_taint(result)
@@ -348,6 +362,8 @@ def _scan_repo(
     elif result.dependencies:
         result.osv_note = "Known-vulnerability lookup skipped (--no-osv)."
 
+    # After OSV, so dependency findings are final; ignores are already applied above.
+    result.hardening = recommend(result, result.profile)
     return result
 
 

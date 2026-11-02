@@ -57,6 +57,10 @@ confinement to `SOURCE_ROOTS` (`core/paths.py`), migration `b7c1d2e3f4a5` (nulla
 `audit_type`), frontend `/audits` + `/audits/[id]` (polling progress, findings, logs, report links),
 dashboard shows real counts. Verified end to end through Docker (register -> audit -> 31 findings -> PDF).
 
+**Hardening recommendations (2026-11-02, ADR-045)**: `analysis/hardening.py`, 16 rules over code signals
+and an optional declared `profile` in `secureagent-intent.json`; shown in CLI (`--recommend`, JSON
+`hardening`), report section 20, `GET /api/audits/{id}`, the audit page and MCP. Guidance, not findings.
+
 **Reporting** (`app/schemas/report.py`, `app/reports/`, `app/analysis/reporting.py`): 19-section
 HTML/PDF report with table of contents, risk rating, "Fix first" priorities, hotspots, findings
 consolidated by type, grouped remediation, compact CVE/CVSS sections; DEMO labelling.
@@ -240,6 +244,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-042 | A guard-aware structural rule, and a "suggest a fix" panel in the UI | Accepted |
 | ADR-043 | Four new feature categories: IaC scanning, SBOM, GitHub Action, VS Code extension | Accepted |
 | ADR-044 | Option 2 resumed -- the live-target pipeline, day 1 | Accepted |
+| ADR-045 | Context-aware hardening recommendations (guidance, not findings) | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |
@@ -337,6 +342,9 @@ Found by dogfooding (SecureAgent scanning/installing itself) and fixed in the 20
 - Business-logic detectors (ADR-010) are Python-only; they cover client-trusted values, mass assignment and
   declared intent rules, not workflow-order. A serializer or middleware outside the handler can neutralise a
   flagged pattern, so findings stay `suspicious`.
+- Hardening recommendations (ADR-045) are import/name-based heuristics: a control behind a gateway, WAF or
+  framework default is invisible, so every item carries a "could not verify" note; usefulness is not
+  evaluated (plan: spec section 14).
 - Some real vulnerabilities will remain `likely`/`suspicious` because only non-destructive validation is intended.
 
 ## 20. Future Improvements
@@ -640,3 +648,11 @@ strength set before the scan starts; the browser-dependent "Client Browser" cate
 outright since a non-destructive scan has no business launching a headless browser). Verified: a
 real scan completed in 131s with 200 genuine alerts, no crash. 592 backend tests passing. This
 closes out the 3-day live-target pipeline resumption.
+
+**Hardening recommendations (2026-11-02, ADR-045):** implemented from the spec. Evidence: 661 backend tests
+passed (2 skipped), 43 Vitest, benchmark unchanged at 98%/98%. New tests live in
+`tests/test_hardening_recommendations.py` (`test_hardening.py` already covers login throttling).
+Not evaluated for usefulness. Audited 2026-11-02: three false triggers fixed with regression tests
+(`token_expiry` -> payment, `pin_code` -> credentials, test/fixture files feeding data categories; data
+detection now uses `validation.is_test_path`). Open minor gaps: report TOC links section 20 even when absent;
+web triage does not recompute `related_findings`; no end-to-end suppressions-file test for hardening.

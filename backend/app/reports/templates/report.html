@@ -80,11 +80,12 @@
   <a href="#s12">12. OWASP Top 10 Mapping</a><a href="#s13">13. CWE Mapping</a>
   <a href="#s14">14. CVE Information</a><a href="#s15">15. CVSS Information</a>
   <a href="#s16">16. Remediation</a><a href="#s17">17. Validation Status</a>
-  <a href="#s18">18. Limitations</a><a href="#s19">19. Audit Timeline</a>
+  <a href="#s18">18. Limitations</a><a href="#s19">19. Audit Timeline</a><a href="#s20">20. Hardening Recommendations</a>
 </nav>
 
 <h2 id="s1">1. Executive Summary</h2>
 <p>{{ r.executive_summary or r.default_executive_summary() }}</p>
+{% if r.hardening and r.hardening.recommendations %}<p class="muted small">{{ r.hardening.recommendations | length }} hardening recommendation(s) (see section 20). They are guidance, not findings, and are not part of the risk rating.</p>{% endif %}
 {% if not r.executive_summary %}<p class="muted">AI narrative unavailable; deterministic summary used.</p>{% elif r.executive_summary_source %}<p class="muted small">Written by {{ r.executive_summary_source }} from the structured findings only (no source code was used). The findings below are authoritative.</p>{% endif %}
 
 <div class="glance">
@@ -289,6 +290,33 @@ CVSS values are reported only when supplied by a reliable source (tool or adviso
 {% if r.timeline %}<table><tr><th>Stage</th><th>Status</th><th>Started</th><th>Completed</th><th>Notes</th></tr>
 {% for t in r.timeline %}<tr><td>{{ t.stage }}</td><td>{{ t.status }}</td><td>{{ t.started_at | dt }}</td><td>{{ t.completed_at | dt }}</td><td>{{ t.note or "" }}</td></tr>{% endfor %}
 </table>{% else %}<p class="muted">No timeline recorded.</p>{% endif %}
+
+{% if r.hardening %}
+{% set h = r.hardening %}
+<h2 id="s20">20. Hardening Recommendations</h2>
+<p class="muted small">Protective controls an application of this kind should probably have. These are guidance, not findings: they carry no severity and are excluded from the risk rating, counts, baselines and gating. "No X was detected" means no evidence was found in source, not that X is absent. Nothing here is a compliance verdict.</p>
+{% if h.profile_declared %}
+<table class="kv">
+  {% for k, v in h.profile_declared.items() %}<tr><th>{{ k | replace("_", " ") | capitalize }}</th><td>{{ v | join(", ") if v is not string else v }}</td></tr>{% endfor %}
+</table>
+{% else %}
+<p>No application profile declared{% if h.needs_profile %}; {{ h.needs_profile | length }} rule(s) need one{% endif %}. Add a <code>profile</code> object to <code>secureagent-intent.json</code> (purpose, expected_users, data_categories, regions, exposure).</p>
+{% endif %}
+{% if h.needs_profile %}<p class="small"><b>Rules waiting for a profile field:</b> {% for n in h.needs_profile %}{{ n.id }} ({{ n.missing | join(", ") }}){{ "; " if not loop.last else "" }}{% endfor %}</p>{% endif %}
+{% if h.data_categories_detected %}<p class="small"><b>Data categories detected in code:</b> {{ h.data_categories_detected | join(", ") }} <span class="muted">(detected from field and parameter names; declared categories are listed above)</span></p>{% endif %}
+<p class="small"><b>Controls observed:</b> {{ h.observed_controls | join(", ") if h.observed_controls else "none detected" }}</p>
+{% for rec in h.recommendations %}
+<div class="finding">
+  <p><span class="status">{{ rec.priority }}</span> <b>{{ rec.title }}</b> <span class="muted small">{{ rec.id }} · {{ rec.category | replace("_", " ") }} · basis: {{ rec.basis }}</span></p>
+  <p>{{ rec.rationale }}</p>
+  <ul class="small">{% for a in rec.actions %}<li>{{ a }}</li>{% endfor %}</ul>
+  {% if rec.evidence %}<p class="small"><b>Evidence:</b> {% for e in rec.evidence %}{{ e.detail }} ({{ e.location }}){{ "; " if not loop.last else "" }}{% endfor %}</p>{% endif %}
+  {% if rec.related_findings %}<p class="small"><b>Related findings:</b> {% for t, n in rec.related_findings.items() %}{{ n }} × {{ t }}{{ "; " if not loop.last else "" }}{% endfor %}</p>{% endif %}
+  {% if rec.references %}<p class="small"><b>References:</b> {{ rec.references | join("; ") }}</p>{% endif %}
+  <p class="small muted"><b>Could not verify:</b> {{ rec.cannot_verify }}</p>
+</div>
+{% else %}<p class="muted">No hardening recommendations for the information available.</p>{% endfor %}
+{% endif %}
 
 </body>
 </html>

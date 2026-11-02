@@ -208,3 +208,10 @@ must enforce; SecureAgent reports where the source does not show it (ADR-010):
 
 Findings are `suspicious`, never `confirmed`: a guard applied by middleware the analyser cannot see
 will still produce a violation to review. A malformed spec stops the scan with exit code 2.
+
+## Hardening recommendations
+
+Context-aware guidance (controls the application probably should have), separate from findings and
+never counted as them. Driven by code signals plus an optional `profile` in `secureagent-intent.json`.
+Spec: `docs/feature-hardening-recommendations.md`; decision: ADR-045. Run `scan --recommend`; JSON output
+always has a `hardening` key.

@@ -1,6 +1,7 @@
 # SecureAgent: Project Documentation for Publication
 
-Status: compiled 2026-11-01 from the repository (`PROJECT_MEMORY.md`, `docs/`, ADR-001..044, source tree).
+Status: compiled 2026-11-01, updated 2026-11-02 from the repository (`PROJECT_MEMORY.md`, `docs/`, ADR-001..045,
+source tree).
 Every number below is copied from a project document or an ADR; none was re-measured when this file was
 written. Figures marked *(author corpus)* or *(tuned-on)* are **not** independent and must not be quoted as
 real-world accuracy. See section 9 and `docs/paper/PAPER_PLAN.md` for what a submission still needs.
@@ -52,6 +53,9 @@ the code and has no authority over results.
    vulnerable-application sets with frozen truth lists, including retracted claims (ADR-021..041).
 8. **Live-target pipeline** with SSRF-hardened target validation, authorization gates at three layers, and
    non-destructive evidence collection (ADR-003, 044).
+9. **Context-aware hardening recommendations** (ADR-045): a deterministic interpretation layer that is not
+   a finding, combining code signals with a developer-declared profile, citing evidence and stating what
+   static analysis cannot verify. Evaluation status: **not evaluated**.
 
 ## 4. System overview
 
@@ -92,7 +96,7 @@ enforced by `tests/test_cli_standalone.py`, which runs the CLI with SQLAlchemy a
 | Supply chain | OSV API, CycloneDX 1.5 | CVE only from real advisories; SBOM export |
 | LLM (optional) | Anthropic, Mistral via a provider table | ADR-017/033; consent, redaction, quote verification |
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind 4, `jszip` | client-side zip for folder picker; polling every 2 s |
-| Testing | pytest, Vitest 5, Playwright | 592 backend tests passing at last record (ADR-044), 42 Vitest, 7 e2e |
+| Testing | pytest, Vitest 5, Playwright | 661 backend tests passing (2026-11-02), 43 Vitest, 7 e2e |
 | Packaging / CI | Docker Compose, GitHub Actions (4 jobs), composite Action, Electron | backend, frontend, self-scan, e2e |
 | Integrations | MCP (hand-written stdio server), SARIF 2.1.0, VS Code extension (plain JS) | assistants, GitHub Security tab, editor |
 
@@ -125,6 +129,15 @@ enforced by `tests/test_cli_standalone.py`, which runs the CLI with SQLAlchemy a
 | Business logic (`business_logic.py`, `intent.py`, `workflow.py`) | mass assignment, client-trusted values, workflow-order, declared intent rules | Python only, handler-local, stays `suspicious` |
 | Misconfiguration / IaC (`misconfig.py`) | Flask/FastAPI/Django flags; Dockerfile, compose, Kubernetes, Terraform | regex on manifest text |
 | Logging (`logging_checks.py`) | secrets in logs, swallowed exceptions | |
+
+### 6.2a Hardening recommendations (ADR-045)
+
+`hardening.py` applies 16 fixed rules to the scan's code facts (detected controls, data-category names,
+routes, dependencies) and an optional declared profile (purpose, expected users, data categories, regions,
+exposure). Output items have a priority (`recommended`/`consider`) but never a severity, cite their
+evidence, give a rule-specific "could not verify" note, and never enter totals, SARIF, baselines or gating.
+Profile values are never inferred; rules that need a missing field are listed instead of guessed.
+Compliance appears only as a "may apply" note. Evaluation status: not evaluated; no usefulness claim is made.
 
 ### 6.3 Source-audit pipeline (web app, LangGraph, ADR-016)
 
@@ -190,12 +203,12 @@ with progress, findings, taint paths, chains, suggested fix), targets (+ detail)
 
 ## 8. Engineering process and quality assurance
 
-- 44 ADRs record each decision, including corrections (ADR-036 retracts a claimed taint gap that did not exist).
+- 45 ADRs record each decision, including corrections (ADR-036 retracts a claimed taint gap that did not exist).
 - Requirement traceability R1-R69 (`docs/REQUIREMENTS_TRACEABILITY.md`); acceptance tally at last full
   count: 15 done, 7 source-only, 6 partial, 0 not built (before ADR-043/044 work).
 - Dogfooding: the project scans itself in CI; this found a clean-install crash and an un-scanned lockfile
   type. Dependency bumps follow self-scan findings.
-- Tests: 592 backend (about 93 % line coverage at an earlier count), 42 Vitest, 7 Playwright; a CI job runs
+- Tests: 661 backend, 2 skipped (about 93 % line coverage at an earlier count), 43 Vitest, 7 Playwright; a CI job runs
   the full Docker stack. A live audit test runs against a real local HTTP server and yields a genuinely
   `confirmed` finding.
 - Test counts above are from project documents, not re-run for this file.
@@ -226,6 +239,9 @@ Caveats the paper must state:
   the value came from a request (e.g. CLI `input()` flagged).
 - **Live pipeline:** ZAP verified against Juice Shop (200 alerts, 131 s, two real bugs found and fixed);
   Nuclei only its graceful-degradation path; live audits cannot resume from a failed stage.
+- **Hardening recommendations** (ADR-045) have no usefulness evaluation. Their data-category signals are
+  name-based; an audit of the first build found three false triggers (`token_expiry` read as card data,
+  `pin_code` as a credential, test fixtures as application data), fixed with regression tests.
 
 Reproduce: `python -m app.evaluation prepare REPO... --out DIR`, label `labels.json`, then
 `python -m app.evaluation score`; recall: `python -m app.evaluation recall --apps DIR` with

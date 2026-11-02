@@ -14,6 +14,7 @@ from app.pipeline.context import to_report_finding
 from app.schemas.audit import AUTHORIZATION_STATEMENT
 from app.schemas.report import (
     AttackChain,
+    HardeningSummary,
     MatrixGroupView,
     MatrixRoute,
     ReportContext,
@@ -100,6 +101,7 @@ async def build_context(
         for g in build_matrix(routes)
     ]
     chains = [AttackChain.model_validate(c) for c in state.get("attack_chains", [])]
+    hardening = state.get("hardening")
     limitations = [
         "Static source analysis only; no live target was tested in this report.",
         "Authorization may be enforced by global middleware this analyser cannot observe, "
@@ -134,6 +136,7 @@ async def build_context(
         executive_summary_source=(f"AI ({narrative['model']})" if narrative.get("text") else None),
         findings=findings,
         attack_chains=chains,
+        hardening=HardeningSummary.model_validate(hardening) if hardening else None,
         authorization_matrix=matrix,
         limitations=limitations,
         timeline=_timeline(state),

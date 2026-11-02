@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 from dataclasses import dataclass
 
 from app.analysis.access_control import IdorFinding
@@ -37,7 +38,7 @@ class IntentRule:
     description: str = ""
 
 
-def load_intent(path: str) -> list[IntentRule]:
+def _read(path: str) -> dict:
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
@@ -45,7 +46,16 @@ def load_intent(path: str) -> list[IntentRule]:
         raise IntentError(f"cannot read intent spec {path}: {exc}") from exc
     except ValueError as exc:
         raise IntentError(f"intent spec {path} is not valid JSON: {exc}") from exc
-    raw = data.get("rules") if isinstance(data, dict) else None
+    if not isinstance(data, dict) or not ({"rules", "profile"} & data.keys()):
+        raise IntentError(f"intent spec {path}: expected an object with a 'rules' list")
+    return data
+
+
+def load_intent(path: str) -> list[IntentRule]:
+    data = _read(path)
+    if "rules" not in data and "profile" in data:
+        return []  # a profile-only file declares no rules
+    raw = data.get("rules")
     if not isinstance(raw, list):
         raise IntentError(f"intent spec {path}: expected an object with a 'rules' list")
     rules: list[IntentRule] = []
@@ -80,6 +90,100 @@ def _str_list(value, where: str, key: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise IntentError(f"{where}: '{key}' must be a list of strings")
     return value
+
+
+PURPOSES = (
+    "ecommerce", "fintech", "healthcare", "education", "social",
+    "saas", "internal_tool", "content", "government", "other",
+)  # fmt: skip
+USER_BANDS = ("<1k", "1k-10k", "10k-100k", "100k-1m", ">1m")
+DATA_CATEGORIES = (
+    "pii", "credentials", "payment", "financial", "health",
+    "children", "location", "biometric", "government_id",
+)  # fmt: skip
+EXPOSURES = ("internet", "internal")
+_PROFILE_KEYS = {
+    "purpose",
+    "expected_users",
+    "data_categories",
+    "regions",
+    "exposure",
+    "description",
+}
+_REGION = re.compile(r"^(?:[A-Z]{2}|EU)$")
+
+
+@dataclass(frozen=True)
+class Profile:
+    """What the developer declares about the application. Code cannot reveal these, so nothing
+    here is ever inferred (ADR-045). ``description`` is displayed only; no rule reads it."""
+
+    purpose: str | None = None
+    expected_users: str | None = None
+    data_categories: tuple[str, ...] = ()
+    regions: tuple[str, ...] = ()
+    exposure: str | None = None
+    description: str = ""
+
+    def declared(self) -> dict:
+        out: dict = {}
+        for key in ("purpose", "expected_users", "exposure", "description"):
+            if getattr(self, key):
+                out[key] = getattr(self, key)
+        if self.data_categories:
+            out["data_categories"] = list(self.data_categories)
+        if self.regions:
+            out["regions"] = list(self.regions)
+        return out
+
+
+def load_profile(path: str) -> Profile | None:
+    data = _read(path)
+    raw = data.get("profile")
+    if raw is None:
+        return None
+    where = f"intent spec {path}: profile"
+    if not isinstance(raw, dict):
+        raise IntentError(f"{where} must be an object")
+    unknown = sorted(set(raw) - _PROFILE_KEYS)
+    if unknown:
+        raise IntentError(
+            f"{where}: unknown field {unknown[0]!r} (allowed: {sorted(_PROFILE_KEYS)})"
+        )
+    description = raw.get("description", "")
+    if not isinstance(description, str) or len(description) > 500:
+        raise IntentError(f"{where}: 'description' must be a string of at most 500 characters")
+    regions = _str_list(raw.get("regions", []), where, "regions")
+    for r in regions:
+        if not _REGION.match(r):
+            raise IntentError(
+                f"{where}: 'regions' value {r!r} is not an ISO 3166-1 alpha-2 code or EU"
+            )
+    categories = _str_list(raw.get("data_categories", []), where, "data_categories")
+    for c in categories:
+        _check(where, "data_categories", c, DATA_CATEGORIES)
+    return Profile(
+        purpose=_choice(where, raw, "purpose", PURPOSES),
+        expected_users=_choice(where, raw, "expected_users", USER_BANDS),
+        data_categories=tuple(sorted(set(categories))),
+        regions=tuple(sorted(set(regions))),
+        exposure=_choice(where, raw, "exposure", EXPOSURES),
+        description=description,
+    )
+
+
+def _check(where: str, key: str, value, allowed: tuple[str, ...]) -> None:
+    if value not in allowed:
+        raise IntentError(
+            f"{where}: '{key}' value {value!r} is not allowed (expected one of {list(allowed)})"
+        )
+
+
+def _choice(where: str, raw: dict, key: str, allowed: tuple[str, ...]) -> str | None:
+    if key not in raw:
+        return None
+    _check(where, key, raw[key], allowed)
+    return raw[key]
 
 
 def extra_fields(rules: list[IntentRule]) -> frozenset[str]:

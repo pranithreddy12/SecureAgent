@@ -23,7 +23,7 @@ from app.schemas.audit import (
     SuggestedFix,
     TriageRequest,
 )
-from app.schemas.report import AttackChain
+from app.schemas.report import AttackChain, HardeningSummary
 from app.services import audit_service
 
 router = APIRouter(prefix="/audits", tags=["audits"])
@@ -156,6 +156,8 @@ async def get_audit(audit_id: uuid.UUID, db: DbSession, user: CurrentUser):
     detail.attack_chains = [
         AttackChain.model_validate(c) for c in (audit.stage_state or {}).get("attack_chains", [])
     ]
+    hardening = (audit.stage_state or {}).get("hardening")
+    detail.hardening = HardeningSummary.model_validate(hardening) if hardening else None
     return detail
 
 

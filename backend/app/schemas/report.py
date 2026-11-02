@@ -4,6 +4,7 @@ audit data; templates only format it and never invent values."""
 import re
 from collections import Counter
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -155,6 +156,36 @@ class MatrixGroupView(BaseModel):
     routes: list[MatrixRoute]
 
 
+class RecommendationEvidence(BaseModel):
+    location: str  # "relpath:line", "relpath" or "profile"
+    detail: str  # e.g. "parameter json:card_number", "route POST /login"
+
+
+class Recommendation(BaseModel):
+    """A protective control worth having, given what the application is (ADR-045).
+    Deliberately has no severity: it is guidance, never a finding."""
+
+    id: str  # "HR-UPLOAD"
+    title: str
+    category: str
+    priority: Literal["recommended", "consider"]
+    basis: Literal["code", "profile", "code+profile"]
+    rationale: str
+    actions: list[str]
+    evidence: list[RecommendationEvidence] = []  # at most 5
+    references: list[str] = []
+    cannot_verify: str  # what static analysis cannot see
+    related_findings: dict[str, int] = {}  # finding type -> count
+
+
+class HardeningSummary(BaseModel):
+    profile_declared: dict[str, Any] = {}  # as declared; {} when absent
+    data_categories_detected: list[str] = []
+    observed_controls: list[str] = []
+    recommendations: list[Recommendation] = []
+    needs_profile: list[dict[str, Any]] = []  # {"id": ..., "missing": [...]}
+
+
 class ReportContext(BaseModel):
     audit_id: str
     audit_status: str
@@ -183,6 +214,7 @@ class ReportContext(BaseModel):
     interesting_paths: list[str] = []
     findings: list[ReportFinding] = []
     attack_chains: list[AttackChain] = []
+    hardening: HardeningSummary | None = None
     outbound_hosts: list[str] = []
     environment_variables: list[str] = []
     validation_notes: list[str] = []

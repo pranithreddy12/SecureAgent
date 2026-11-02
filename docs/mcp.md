@@ -14,6 +14,7 @@ SecureAgent's static analyser can be called directly by an AI coding assistant o
 | `explain_finding` | One finding in full: evidence, numbered taint path, remediation, and the enclosing function plus resolved helpers (secrets redacted). Pass the `id` from a scan result. |
 | `scan_diff` | Findings that are new compared with a git ref (`since`), so a change can be reviewed instead of the whole repository. |
 | `application_model` | Static reconnaissance: technologies, inputs read, outbound hosts, env vars. Reads files only. |
+| `hardening_recommendations` | Context-aware hardening guidance (`path`, optional `intent`): recommendations with evidence and what could not be verified, observed controls, and rules waiting for a profile field. Not findings. |
 | `authorization_matrix` | Route × guard grid for a directory, grouped by resource. |
 
 | `record_verdict` | **Opt-in** (`SECUREAGENT_MCP_WRITE=1`; hidden otherwise). Records a justified false positive in `secureagent-suppressions.json`. |

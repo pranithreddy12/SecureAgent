@@ -45,6 +45,7 @@ never `confirmed`, and CVE/CVSS appear only from real advisory data.
 | Injection | SQL / command / code / SSRF / path traversal / open redirect, by data flow across helpers and files, **with the source→sink path shown** |
 | Access control | IDOR, unguarded routes (FastAPI, Flask, Express, Django/DRF, NestJS), inconsistent guards, **authorization matrix** |
 | Business logic | mass assignment, client-trusted prices/roles, workflow-order gaps, your own rules via an **intent spec** |
+| Hardening advice | **recommendations** for missing protective controls, from the code plus an optional declared `profile` (guidance, never findings; `--recommend`) |
 | Correlation | **attack chains**: an unguarded route that reaches an injection, credentialed CORS + CSRF off |
 | Misconfiguration | debug mode, CORS, JWT verification, CSRF, cookies; secrets in logs, swallowed exceptions; root containers, CSP `unsafe-inline`, unbounded exports |
 | Infrastructure as code | Kubernetes privileged/root/host-namespace containers; Terraform public S3 ACLs, open security-group ingress, hardcoded credentials |
@@ -143,7 +144,7 @@ while the backend comes up) instead of a browser tab. See [desktop/README.md](de
 
 ```bash
 make testdb                              # throwaway PostgreSQL (needs Docker)
-cd backend && python -m pytest -q        # 591 passed, 2 skipped
+cd backend && python -m pytest -q        # 661 passed, 2 skipped
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build   # 42 unit tests
 cd frontend && npm run e2e               # 7 Playwright tests against the Docker stack
 ```
@@ -157,7 +158,7 @@ CI runs four jobs on every push: backend (lint + tests), frontend, SecureAgent s
 | **How to run it (CLI, web app, MCP)** | [docs/MANUAL.md](docs/MANUAL.md) |
 | **Everything that was built** | [docs/OVERVIEW.md](docs/OVERVIEW.md) |
 | Verdict against the original brief | [docs/PROJECT_CLOSEOUT.md](docs/PROJECT_CLOSEOUT.md) |
-| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (44 ADRs) |
+| Current state / history / decisions | [PROJECT_MEMORY.md](PROJECT_MEMORY.md), [PROJECT_CHANGELOG.md](PROJECT_CHANGELOG.md), [docs/adr/](docs/adr/) (45 ADRs) |
 | Original baseline requirements | [SPECIFICATION.md](SPECIFICATION.md) |
 | Requirement-to-code mapping | [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Detector behaviour and limits | [docs/static-analysis.md](docs/static-analysis.md), [docs/business-logic-engine.md](docs/business-logic-engine.md) |
@@ -174,3 +175,14 @@ Standards: OWASP Top 10, CWE, CVE (via OSV), CVSS v3 (computed from published ve
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+### Application profile (optional)
+
+Add a `profile` to `secureagent-intent.json` so hardening recommendations can use facts code cannot show
+(`rules` may then be omitted). Nothing here is inferred, and `description` is display-only:
+
+```json
+{"profile": {"purpose": "ecommerce", "expected_users": "10k-100k",
+             "data_categories": ["pii", "payment"], "regions": ["IN", "EU"],
+             "exposure": "internet", "description": "Marketplace for handmade goods"}}
+```

@@ -1,5 +1,8 @@
 # SecureAgent – Testing
 
+**Current (2026-11-02):** 661 backend tests pass, 2 skipped; 43 Vitest; 7 Playwright. The figures below
+are historical. Hardening recommendations (ADR-045): `backend/tests/test_hardening_recommendations.py`.
+
 Frontend (added 2026-10-11): `cd frontend && npm test` runs 33 Vitest + Testing Library tests (API client,
 badges, audit list/detail pages incl. polling and the authorization gate); CI runs them. Browser end-to-end:
 `cd frontend && npm run e2e` (Playwright, 7 tests against the Docker stack; see
