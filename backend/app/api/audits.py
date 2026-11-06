@@ -225,7 +225,13 @@ async def triage_finding(
 
 
 @router.get("/{audit_id}/findings/{finding_id}/fix", response_model=SuggestedFix)
-async def suggest_fix(audit_id: uuid.UUID, finding_id: uuid.UUID, db: DbSession, user: CurrentUser):
+async def suggest_fix(
+    audit_id: uuid.UUID,
+    finding_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    ai: bool = False,
+):
     """A deterministic, verified patch for this one finding (ADR-013), if one exists. Most finding
     types have none -- the response says so rather than inventing a snippet."""
     from app.analysis.fixes import suggest_fix_for
@@ -250,7 +256,7 @@ async def suggest_fix(audit_id: uuid.UUID, finding_id: uuid.UUID, db: DbSession,
         return SuggestedFix(available=False)
     patch = suggest_fix_for(audit.source_path, row.endpoint, row.type)
     if patch is None or not patch.changes:
-        return SuggestedFix(available=False)
+        return await _ai_fix(audit.source_path, row) if ai else SuggestedFix(available=False)
     change = patch.changes[0]
     return SuggestedFix(
         available=True,
@@ -259,6 +265,43 @@ async def suggest_fix(audit_id: uuid.UUID, finding_id: uuid.UUID, db: DbSession,
         description=change.description,
         caveat=change.caveat,
         note=patch.note,
+    )
+
+
+async def _ai_fix(source_path: str, row: Vulnerability) -> SuggestedFix:
+    """An LLM-drafted, explicitly unverified fix. Only runs when the user asks for it (``ai=true``);
+    sends the same redacted code excerpt as the AI review, and the result is never applied."""
+    from app.analysis import llm_review as lr
+    from app.core.config import get_settings
+    from app.pipeline.context import to_report_finding
+
+    settings = get_settings()
+    if not settings.llm_api_key:
+        raise HTTPException(status.HTTP_409_CONFLICT, "No LLM key is configured on this server.")
+    provider = settings.llm_provider or "anthropic"
+    finding = to_report_finding(row)
+    path = lr.evidence_path(finding.evidence)
+    context = lr.build_context(source_path, finding, path)
+    if context is None:
+        return SuggestedFix(available=False)
+    reviewer = lr.Reviewer(
+        api_key=settings.llm_api_key,
+        model=settings.llm_model,
+        provider=provider,
+        transport=lr.mistral_transport if provider == "mistral" else lr.http_transport,
+    )
+    try:  # blocking HTTP: keep it off the event loop
+        fix = await asyncio.to_thread(lr.suggest_fix_text, reviewer, finding, context, path)
+    except lr.ReviewError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"AI fix unavailable: {exc}") from None
+    return SuggestedFix(
+        available=True,
+        verified=False,
+        ai_generated=True,
+        diff=fix["diff"],
+        description=fix["description"],
+        caveat=fix["caveat"],
+        note="AI-suggested and not verified (not parsed or re-scanned). Review before applying.",
     )
 
 

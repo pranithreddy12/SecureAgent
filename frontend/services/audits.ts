@@ -20,8 +20,8 @@ export const auditService = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
-  suggestFix: (auditId: string, findingId: string) =>
-    api<SuggestedFix>(`/audits/${auditId}/findings/${findingId}/fix`),
+  suggestFix: (auditId: string, findingId: string, ai = false) =>
+    api<SuggestedFix>(`/audits/${auditId}/findings/${findingId}/fix${ai ? "?ai=true" : ""}`),
   createSource: (body: SourceAuditRequest) =>
     api<Audit>("/audits/source", { method: "POST", body: JSON.stringify(body) }),
   reportUrl: (id: string, opts: { format?: "html" | "pdf"; download?: boolean } = {}) => {

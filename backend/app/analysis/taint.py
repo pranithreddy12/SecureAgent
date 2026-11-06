@@ -954,6 +954,13 @@ def _is_http_call(name: str, last: str) -> bool:
 
 _JS_REQ_PARTS = r"(?:query|params|body|cookies|headers|files|file)"
 _JS_SOURCE = re.compile(r"\breq(?:uest)?\." + _JS_REQ_PARTS + r"\b")
+# Next.js App Router handlers: `await request.json()` and `searchParams.get('x')`
+_JS_NEXT_SOURCE = re.compile(
+    r"\bawait\s+req(?:uest)?\.(?:json|formData|text)\s*\(|\bsearchParams\.(?:get|getAll)\s*\("
+)
+_JS_NEXT_DESTRUCTURE = re.compile(
+    r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*await\s+req(?:uest)?\.(?:json|formData)\s*\("
+)
 _JS_ASSIGN = re.compile(
     r"(?:const|let|var)\s+(\w+)(?:\s*:\s*[\w<>\[\]|. ]+)?\s*=\s*[^;]*req(?:uest)?\." + _JS_REQ_PARTS
 )
@@ -975,7 +982,11 @@ _JS_REDIRECT_CHECK = re.compile(
 )
 _JS_BUILT = re.compile(r"[`+]|\$\{")
 _JS_SINKS = [
-    ("sql_injection", re.compile(r"\.(query|execute)\s*\("), re.compile(r"[`+]|\$\{")),
+    (
+        "sql_injection",
+        re.compile(r"\.(?:query|execute|\$queryRawUnsafe|\$executeRawUnsafe)\s*\("),
+        re.compile(r"[`+]|\$\{"),
+    ),
     ("command_injection", re.compile(r"\b(?:child_process\.)?(?:exec|execSync)\s*\("), None),
     (
         "code_injection",
@@ -1024,6 +1035,23 @@ def _js_constant_call(sink_re: re.Pattern[str], line: str) -> bool:
     return bool(_JS_LITERAL_ARG.match(line[m.end() - 1 :]))
 
 
+def _js_statement(lines: list[str], i: int, limit: int = 4) -> str:
+    """Line ``i`` plus its continuation lines while the call's parentheses stay open, so a call
+    split over several lines is one statement. A callback (`=>`, `function`) ends it, so the body of
+    a handler is never read as part of the sink call."""
+    stmt = lines[i]
+    depth = stmt.count("(") - stmt.count(")")
+    j = i
+    while depth > 0 and j + 1 < len(lines) and j - i < limit and not _JS_CALLBACK.search(lines[j]):
+        j += 1
+        stmt += "\n" + lines[j]
+        depth += lines[j].count("(") - lines[j].count(")")
+    return stmt
+
+
+_JS_CALLBACK = re.compile(r"=>|\bfunction\b")
+
+
 def _js_extra(relpath: str, lines: list[str], tainted: set[str]) -> list[TaintFinding]:
     return [
         TaintFinding(vuln, SEVERITY[vuln], 0.5, relpath, lineno, sink, snippet)
@@ -1050,6 +1078,8 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
             )
         for m in _JS_DESTRUCTURE.finditer(line):
             tainted.update(re.findall(r"\w+", m.group(1)))
+        for m in _JS_NEXT_DESTRUCTURE.finditer(line):  # const { name } = await request.json()
+            tainted.update(re.findall(r"\w+", m.group(1)))
     for _ in range(3):  # `const to = query.to as string`: derived from a tainted variable
         before = len(tainted)
         for line in lines:
@@ -1057,8 +1087,10 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
                 name, rhs = m.group(1), m.group(2)
                 if name in tainted:
                     continue
-                if _JS_SOURCE.search(rhs) or any(
-                    re.search(r"\b" + re.escape(v) + r"\b", rhs) for v in tainted
+                if (
+                    _JS_SOURCE.search(rhs)
+                    or _JS_NEXT_SOURCE.search(rhs)
+                    or any(re.search(r"\b" + re.escape(v) + r"\b", rhs) for v in tainted)
                 ):
                     tainted.add(name)
                     if _JS_BUILT.search(rhs):
@@ -1072,18 +1104,23 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
     for lineno, line in enumerate(lines, start=1):
         if len(line) > 4000:
             continue
-        if not (_JS_SOURCE.search(line) or any(r.search(line) for r in var_res)):
+        stmt = _js_statement(lines, lineno - 1)
+        if not (
+            _JS_SOURCE.search(stmt)
+            or _JS_NEXT_SOURCE.search(stmt)
+            or any(r.search(stmt) for r in var_res)
+        ):
             continue
         for vuln_type, sink_re, extra_re in _JS_SINKS:
             m = sink_re.search(line)
-            built_here = any(re.search(r"\b" + re.escape(v) + r"\b", line) for v in built)
+            built_here = any(re.search(r"\b" + re.escape(v) + r"\b", stmt) for v in built)
             if (
                 m
                 and vuln_type in {"command_injection", "code_injection"}
                 and _js_constant_call(sink_re, line)
             ):
                 continue
-            if m and vuln_type == "reflected_xss" and _JS_ESCAPES.search(line):
+            if m and vuln_type == "reflected_xss" and _JS_ESCAPES.search(stmt):
                 continue  # res.send("<h1>" + escapeHtml(name) + "</h1>")
             if m and vuln_type == "open_redirect":
                 prior = "\n".join(lines[max(0, lineno - 9) : lineno])
@@ -1091,7 +1128,7 @@ def _js_taint(relpath: str, text: str) -> list[TaintFinding]:
                     continue  # the target was validated just above (startsWith / allow-list)
             if (
                 m
-                and (extra_re is None or extra_re.search(line) or built_here)
+                and (extra_re is None or extra_re.search(stmt) or built_here)
                 and (vuln_type, lineno) not in seen
             ):
                 seen.add((vuln_type, lineno))

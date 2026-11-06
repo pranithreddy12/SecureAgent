@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from app.demo.adapters import demo_recon
 from app.tools.policy import RequestContext
 from app.tools.recon_tool import crawl
@@ -11,7 +13,7 @@ async def run(state: AuditState) -> dict:
     if state.get("demo_mode"):
         recon = demo_recon()
     else:
-        recon = crawl(state["target_url"], ctx)
+        recon = await asyncio.to_thread(crawl, state["target_url"], ctx)
     return {
         "reconnaissance_results": recon.model_dump(mode="json"),
         "technologies": recon.technologies,

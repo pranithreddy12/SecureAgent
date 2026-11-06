@@ -137,8 +137,21 @@ describe("AuditDetailPage", () => {
     render(<AuditDetailPage />);
     await userEvent.click(await screen.findByText(/SQL injection/));
     await userEvent.click(screen.getByRole("button", { name: "Suggest a fix" }));
-    expect(service.suggestFix).toHaveBeenCalledWith("audit-1", "f1");
+    expect(service.suggestFix).toHaveBeenCalledWith("audit-1", "f1", false);
     expect(await screen.findByText(/No automatic fix for this finding type yet/)).toBeInTheDocument();
+  });
+
+  it("offers an AI-suggested fix when no automatic one exists, labelled unverified", async () => {
+    service.get.mockResolvedValue(base);
+    service.suggestFix
+      .mockResolvedValueOnce({ available: false, verified: false, diff: null, description: null, caveat: null, note: null })
+      .mockResolvedValueOnce({ available: true, verified: false, ai_generated: true, diff: "-a +b", description: "Bind it.", caveat: null, note: "Review first." });
+    render(<AuditDetailPage />);
+    await userEvent.click(await screen.findByText(/SQL injection/));
+    await userEvent.click(screen.getByRole("button", { name: "Suggest a fix" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Draft an AI-suggested fix" }));
+    expect(service.suggestFix).toHaveBeenLastCalledWith("audit-1", "f1", true);
+    expect(await screen.findByText(/AI-suggested fix \(unverified\)/)).toBeInTheDocument();
   });
 
   it("shows a verified fix's diff when one exists", async () => {

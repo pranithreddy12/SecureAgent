@@ -299,6 +299,7 @@ async def test_suggest_fix_for_a_fixable_type_and_none_for_an_unfixable_one(
     assert none_fix.json() == {
         "available": False,
         "verified": False,
+        "ai_generated": False,
         "diff": None,
         "description": None,
         "caveat": None,

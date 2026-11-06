@@ -179,16 +179,14 @@ function Triage({
 function SuggestedFixPanel({ auditId, findingId }: { auditId: string; findingId: string }) {
   const [fix, setFix] = useState<SuggestedFix | "loading" | "error" | null>(null);
 
+  function ask(ai: boolean) {
+    setFix("loading");
+    auditService.suggestFix(auditId, findingId, ai).then(setFix, () => setFix("error"));
+  }
+
   if (fix === null) {
     return (
-      <Button
-        type="button"
-        className="self-start"
-        onClick={() => {
-          setFix("loading");
-          auditService.suggestFix(auditId, findingId).then(setFix, () => setFix("error"));
-        }}
-      >
+      <Button type="button" className="self-start" onClick={() => ask(false)}>
         Suggest a fix
       </Button>
     );
@@ -197,15 +195,29 @@ function SuggestedFixPanel({ auditId, findingId }: { auditId: string; findingId:
   if (fix === "error") return <p className="text-sm text-danger">Could not check for a fix.</p>;
   if (!fix.available) {
     return (
-      <p className="text-sm text-muted">
-        No automatic fix for this finding type yet -- see the remediation guidance above.
-      </p>
+      <div className="flex flex-col gap-2 text-sm text-muted">
+        <p>No automatic fix for this finding type yet -- see the remediation guidance above.</p>
+        <Button type="button" className="self-start" onClick={() => ask(true)}>
+          Draft an AI-suggested fix
+        </Button>
+        <p className="text-xs">
+          Sends a redacted excerpt of the affected code to the configured AI provider. The result
+          is a draft and is not verified.
+        </p>
+      </div>
     );
   }
   return (
     <div className="flex flex-col gap-2 rounded-sm border border-border p-3 text-sm">
       <p>
-        <span className="font-semibold">{fix.verified ? "Verified fix" : "Proposed fix"}: </span>
+        <span className="font-semibold">
+          {fix.ai_generated
+            ? "AI-suggested fix (unverified)"
+            : fix.verified
+              ? "Verified fix"
+              : "Proposed fix"}
+          :{" "}
+        </span>
         {fix.description}
       </p>
       <pre className="overflow-x-auto rounded bg-background p-2 font-mono text-xs">{fix.diff}</pre>

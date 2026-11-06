@@ -5,7 +5,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { AiConsent } from "@/components/AiConsent";
 import { Button, Card, ErrorMessage, Field } from "@/components/ui";
-import { suggestedProjectName, zipFolder } from "@/lib/zipFolder";
+import {
+  canPickLazily,
+  fromFileList,
+  pickFolderLazily,
+  suggestedProjectName,
+  zipFolder,
+  type PickedFile,
+} from "@/lib/zipFolder";
 import { projectService } from "@/services/projects";
 import type { Project, ProjectDetail } from "@/types/api";
 
@@ -22,7 +29,7 @@ export default function RunPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsError, setProjectsError] = useState<string | null>(null);
 
-  const [folderFiles, setFolderFiles] = useState<FileList | null>(null);
+  const [folderFiles, setFolderFiles] = useState<PickedFile[] | null>(null);
   const [folderSummary, setFolderSummary] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [existingId, setExistingId] = useState("");
@@ -39,16 +46,31 @@ export default function RunPage() {
     projectService.list().then(setProjects, (e) => setProjectsError(e.message));
   }, []);
 
-  function onFolderPicked(files: FileList | null) {
+  function onFolderPicked(files: PickedFile[], skipped = 0) {
     setFolderFiles(files);
     setResolved(null);
     setConfirmed(false);
-    if (files && files.length > 0) {
+    if (files.length > 0) {
       setName(suggestedProjectName(files));
-      const bytes = Array.from(files).reduce((sum, f) => sum + f.size, 0);
-      setFolderSummary(`${files.length} files, ${(bytes / (1024 * 1024)).toFixed(1)} MB`);
+      const bytes = files.reduce((sum, f) => sum + f.file.size, 0);
+      const extra = skipped ? `, ${skipped} skipped` : "";
+      setFolderSummary(`${files.length} files, ${(bytes / (1024 * 1024)).toFixed(1)} MB${extra}`);
     } else {
       setFolderSummary(null);
+    }
+  }
+
+  async function chooseFolder() {
+    if (!canPickLazily()) return fileInput.current?.click(); // browsers without the directory API
+    setError(null);
+    setFolderSummary("Reading folder…");
+    try {
+      const picked = await pickFolderLazily();
+      if (picked) onFolderPicked(picked.files, picked.skipped);
+      else setFolderSummary(null);
+    } catch (e) {
+      setFolderSummary(null);
+      setError(e instanceof Error ? e.message : "Could not read that folder");
     }
   }
 
@@ -153,7 +175,7 @@ export default function RunPage() {
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Folder</span>
               <div className="flex items-center gap-3">
-                <Button type="button" onClick={() => fileInput.current?.click()}>
+                <Button type="button" onClick={chooseFolder}>
                   Choose folder…
                 </Button>
                 {folderSummary && <span className="text-xs text-muted">{folderSummary}</span>}
@@ -164,7 +186,7 @@ export default function RunPage() {
                 className="hidden"
                 // Non-standard but universally supported attributes for a directory picker.
                 {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-                onChange={(e) => onFolderPicked(e.target.files)}
+                onChange={(e) => onFolderPicked(e.target.files ? fromFileList(e.target.files) : [])}
               />
               <span className="text-xs text-muted">
                 Zipped in your browser and uploaded -- nothing is sent until you confirm below.

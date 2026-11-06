@@ -265,3 +265,21 @@ def test_report_renders_the_ai_review_block(project):
     assert "AI review" in html and "false positive" in html
     assert "not found in the code sent" in html  # an unverified quote is labelled as such
     assert "does not change this finding" in html
+
+
+def test_ai_fix_returns_description_diff_caveat_and_sends_no_secret(project):
+    f = sqli(project)
+    ctx = lr.build_context(str(project), f)
+    want = {"description": "Bind it.", "diff": "-a\n+b", "caveat": "Test it."}
+    fake = Fake({"content": [{"type": "text", "text": json.dumps(want)}]})
+    fix = lr.suggest_fix_text(lr.Reviewer(api_key="k", transport=fake), f, ctx)
+    assert fix == want
+    assert "Zx9Qw3Vb7Np2Lk8Rt4Ya1Hs6Dc0Mf5" not in json.dumps(fake.calls[0]["payload"])
+
+
+def test_ai_fix_without_a_diff_is_an_error(project):
+    f = sqli(project)
+    ctx = lr.build_context(str(project), f)
+    fake = Fake({"content": [{"type": "text", "text": "I cannot help with that."}]})
+    with pytest.raises(lr.ReviewError):
+        lr.suggest_fix_text(lr.Reviewer(api_key="k", transport=fake), f, ctx)

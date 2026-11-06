@@ -90,6 +90,7 @@ class SuggestedFix(BaseModel):
 
     available: bool
     verified: bool = False
+    ai_generated: bool = False
     diff: str | None = None
     description: str | None = None
     caveat: str | None = None

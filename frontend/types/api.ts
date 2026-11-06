@@ -147,6 +147,7 @@ export interface Finding {
 export interface SuggestedFix {
   available: boolean;
   verified: boolean;
+  ai_generated?: boolean;
   diff: string | null;
   description: string | null;
   caveat: string | null;
