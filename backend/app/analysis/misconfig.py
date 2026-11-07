@@ -124,7 +124,67 @@ CATEGORY = {
         "high",
         0.7,
     ),
+    # Supply chain (app/analysis/supply_chain.py)
+    "typosquat_package": (
+        "CWE-1357",
+        "A06:2021 Vulnerable and Outdated Components",
+        "Check the spelling against the package you meant; a one-letter-off name of a popular "
+        "package is a common malware trick. Remove it if it is not the package you intended.",
+        "medium",
+        0.5,
+    ),
+    "unregistered_package": (
+        "CWE-1357",
+        "A06:2021 Vulnerable and Outdated Components",
+        "The public registry has no package by this name, so anyone can publish one. If it is a "
+        "private package, pin the private index explicitly; if an AI assistant suggested it, it "
+        "may be hallucinated -- remove it.",
+        "medium",
+        0.45,
+    ),
 }
+
+# AI / agent applications (OWASP LLM Top 10, Agentic Top 10, MCP Top 10)
+CATEGORY.update(
+    {
+        "mcp_unpinned_server": (
+            "CWE-829",
+            "A08:2021 Software and Data Integrity Failures",
+            "Pin the MCP server package to an exact version (npx pkg@1.2.3, uvx pkg==1.2.3). An "
+            "unpinned server runs whatever the registry serves today, with your agent's access.",
+            "medium",
+            0.6,
+        ),
+        "mcp_insecure_transport": (
+            "CWE-319",
+            "A02:2021 Cryptographic Failures",
+            "Use https:// for remote MCP servers; plain http exposes tool calls, results and any "
+            "bearer token to the network.",
+            "medium",
+            0.6,
+        ),
+        "llm_key_in_browser": (
+            "CWE-522",
+            "A07:2021 Identification and Authentication Failures",
+            "Call the LLM provider from your server. A key in a NEXT_PUBLIC_/VITE_/REACT_APP_ "
+            "variable or an SDK with dangerouslyAllowBrowser ships to every visitor's browser.",
+            "high",
+            0.7,
+        ),
+    }
+)
+
+# Categories whose title is not "Security misconfiguration: ..." (same finding shape).
+TITLE_PREFIX = {
+    "typosquat_package": "Suspicious package name",
+    "unregistered_package": "Package not on the public registry",
+    "mcp_unpinned_server": "AI agent supply chain",
+    "mcp_insecure_transport": "AI agent configuration",
+    "llm_key_in_browser": "LLM API key exposed to the browser",
+}
+
+# Categories that are a reason to look, not a definite insecure setting -> status "suspicious".
+SUSPICIOUS = {"typosquat_package", "unregistered_package"}
 
 
 @dataclass(frozen=True)
@@ -151,7 +211,7 @@ class MisconfigFinding:
 
     @property
     def title(self) -> str:
-        return f"Security misconfiguration: {self.rule}"
+        return f"{TITLE_PREFIX.get(self.category, 'Security misconfiguration')}: {self.rule}"
 
 
 _DOCKERFILE = re.compile(r"(?i)(^|/)([^/]*\.dockerfile|dockerfile[^/]*)$")
@@ -165,13 +225,28 @@ _K8S_RUN_AS_ROOT = re.compile(r"(?i)^\s*runAsUser\s*:\s*0\b")
 _K8S_ESCALATION = re.compile(r"(?i)^\s*allowPrivilegeEscalation\s*:\s*true\b")
 _K8S_HOST_NS = re.compile(r"(?i)^\s*(hostNetwork|hostPID|hostIPC)\s*:\s*true\b")
 _TF_FILE = re.compile(r"(?i)\.tf$")
-_TF_PUBLIC_ACL = re.compile(r"""(?i)^\s*acl\s*=\s*["'](public-read(-write)?|authenticated-read)["']""")
-_TF_OPEN_CIDR = re.compile(r'0\.0\.0\.0/0')
+_TF_PUBLIC_ACL = re.compile(
+    r"""(?i)^\s*acl\s*=\s*["'](public-read(-write)?|authenticated-read)["']"""
+)
+_TF_OPEN_CIDR = re.compile(r"0\.0\.0\.0/0")
 _TF_INGRESS_BLOCK = re.compile(r"(?i)^\s*ingress\s*\{")
 _TF_BLOCK_END = re.compile(r"^\s*\}")
 _TF_CREDENTIAL = re.compile(
     r"""(?i)^\s*(access_key|secret_key|secret_access_key|password|api_key|api_token)\s*=\s*["'][^"'$]{8,}["']"""
 )
+_MCP_CONFIG = re.compile(
+    r"(?i)(^|/)(\.?mcp(_config)?\.json|claude_desktop_config\.json|\.cursor/mcp\.json|"
+    r"\.vscode/mcp\.json)$"
+)
+_MCP_RUNNERS = {"npx", "uvx", "bunx", "pnpx", "pipx"}
+_PINNED_NPM = re.compile(r"^(@[^/@]+/)?[^@/]+@\d[\w.+-]*$")
+_PINNED_PY = re.compile(r"^[A-Za-z0-9._-]+(\[[^\]]*\])?(==|@)\d[\w.+-]*$")
+_LLM_BROWSER_KEY = re.compile(
+    r"\b(NEXT_PUBLIC|VITE|REACT_APP|EXPO_PUBLIC)_[A-Z0-9_]*"
+    r"(OPENAI|ANTHROPIC|CLAUDE|MISTRAL|GEMINI|GROQ|COHERE|DEEPSEEK|LLM|AI)[A-Z0-9_]*"
+    r"(KEY|TOKEN|SECRET)\b"
+)
+_DANGEROUS_BROWSER = re.compile(r"dangerouslyAllowBrowser\s*:\s*true")
 _BULK_NAME = re.compile(r"(?i)export|download|dump|backup|csv|(?:^|[_/.-])all(?:$|[_/.-])")
 _LIMIT_HINT = re.compile(
     r"(?i)\blimit\b|paginat|per_page|page_size|max_rows|fetchmany|\.first\(|islice|\[:\s*\w+\]|\.slice"
@@ -220,7 +295,11 @@ def _infra_findings(relpath: str, text: str) -> list[MisconfigFinding]:
                 add("container_runs_as_root", "compose: service runs as root", i)
             elif _PRIVILEGED.match(raw):
                 add("privileged_container", "compose: privileged container", i)
-    if relpath.lower().endswith((".yml", ".yaml")) and _K8S_MANIFEST.search(text) and _K8S_KIND.search(text):
+    if (
+        relpath.lower().endswith((".yml", ".yaml"))
+        and _K8S_MANIFEST.search(text)
+        and _K8S_KIND.search(text)
+    ):
         for i, raw in enumerate(lines, start=1):
             if _PRIVILEGED.match(raw):
                 add("privileged_container", "k8s: securityContext.privileged: true", i)
@@ -249,7 +328,62 @@ def _infra_findings(relpath: str, text: str) -> list[MisconfigFinding]:
         for i, raw in enumerate(lines, start=1):
             if "unsafe-inline" in raw and _CSP_INLINE.search(raw):
                 add("csp_unsafe_inline", "CSP allows 'unsafe-inline' scripts", i)
+    base = relpath.rsplit("/", 1)[-1]
+    if relpath.lower().endswith(_TEXT_SUFFIXES) or base.startswith(".env"):
+        for i, raw in enumerate(lines, start=1):
+            m = _LLM_BROWSER_KEY.search(raw)
+            if m:
+                add("llm_key_in_browser", f"{m.group(0)} is a public (browser-bundled) variable", i)
+            elif _DANGEROUS_BROWSER.search(raw):
+                add("llm_key_in_browser", "LLM SDK created with dangerouslyAllowBrowser: true", i)
+    if _MCP_CONFIG.search(relpath):
+        found += _mcp_config_findings(relpath, text, add)
     return found
+
+
+def _mcp_config_findings(relpath: str, text: str, add) -> list[MisconfigFinding]:
+    """MCP client configuration: unpinned server packages and plain-http remote servers."""
+    import json
+
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return []
+    servers = data.get("mcpServers") or data.get("servers") or {}
+    if not isinstance(servers, dict):
+        return []
+
+    def line_of(needle: str) -> int:
+        idx = text.find(needle)
+        return text.count("\n", 0, idx) + 1 if idx >= 0 else 1
+
+    for name, cfg in servers.items():
+        if not isinstance(cfg, dict):
+            continue
+        command = str(cfg.get("command") or "").replace("\\", "/").rsplit("/", 1)[-1]
+        command = command.removesuffix(".cmd").removesuffix(".exe")
+        args = [str(a) for a in cfg.get("args") or [] if isinstance(a, (str, int, float))]
+        if command in _MCP_RUNNERS:
+            pkgs = [a for a in args if not a.startswith("-") and a != "run"]
+            pkg = pkgs[0] if pkgs else ""
+            pinned = _PINNED_PY.match(pkg) if command in {"uvx", "pipx"} else _PINNED_NPM.match(pkg)
+            if pkg and not pinned:
+                add(
+                    "mcp_unpinned_server",
+                    f"MCP server '{name}' runs `{command} {pkg}` without a pinned version",
+                    line_of(f'"{pkg}"'),
+                )
+        url = str(cfg.get("url") or cfg.get("serverUrl") or "")
+        host = (
+            url[7:].split("/", 1)[0].split(":", 1)[0].lower() if url.startswith("http://") else ""
+        )
+        if host and host not in {"localhost", "127.0.0.1", "::1", "[::1]"}:
+            add(
+                "mcp_insecure_transport",
+                f"MCP server '{name}' is reached over plain http ({host})",
+                line_of(url),
+            )
+    return []  # findings are appended through `add`
 
 
 def _is_route(func: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool, list[str]]:

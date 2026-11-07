@@ -39,10 +39,19 @@ class Vuln:
     cvss_score: float | None = None
     cvss_vector: str | None = None
     cvss_version: str | None = None
+    aliases: tuple[str, ...] = ()  # other ids for the same advisory (a GHSA's CVE, ...)
 
     @property
     def cve(self) -> str | None:
-        return self.id if self.id.startswith("CVE-") else None
+        """The advisory's own CVE id, or a CVE it lists as an alias -- never invented."""
+        if self.id.startswith("CVE-"):
+            return self.id
+        return next((a for a in self.aliases if a.startswith("CVE-")), None)
+
+    @property
+    def malicious(self) -> bool:
+        """OSV's malicious-package advisories (the ``MAL-`` namespace)."""
+        return self.id.startswith("MAL-")
 
 
 def _default_fetch(url: str, payload: bytes | None) -> bytes:
@@ -109,6 +118,7 @@ class OsvClient:
                 cvss_score=cvss.score if cvss else None,
                 cvss_vector=cvss.vector if cvss else None,
                 cvss_version=cvss.version if cvss else None,
+                aliases=tuple(str(a) for a in data.get("aliases") or ()),
             )
         return out
 

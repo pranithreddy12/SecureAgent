@@ -12,6 +12,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.audits import Launcher, get_launcher
@@ -28,8 +29,22 @@ from app.schemas.target import (
 )
 from app.security.target_validation import InvalidTargetURL
 from app.services import audit_service, authorization_service, live_audit_service, target_service
+from app.tools.access_check import AccessCheckError, parse_config
 
 router = APIRouter(prefix="/targets", tags=["targets"])
+
+
+class AccessCheckRequest(BaseModel):
+    """Two test accounts of the owner's own application, as request headers, plus URLs of objects
+    owned by account A. Held in memory for the run only; never stored."""
+
+    user_a: dict[str, str]
+    user_b: dict[str, str]
+    urls: list[str] = Field(default_factory=list)
+
+
+class StartLiveAudit(BaseModel):
+    access_check: AccessCheckRequest | None = None
 
 
 def _http(exc: Exception) -> HTTPException:
@@ -129,10 +144,16 @@ async def start_target_audit(
     db: DbSession,
     user: CurrentUser,
     launch: Annotated[Launcher, Depends(get_launcher)],
+    body: StartLiveAudit | None = None,
 ):
     target = await _owned(db, user, target_id)
+    access = body.access_check.model_dump() if body and body.access_check else None
     try:
-        audit = await live_audit_service.create_live_audit(db, user, target)
+        parse_config(access)  # reject bad input now, not halfway through the audit
+    except AccessCheckError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from None
+    try:
+        audit = await live_audit_service.create_live_audit(db, user, target, access)
     except live_audit_service.TargetNotReady as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
     except audit_service.TooManyActiveAudits:

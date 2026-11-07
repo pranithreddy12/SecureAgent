@@ -117,7 +117,7 @@ async def retry_audit(
         audit = await audit_service.reset_for_retry(db, audit, resume=resume)
     except audit_service.AuditNotRetryable:
         raise HTTPException(
-            status.HTTP_409_CONFLICT, "Only a failed source audit can be retried."
+            status.HTTP_409_CONFLICT, "Only a failed audit can be retried."
         ) from None
     await launch(audit.id)
     return audit
@@ -294,14 +294,21 @@ async def _ai_fix(source_path: str, row: Vulnerability) -> SuggestedFix:
         fix = await asyncio.to_thread(lr.suggest_fix_text, reviewer, finding, context, path)
     except lr.ReviewError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"AI fix unavailable: {exc}") from None
+    from app.analysis.fixes import verify_ai_fix
+
+    patch = await asyncio.to_thread(verify_ai_fix, source_path, row.endpoint, row.type, fix)
     return SuggestedFix(
         available=True,
-        verified=False,
+        verified=patch.verified,
         ai_generated=True,
-        diff=fix["diff"],
+        diff=patch.diff if patch.patched != patch.original else fix["diff"],
         description=fix["description"],
         caveat=fix["caveat"],
-        note="AI-suggested and not verified (not parsed or re-scanned). Review before applying.",
+        note=(
+            f"AI-suggested; verified: {patch.note}."
+            if patch.verified
+            else f"AI-suggested and NOT verified: {patch.note}. Review before applying."
+        ),
     )
 
 

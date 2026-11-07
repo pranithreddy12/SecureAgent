@@ -283,6 +283,46 @@ GUIDANCE: dict[str, Guidance] = {
         "Is this a real secret? Where should it come from instead (env var, secrets manager, "
         "a `TF_VAR_` input)?",
     ),
+    "malicious_dependency": _g(
+        "Arbitrary code ran at install or import time on every machine that installed it.",
+        "Which version of the payload ran, or what it took.",
+        "Was this exact version installed anywhere (CI runners, developer machines, images)?",
+        "Which credentials could those machines reach? Rotate them.",
+    ),
+    "typosquat_package": _g(
+        "If it is an impostor: code execution at install time on developer and CI machines.",
+        "That the package is malicious; it is only one edit away from a popular name.",
+        "Is this the package the developer meant, or a misspelling of the popular one?",
+        "Who publishes it, and how old/popular is it on the registry?",
+    ),
+    "prompt_injection": _g(
+        "The model follows attacker instructions: leaks its context, misuses tools it can call.",
+        "That the model obeys the injected text, or that it has tools worth abusing.",
+        "Does request data reach the system/developer instructions, not just a user message?",
+        "What tools, data or actions can this model call with the injected instructions?",
+    ),
+    "mcp_unpinned_server": _g(
+        "A future malicious release runs with the agent's file, network and credential access.",
+        "That the current release is malicious.",
+        "Is the package pinned anywhere else (lockfile, wrapper script)? Who maintains it?",
+    ),
+    "mcp_insecure_transport": _g(
+        "Tool calls, results and bearer tokens readable or alterable on the network path.",
+        "That the traffic crosses an untrusted network.",
+        "Does the remote server support https? Is the host on a trusted internal network?",
+    ),
+    "llm_key_in_browser": _g(
+        "Anyone visiting the site can copy the key and spend the account's LLM quota.",
+        "That the variable holds a real key in production builds.",
+        "Is the variable inlined into the client bundle by the framework (NEXT_PUBLIC_/VITE_)?",
+        "Is the call proxied through the server instead in production?",
+    ),
+    "unregistered_package": _g(
+        "If someone registers the name: code execution at install time.",
+        "That the name is hallucinated; a private package also returns 404 publicly.",
+        "Is it a private/internal package served from a private index?",
+        "Did an AI assistant suggest it? Does any documentation for it exist?",
+    ),
 }
 
 DEFAULT: Guidance = _g(

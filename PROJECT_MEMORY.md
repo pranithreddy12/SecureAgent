@@ -4,7 +4,7 @@
 > Current state lives here; history lives in `PROJECT_CHANGELOG.md`; the original
 > baseline lives in `SPECIFICATION.md`. Never store secrets in this file.
 
-Last updated: 2026-10-12 (inventory of everything built: docs/OVERVIEW.md; verdict: docs/PROJECT_CLOSEOUT.md)
+Last updated: 2026-11-07 (ADR-046: ten research-driven features; inventory: docs/OVERVIEW.md)
 
 ## 1. Project Identity
 
@@ -60,6 +60,16 @@ dashboard shows real counts. Verified end to end through Docker (register -> aud
 **Hardening recommendations (2026-11-02, ADR-045)**: `analysis/hardening.py`, 16 rules over code signals
 and an optional declared `profile` in `secureagent-intent.json`; shown in CLI (`--recommend`, JSON
 `hardening`), report section 20, `GET /api/audits/{id}`, the audit page and MCP. Guidance, not findings.
+
+**Research-driven features (2026-11-07, ADR-046)**: KEV/EPSS + import reachability -> dependency
+`priority`; malicious (`MAL-`), typosquat and registry-404 package checks; LLM-app checks (LLM output as
+taint source, `prompt_injection`, MCP/agent tools as entry points, MCP config, browser LLM keys);
+two-account BOLA check stage on live targets (confirmed `bola`); live audit resume; Nuclei pinned in the
+image + partial results; `secureagent specs` (AI-suggested, human-committed `secureagent-taint.json`);
+`fix --ai` with verification; `scan --verify-secrets`; optional tree-sitter JS/TS engine (`[js]` extra).
+Held-out recall (fresh clones, 2026-11-07): 275/361 = 76.2% with the `js` extra, 274/361 without
+(and before ADR-046); only added findings are two genuine SSRFs. Clones live in the session scratchpad;
+re-clone at the pinned commits in `benchmark/known_vulnerable.json` to repeat.
 
 **Reporting** (`app/schemas/report.py`, `app/reports/`, `app/analysis/reporting.py`): 19-section
 HTML/PDF report with table of contents, risk rating, "Fix first" priorities, hotspots, findings
@@ -194,7 +204,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | 14 Frontend | Auth, dashboard (real data), audits list/detail; targets/global pages pending their APIs |
 | 15 Audit progress | Done for source audits (stages, polling, activity log) |
 | 16 Demo mode | CLI demo done; fixture demo of the agent pipeline pending |
-| 17 Testing | 465 backend (93% cov.) + 33 Vitest + 7 Playwright, all in CI |
+| 17 Testing | 712 backend + 47 Vitest + 7 Playwright (2026-11-07) |
 | 18 Docker integration | Compose runs and is e2e-tested; ZAP/Nuclei unused |
 | 19 End-to-end | Done for the source-audit journey (Playwright, CI job `e2e`) |
 | 20 Documentation | Done (18 ADRs, UML, guides, traceability R1-R69, close-out, OVERVIEW) |
@@ -245,6 +255,7 @@ Container images will pin Python 3.12 for library-wheel compatibility.
 | ADR-043 | Four new feature categories: IaC scanning, SBOM, GitHub Action, VS Code extension | Accepted |
 | ADR-044 | Option 2 resumed -- the live-target pipeline, day 1 | Accepted |
 | ADR-045 | Context-aware hardening recommendations (guidance, not findings) | Accepted |
+| ADR-046 | Ten research-driven features: exploit intel, supply chain, AI-app checks, BOLA check, taint specs, verified AI fixes, Nuclei, secret liveness, tree-sitter JS | Accepted |
 | ADR-032 | A single "Run" page instead of three separate forms | Accepted |
 | ADR-033 | Mistral as a second LLM provider | Accepted |
 | ADR-037 | Classic, ledger-style design instead of the default dark-dashboard look | Accepted |

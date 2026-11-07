@@ -23,6 +23,7 @@ from app.analysis.ingest import IngestError
 from app.analysis.intent import IntentError
 from app.analysis.scanner import ScanResult, scan_repo
 from app.analysis.suppressions import SuppressionError
+from app.analysis.taint_specs import TaintSpecError
 from app.core.enums import FindingStatus
 
 _COLORS = {
@@ -129,6 +130,8 @@ def _render_text(
             lines.append(f"  {_tag(f.severity, color)} {f.rule}")
             lines.append(f"      {f.relpath}:{f.line}")
             lines.append(f"      value: {f.redacted}   confidence: {f.confidence:.0%}")
+            if f.liveness:
+                lines.append(f"      provider check: {f.liveness.upper()}")
 
     if shown_ordered_misconfig_findings:
         lines.append("\nSecurity misconfigurations:")
@@ -183,6 +186,7 @@ def _render_text(
             ids = ", ".join(v.id for v in f.vulns[:5])
             lines.append(f"  {_tag(f.severity, color)} {d.name} {d.version}  ({d.ecosystem})")
             lines.append(f"      {d.relpath}   {len(f.vulns)} advisory(ies): {ids}")
+            lines.append(f"      fix priority: {f.priority} ({f.priority_reason})")
 
     if shown_ordered_route_findings:
         lines.append(
@@ -316,8 +320,19 @@ def _render_json(result: ScanResult, items=None, baseline=None) -> str:
                 "name": f.dependency.name,
                 "version": f.dependency.version,
                 "relpath": f.dependency.relpath,
+                "malicious": f.malicious,
+                "kev": f.kev,
+                "epss": f.epss,
+                "imported": f.imported,
+                "priority": f.priority,
                 "advisories": [
-                    {"id": v.id, "severity": v.severity, "summary": v.summary, "url": v.url}
+                    {
+                        "id": v.id,
+                        "cve": v.cve,
+                        "severity": v.severity,
+                        "summary": v.summary,
+                        "url": v.url,
+                    }
                     for v in f.vulns
                 ],
             }
@@ -368,10 +383,12 @@ def _run_fix(args) -> int:
 
     try:
         result = scan_repo(args.path, check_osv=False, exclude=args.exclude)
-    except (IngestError, IntentError, FileNotFoundError) as exc:
+    except (IngestError, IntentError, TaintSpecError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     findings = scan_to_report_context(result).findings
+    if getattr(args, "ai", False):
+        return _run_ai_fix(args, findings)
     patches = propose_fixes(args.path, findings)
     if not patches:
         print("No automatic fixes available for the findings in this source tree.")
@@ -393,6 +410,140 @@ def _run_fix(args) -> int:
     return 0
 
 
+def _llm_reviewer(args, what: str):
+    """Resolve provider/model/key and get consent. Returns (reviewer, None) or (None, exit code)."""
+    from app.analysis import llm_review as lr
+
+    provider = args.provider or os.environ.get("SECUREAGENT_REVIEW_PROVIDER") or "anthropic"
+    try:
+        spec = lr.provider_spec(provider)
+        key = lr.api_key_from_env(provider)
+    except lr.ReviewError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return None, 2
+    model = args.model or os.environ.get("SECUREAGENT_REVIEW_MODEL") or spec.default_model
+    if not args.yes:
+        if not sys.stdin.isatty():
+            print("error: refusing to send anything without --yes in a non-interactive session",
+                  file=sys.stderr)  # fmt: skip
+            return None, 2
+        answer = input(f"Send {what} to {provider} ({model})? [y/N] ").strip().lower()
+        if answer not in {"y", "yes"}:
+            print("Cancelled; nothing was sent.", file=sys.stderr)
+            return None, 1
+    transport = lr.mistral_transport if provider == "mistral" else lr.http_transport
+    return lr.Reviewer(api_key=key, model=model, provider=provider, transport=transport), None
+
+
+def _run_specs(args) -> int:
+    """AI-suggested taint specification (IRIS-style): names and signatures only are sent."""
+    from app.analysis import taint_specs as ts
+    from app.analysis.ingest import iter_source_files, read_text
+    from app.analysis.llm_review import ReviewError, redact_secrets
+
+    sources = []
+    for f in iter_source_files(args.path):
+        if f.relpath.endswith(".py"):
+            with contextlib.suppress(OSError):
+                sources.append((f.relpath, read_text(f)))
+    lines = [redact_secrets(line) for line in ts.candidates(sources)]
+    if not lines:
+        print("No Python APIs found to label.")
+        return 0
+    print(
+        f"Taint-spec suggestion: {len(lines)} API name(s)/signature(s) from "
+        f"{len(sources)} file(s). "
+        "Function bodies and literal values are NOT sent. The model only proposes; the result is "
+        f"written to {ts.FILENAME} for you to review, and scans read that file, not the model.",
+        file=sys.stderr,
+    )
+    if args.dry_run:
+        print(ts.build_prompt(lines))
+        print("\n(dry run: nothing was sent)", file=sys.stderr)
+        return 0
+    reviewer, code = _llm_reviewer(args, f"{len(lines)} API names")
+    if reviewer is None:
+        return code
+    try:
+        spec, dropped = ts.suggest(reviewer, lines)
+    except ReviewError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    target = os.path.join(args.path, ts.FILENAME)
+    if os.path.isfile(target):
+        spec = ts.merge(ts.load(target), spec)
+    body = json.dumps(spec.to_json(), indent=2) + "\n"
+    print(body)
+    if dropped:
+        print(f"Dropped {len(dropped)} name(s) the model invented: {', '.join(dropped[:10])}",
+              file=sys.stderr)  # fmt: skip
+    if args.write:
+        with open(target, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(body)
+        print(f"Wrote {target}. Review it, then commit it; scans pick it up automatically.",
+              file=sys.stderr)  # fmt: skip
+    else:
+        print("Not written. Re-run with --write to save it.", file=sys.stderr)
+    return 0
+
+
+def _run_ai_fix(args, findings) -> int:
+    """AI-drafted fixes for findings with no deterministic fixer, verified like the others."""
+    from app.analysis import llm_review as lr
+    from app.analysis.fixes import FIXERS, apply_patches, verify_ai_fix
+
+    order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
+    todo = sorted(
+        (
+            f
+            for f in findings
+            if f.type in lr.REVIEWABLE
+            and f.type not in FIXERS
+            and f.status not in (FindingStatus.INFORMATIONAL, FindingStatus.FALSE_POSITIVE)
+        ),
+        key=lambda f: (order.get(f.severity.value, 9), -f.confidence, f.endpoint),
+    )[: max(args.limit, 0)]
+    prepared = []
+    for f in todo:
+        path = lr.evidence_path(f.evidence)
+        context = lr.build_context(args.path, f, path)
+        if context is not None:
+            prepared.append((f, path, context))
+    if not prepared:
+        print("No findings to draft AI fixes for.")
+        return 0
+    print(
+        f"AI fix: {len(prepared)} finding(s); redacted code excerpts are sent. Each drafted patch "
+        "is applied to a private copy, parsed and re-scanned; only VERIFIED ones can be written.",
+        file=sys.stderr,
+    )
+    reviewer, code = _llm_reviewer(args, f"code excerpts for {len(prepared)} finding(s)")
+    if reviewer is None:
+        return code
+    patches = []
+    for f, path, context in prepared:
+        try:
+            fix = lr.suggest_fix_text(reviewer, f, context, path)
+        except lr.ReviewError as exc:
+            print(f"\n=== {f.endpoint}  [no fix: {exc}]")
+            continue
+        patch = verify_ai_fix(args.path, f.endpoint, f.type, fix)
+        patches.append(patch)
+        state = "VERIFIED" if patch.verified else "NOT VERIFIED"
+        print(f"\n=== {f.endpoint}  {f.type}  [{state}: {patch.note}]")
+        print(f"  {fix['description']}\n  check: {fix['caveat']}")
+        print((patch.diff or fix["diff"]).rstrip("\n"))
+    verified = [p for p in patches if p.verified]
+    print(f"\n{len(verified)}/{len(patches)} AI patch(es) verified.")
+    if args.apply:
+        # One patch per file at a time: a second patch on the same file would be stale.
+        seen: set[str] = set()
+        unique = [p for p in verified if not (p.path in seen or seen.add(p.path))]
+        written = apply_patches(args.path, unique)
+        print(f"Applied to {len(written)} file(s): {', '.join(written) or 'none'}")
+    return 0
+
+
 def _run_review(args) -> int:
     from app.analysis import llm_review as lr
     from app.analysis.baseline import fingerprint
@@ -401,7 +552,7 @@ def _run_review(args) -> int:
 
     try:
         result = scan_repo(args.path, check_osv=False, exclude=args.exclude)
-    except (IngestError, IntentError, SuppressionError, FileNotFoundError) as exc:
+    except (IngestError, IntentError, SuppressionError, TaintSpecError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     ctx = scan_to_report_context(result)
@@ -527,7 +678,7 @@ def _run_suppress(args) -> int:
     try:
         # Scan without applying existing suppressions so every finding keeps its identity.
         result = scan_repo(args.path, check_osv=False, exclude=args.exclude)
-    except (IngestError, IntentError, SuppressionError, FileNotFoundError) as exc:
+    except (IngestError, IntentError, SuppressionError, TaintSpecError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     result.suppressions = []
@@ -749,7 +900,7 @@ def _open_report(result: ScanResult, scanned: str, written: str | None) -> bool:
     return True
 
 
-_COMMANDS = {"scan", "demo", "benchmark", "fix", "suppress", "review", "-h", "--help"}
+_COMMANDS = {"scan", "demo", "benchmark", "fix", "suppress", "review", "specs", "-h", "--help"}
 
 
 def _expand_shorthand(argv: list[str]) -> list[str]:
@@ -820,6 +971,12 @@ def main(argv: list[str] | None = None) -> int:
         "--no-osv", action="store_true", help="Skip the OSV known-vulnerability lookup (offline)."
     )
     scan.add_argument(
+        "--verify-secrets",
+        action="store_true",
+        help="Ask each secret's provider whether it is still live (GitHub, Slack, Stripe). Sends "
+        "the secret to the provider that issued it, read-only identity check; off by default.",
+    )
+    scan.add_argument(
         "--intent",
         metavar="FILE",
         help="Developer intent spec (JSON rules the code must satisfy). "
@@ -862,6 +1019,16 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Write the VERIFIED patches into the files (unverified ones are never written).",
     )
+    fix.add_argument(
+        "--ai",
+        action="store_true",
+        help="Draft fixes with an LLM for findings that have no deterministic fixer; each draft "
+        "is parsed and re-scanned, and only verified ones can be applied.",
+    )
+    fix.add_argument("--provider", choices=("anthropic", "mistral"), default=None)
+    fix.add_argument("--model", default=None)
+    fix.add_argument("--limit", type=int, default=10, help="Max findings for --ai (default 10).")
+    fix.add_argument("--yes", action="store_true", help="Do not ask before sending (--ai).")
 
     supp = sub.add_parser(
         "suppress",
@@ -874,6 +1041,17 @@ def main(argv: list[str] | None = None) -> int:
     supp.add_argument("--by", help="Who is making the call (default: your user name).")
     supp.add_argument("--expires", help="Re-review date, YYYY-MM-DD (recommended).")
     supp.add_argument("--exclude", action="append", default=[], metavar="PATTERN")
+
+    specs = sub.add_parser(
+        "specs",
+        help="AI-suggested taint sources/sinks/sanitizers for this project (names only are sent).",
+    )
+    specs.add_argument("path", nargs="?", default=".", help="Project directory (default: .)")
+    specs.add_argument("--provider", choices=("anthropic", "mistral"), default=None)
+    specs.add_argument("--model", default=None)
+    specs.add_argument("--dry-run", action="store_true", help="Show exactly what would be sent.")
+    specs.add_argument("--yes", action="store_true", help="Do not ask for confirmation.")
+    specs.add_argument("--write", action="store_true", help="Save to secureagent-taint.json.")
 
     review = sub.add_parser(
         "review",
@@ -925,6 +1103,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_suppress(args)
     if args.command == "review":
         return _run_review(args)
+    if args.command == "specs":
+        return _run_specs(args)
 
     try:
         result = scan_repo(
@@ -934,9 +1114,13 @@ def main(argv: list[str] | None = None) -> int:
             exclude=args.exclude,
             intent=args.intent,
         )
-    except (IngestError, IntentError, SuppressionError, FileNotFoundError) as exc:
+    except (IngestError, IntentError, SuppressionError, TaintSpecError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    if args.verify_secrets and result.secret_findings:
+        from app.analysis.secret_verify import verify_secrets
+
+        result.secret_findings = verify_secrets(args.path, result.secret_findings)
 
     # Unified findings drive baselining, the JSON canonical list, and CI gating.
     from app.analysis.baseline import fails_threshold, fingerprint, load_baseline, write_baseline

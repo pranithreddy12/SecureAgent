@@ -146,6 +146,7 @@ class SecretFinding:
     redacted: str
     fingerprint: str  # non-reversible, for de-duplication only
     gitignored: bool = False  # the file is ignored by git: local, not committed
+    liveness: str | None = None  # live | revoked | unknown, only with --verify-secrets
 
     @property
     def title(self) -> str:

@@ -27,11 +27,35 @@ pip install "git+https://github.com/pranithreddy12/SecureAgent.git#subdirectory=
 Or from a local checkout: `pip install ./backend`. No database, no Docker, nothing to configure —
 it reads your source tree and writes a report. **Only scan code you own or are authorized to test.**
 
-### The six subcommands
+### The seven subcommands
 
 ```
-secureagent {scan,fix,suppress,review,benchmark,demo}
+secureagent {scan,fix,suppress,review,specs,benchmark,demo}
 ```
+
+New in ADR-046 (2026-11-07):
+
+```bash
+secureagent scan . --verify-secrets   # opt-in: ask GitHub/Slack/Stripe whether found keys still work
+secureagent specs . --dry-run         # show the API names an LLM would label (nothing sent)
+secureagent specs . --yes --write     # AI-suggested secureagent-taint.json; review it, then commit it
+secureagent fix . --ai --yes          # LLM-drafted fixes, each parsed + re-scanned; --apply writes verified ones
+pip install "./backend[js]"           # optional tree-sitter JS/TS engine (already in the Docker image)
+```
+
+With the OSV lookup on (the default), dependency findings also carry CISA KEV / FIRST EPSS exploit
+data, whether first-party code imports the package, and a fix `priority`; declared packages are checked
+for typosquats (always, offline) and for names missing from PyPI/npm (online). `--no-osv` turns all
+network lookups off.
+
+`secureagent-taint.json` (project root, optional) teaches the taint engine your wrappers:
+
+```json
+{"sources": ["get_param"], "sinks": {"sql_injection": ["run_sql"]}, "sanitizers": ["quote_ident"]}
+```
+
+Sink types: sql_injection, command_injection, code_injection, ssrf, path_traversal, open_redirect,
+template_injection, nosql_injection, xpath_injection.
 
 #### `scan` — the main command
 
@@ -57,6 +81,7 @@ Full flag reference (`secureagent scan --help`):
 | `--max-files N` | Cap how many files are scanned. |
 | `--exclude PATTERN` | Skip a glob (repeatable); `<path>/.secureagentignore` patterns apply too. |
 | `--no-osv` | Skip the OSV known-vulnerable-dependency lookup (fully offline). |
+| `--verify-secrets` | Opt-in: send each GitHub/Slack/Stripe key found to its own provider's identity endpoint; live keys become `confirmed`. |
 | `--intent FILE` | Your own rules the code must satisfy (defaults to `secureagent-intent.json`). |
 | `--baseline FILE` / `--write-baseline FILE` | Suppress a known set of findings / freeze the current set. |
 | `--fail-on {critical,high,medium,low}` | Exit non-zero only above this severity (new findings in `--since` mode). |
@@ -165,6 +190,16 @@ Useful for code that already lives on the server, or for code you'll audit repea
 Either way: confirm authorization once (it's append-only and revocable, with a visible history), then
 **Run an audit** with an optional exclude-pattern list and the same AI-review checkbox. Every audit for
 that project is listed, each linking to the same live view described above.
+
+### Live targets: the cross-account access check (BOLA)
+
+On a live target's page, open **Cross-account access check (optional)** before starting the audit. Give
+two test accounts of *your own* application as request headers (one `Name: value` per line, e.g.
+`Cookie: session=...`) and up to 50 URLs of objects that belong to account A. The audit fetches each URL
+as A, anonymously and as B (GET only, through the same scope/SSRF policy as every other request). If B
+receives A's object the finding is `confirmed` (`bola`); a 401/403/404 for B is reported as enforced.
+The credentials are kept in memory for that run only and never stored. A failed live audit can be
+retried or resumed from the failed stage; a fresh retry needs the accounts again.
 
 ### Reports
 

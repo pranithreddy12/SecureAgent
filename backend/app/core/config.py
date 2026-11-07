@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     zap_url: str = "http://zap:8080"
     zap_api_key: str = ""
     nuclei_path: str = "nuclei"
+    # Template directories to run (comma-separated). The full ~10k-template set cannot finish
+    # within the scan cap at a polite request rate, so the default is the fast, high-signal part.
+    nuclei_templates: str = "http/exposures,http/misconfiguration,http/exposed-panels"
 
     max_scan_duration: int = Field(1800, gt=0)
     scan_timeout: int = Field(30, gt=0)

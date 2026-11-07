@@ -34,4 +34,6 @@ class AuditState(TypedDict, total=False):
     current_stage: str
     progress: int
     errors: list[dict[str, str]]
+    access_check: dict[str, Any]  # two-account BOLA check input; in memory only, never persisted
+    stage_summary: dict[str, Any]  # a stage's result summary, copied into audit.stage_state
     timestamps: dict[str, dict[str, str | None]]

@@ -22,7 +22,6 @@ IGNORED_DIRS = frozenset(
         ".hg",
         ".svn",
         ".idea",
-        ".vscode",
         "node_modules",
         "bower_components",
         "vendor",
@@ -288,4 +287,5 @@ def _has_binary_extension(name: str) -> bool:
 
 def _is_ignored_hidden(dirname: str) -> bool:
     # Skip hidden tooling dirs (.cache, .git already listed) but keep normal ones.
-    return dirname.startswith(".") and dirname not in {".github", ".gitlab"}
+    # .cursor/.vscode hold MCP client configs (mcp.json), which are security-relevant.
+    return dirname.startswith(".") and dirname not in {".github", ".gitlab", ".cursor", ".vscode"}

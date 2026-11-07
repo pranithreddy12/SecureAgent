@@ -23,6 +23,7 @@ os.environ.setdefault("LANGSMITH_TRACING", "false")
 from langgraph.graph import END, START, StateGraph  # noqa: E402
 
 from app.agents import (  # noqa: E402
+    access_control_agent,
     reconnaissance_agent,
     report_agent,
     safe_validation_agent,
@@ -53,6 +54,7 @@ STAGE_LABELS = {
     "reconnaissance": "Map the live application",
     "attack_surface_processing": "Process the attack surface",
     "vulnerability_scanning": "Scan for vulnerabilities (ZAP + Nuclei + passive)",
+    "access_control_check": "Cross-account access check (two test accounts)",
     "safe_validation": "Safely validate findings (non-destructive)",
     "validator": "Reduce false positives",
     "report_generation": "Generate report",
@@ -63,11 +65,18 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+# Two-account access-check input (credentials of the owner's test accounts), keyed by audit id.
+# Held in process memory only until the runner picks it up -- never written to the database.
+_PENDING_ACCESS_CHECKS: dict[uuid.UUID, dict] = {}
+
+
 class TargetNotReady(Exception):
     """The target failed its readiness check (authorization/safety) at audit-creation time."""
 
 
-async def create_live_audit(db: AsyncSession, user, target: Target) -> SecurityAudit:
+async def create_live_audit(
+    db: AsyncSession, user, target: Target, access_check: dict | None = None
+) -> SecurityAudit:
     ready = authorization_service.readiness(target)
     if not ready.auditable:
         raise TargetNotReady("; ".join(ready.reasons))
@@ -97,15 +106,34 @@ async def create_live_audit(db: AsyncSession, user, target: Target) -> SecurityA
     await db.flush()
     await audit_service._log(db, audit.id, "queued", "Live audit queued (target authorized).")
     await db.commit()
+    if access_check:
+        _PENDING_ACCESS_CHECKS[audit.id] = access_check
     return audit
+
+
+# Gates always re-run on resume: authorization or target safety may have changed since.
+_ALWAYS_RERUN = {"authorization_check", "target_validation"}
 
 
 def _wrap(db: AsyncSession, audit: SecurityAudit, stage: str, agent: str, fn):
     """Persist progress/log around an agent node, the way ``app/pipeline/graph.py`` does for the
-    source pipeline -- the agent functions themselves (``app/agents/*``) are unchanged."""
+    source pipeline -- the agent functions themselves (``app/agents/*``) are unchanged.
+
+    A completed stage's state update is stored in ``stage_state[stage]["output"]`` so a failed
+    audit can resume: a stage that already completed returns its stored output instead of
+    running again (gates excepted)."""
     label = STAGE_LABELS.get(stage, stage)
 
     async def run(state: AuditState) -> dict:
+        if state.get("gate_failed"):
+            return {}  # an earlier stage failed: do not run (or record) anything after it
+        done = (audit.stage_state or {}).get(stage) or {}
+        if stage not in _ALWAYS_RERUN and done.get("completed_at") and "output" in done:
+            await audit_service._log(
+                db, audit.id, "resumed", f"{label}: reused the completed result", agent=agent
+            )
+            await db.commit()
+            return dict(done["output"])
         audit.current_stage = stage
         audit.progress = PROGRESS.get(stage, audit.progress)
         await audit_service._log(db, audit.id, "started", label, agent=agent)
@@ -136,7 +164,11 @@ def _wrap(db: AsyncSession, audit: SecurityAudit, stage: str, agent: str, fn):
             # Same shape the frontend already reads for the source pipeline's stage checklist
             # (``audit.stage_state[key].completed_at``) -- no UI change needed for this part.
             stage_state = dict(audit.stage_state or {})
-            stage_state[stage] = {"completed_at": _now().isoformat()}
+            stage_state[stage] = {
+                "completed_at": _now().isoformat(),
+                **(update.get("stage_summary") or {}),
+                "output": _jsonable(update),
+            }
             audit.stage_state = stage_state
             await audit_service._log(
                 db, audit.id, "completed", label, LogStatus.SUCCESS, agent=agent
@@ -145,6 +177,21 @@ def _wrap(db: AsyncSession, audit: SecurityAudit, stage: str, agent: str, fn):
         return update
 
     return run
+
+
+def _jsonable(update: dict) -> dict:
+    """The stage's state update as plain JSON (pydantic dumps already are); anything else is
+    dropped rather than failing the save."""
+    import json
+
+    out = {}
+    for key, value in update.items():
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            continue
+        out[key] = value
+    return out
 
 
 def _build_graph(db: AsyncSession, audit: SecurityAudit):
@@ -176,6 +223,10 @@ def _build_graph(db: AsyncSession, audit: SecurityAudit):
         ),
     )
     g.add_node(
+        "access_control_check",
+        _wrap(db, audit, "access_control_check", "access-agent", access_control_agent.run),
+    )
+    g.add_node(
         "safe_validation",
         _wrap(db, audit, "safe_validation", "validation-agent", safe_validation_agent.run),
     )
@@ -191,8 +242,9 @@ def _build_graph(db: AsyncSession, audit: SecurityAudit):
     g.add_conditional_edges("target_validation", _after_gate, {"ok": "reconnaissance", "fail": END})
     g.add_edge("reconnaissance", "attack_surface_processing")
     g.add_edge("attack_surface_processing", "vulnerability_scanning")
+    g.add_edge("vulnerability_scanning", "access_control_check")
     g.add_conditional_edges(
-        "vulnerability_scanning",
+        "access_control_check",
         _after_scan,
         {"validate": "safe_validation", "report": "report_generation"},
     )
@@ -290,6 +342,7 @@ async def run_live_audit(db: AsyncSession, audit_id: uuid.UUID) -> None:
         "target_scope": dict(target.scope or {}),
         "demo_mode": False,
         "cancelled": False,
+        "access_check": _PENDING_ACCESS_CHECKS.pop(audit_id, None) or {},
     }
     try:
         final_state = await _build_graph(db, audit).ainvoke(initial)

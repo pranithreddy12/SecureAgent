@@ -11,9 +11,12 @@ from app.workflows.state import AuditState
 
 async def run(state: AuditState) -> dict:
     ctx = _ctx(state)
-    results = []
+    results = list(state.get("validation_results") or [])  # e.g. the access check's own results
+    already = {r["finding_id"] for r in results}
     for raw in state.get("suspected_findings") or []:
         finding = SuspectedFinding.model_validate(raw)
+        if finding.id in already:
+            continue
         if state.get("demo_mode"):
             result = demo_validation(finding)
         else:

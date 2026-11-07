@@ -1,6 +1,6 @@
 # SecureAgent -- what was built, in one place
 
-Status: **2026-10-12.** Delivered as a *grey-box static security auditor* (ADR-014). This document is the
+Status: **2026-10-12**, extended by ADR-046 (2026-11-07; see that ADR for the ten added features). Delivered as a *grey-box static security auditor* (ADR-014). This document is the
 inventory: every capability, where it lives, how it is tested, and its honest limit. Day-to-day state is in
 `PROJECT_MEMORY.md`; history in `PROJECT_CHANGELOG.md`; the requirement mapping in
 `docs/REQUIREMENTS_TRACEABILITY.md`; the verdict against the original brief in `docs/PROJECT_CLOSEOUT.md`.
@@ -101,13 +101,11 @@ gain / hallucination rate is unmeasured (paper RQ5).
 
 ## 8. What does **not** exist
 
-- Real Nuclei verified live end-to-end (ADR-044) -- ZAP has been (a real scan against a live
-  target, 200 genuine alerts); no `nuclei` binary was available in the dev image to do the same
-  for it, so only its graceful-degradation path (`NucleiUnavailable`, logged, audit continues)
-  has been exercised.
-- Resume-from-failed-stage for live audits (source audits have it; live audits restart from
-  scratch on retry).
-- Languages other than Python (deep) and JS/TS (shallow, regex-based).
+- A complete Nuclei scan inside the scan cap: since ADR-046 Nuclei is in the image and has produced
+  real alerts, but even the reduced default template set reaches the 300 s cap at 5 req/s (results
+  are partial, and kept).
+- Languages other than Python (deep) and JS/TS (regex engine, plus an optional tree-sitter engine since
+  ADR-046: 275/361 held-out planted flaws with it vs 274/361 without).
 - Any measured real-world detection rate or LLM accuracy.
 - Per-user LLM keys in the web app (one operator key).
 

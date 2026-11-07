@@ -96,10 +96,36 @@ const LIVE_STAGES = [
   { key: "reconnaissance", label: "Map the live application" },
   { key: "attack_surface_processing", label: "Process the attack surface" },
   { key: "vulnerability_scanning", label: "Scan (ZAP + Nuclei + passive)" },
+  { key: "access_control_check", label: "Cross-account access check" },
   { key: "safe_validation", label: "Safely validate findings" },
   { key: "validator", label: "Reduce false positives" },
   { key: "report_generation", label: "Generate report" },
 ];
+
+type AccessSummary = {
+  skipped?: string;
+  checked?: number;
+  results?: { url: string; verdict: string; note: string }[];
+};
+
+function AccessCheckCard({ summary }: { summary: unknown }) {
+  const s = summary as AccessSummary | undefined;
+  if (!s?.results?.length) return null;
+  return (
+    <Card title={`Cross-account access check (${s.checked} URL(s))`}>
+      <ul className="flex flex-col divide-y divide-border text-sm">
+        {s.results.map((r) => (
+          <li key={r.url} className="flex flex-col py-2">
+            <span className={r.verdict === "exposed" ? "font-semibold text-danger" : ""}>
+              {r.verdict}: <code className="break-all">{r.url}</code>
+            </span>
+            <span className="text-xs text-muted">{r.note}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
 
 function Triage({
   auditId,
@@ -459,6 +485,8 @@ export default function AuditDetailPage() {
       )}
 
       {audit.hardening && <HardeningCard hardening={audit.hardening} />}
+
+      <AccessCheckCard summary={audit.stage_state.access_control_check} />
 
       <Card title={`Findings (${audit.total_findings})`}>
         <div className="mb-4 flex flex-wrap gap-2 text-xs">

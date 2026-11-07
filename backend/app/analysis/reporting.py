@@ -11,6 +11,7 @@ from app.analysis.authz_matrix import build_matrix
 from app.analysis.baseline import fingerprint
 from app.analysis.chains import find_chains
 from app.analysis.hardening import recommend
+from app.analysis.misconfig import SUSPICIOUS
 from app.analysis.routes import PRIVILEGED_PATH
 from app.analysis.scanner import ScanResult
 from app.analysis.suppressions import apply as apply_suppressions
@@ -31,6 +32,31 @@ AUTHORIZATION_STATEMENT = (
 
 
 def _secret_finding(f) -> ReportFinding:
+    live = getattr(f, "liveness", None)
+    if live == "live":
+        return _secret_finding_base(f).model_copy(
+            update={
+                "status": FindingStatus.CONFIRMED,
+                "confidence": 1.0,
+                "status_reason": "The provider accepted this credential (read-only identity "
+                "check, --verify-secrets): a working secret is exposed. Rotate it now.",
+                "validation_method": "provider identity endpoint (opt-in --verify-secrets)",
+                "sources": ["static:secrets", "live:provider-check"],
+            }
+        )
+    if live == "revoked":
+        return _secret_finding_base(f).model_copy(
+            update={
+                "status": FindingStatus.INFORMATIONAL,
+                "status_reason": "The provider rejected this credential (revoked, expired or a "
+                "placeholder). Remove it from the code and history anyway.",
+                "validation_method": "provider identity endpoint (opt-in --verify-secrets)",
+            }
+        )
+    return _secret_finding_base(f)
+
+
+def _secret_finding_base(f) -> ReportFinding:
     ignored = getattr(f, "gitignored", False)
     return ReportFinding(
         title=f.title,
@@ -67,14 +93,17 @@ def _dependency_finding(f) -> ReportFinding:
     severity = f.severity if f.severity != "unknown" else "medium"
     return ReportFinding(
         title=f.title,
-        type="vulnerable_dependency",
+        type="malicious_dependency" if f.malicious else "vulnerable_dependency",
         severity=Severity(severity),
         confidence=f.confidence,
         status=FindingStatus.LIKELY,
         status_reason=f"The lockfile declares {d.name} {d.version}, which has known advisories.",
         endpoint=d.relpath,
         parameter=f"{d.ecosystem}:{d.name}@{d.version}",
-        description=f"{len(f.vulns)} known advisory/advisories affect this version: {ids}.",
+        description=(
+            f"{len(f.vulns)} known advisory/advisories affect this version: {ids}. "
+            f"Fix priority: {f.priority} ({f.priority_reason})."
+        ),
         impact="Known-vulnerable dependencies can be exploited through your application.",
         evidence="; ".join(f"{v.id} [{v.severity}] {v.summary}".strip() for v in f.vulns[:10]),
         validation_method="dependency manifest matched against the OSV database",
@@ -86,8 +115,15 @@ def _dependency_finding(f) -> ReportFinding:
             if top
             else None  # no published v3 vector: stays "CVSS not determined"
         ),
-        remediation="Upgrade to a non-vulnerable version listed in the advisories.",
-        sources=["static:dependencies(osv)"],
+        remediation=(
+            "Remove this package now and rotate any credentials the machine that installed it "
+            "could reach: OSV lists it as malicious, not merely vulnerable."
+            if f.malicious
+            else "Upgrade to a non-vulnerable version listed in the advisories."
+        ),
+        sources=["static:dependencies(osv)"]
+        + (["intel:cisa-kev"] if f.kev else [])
+        + (["intel:first-epss"] if f.epss is not None else []),
     )
 
 
@@ -162,8 +198,13 @@ def _misconfig_finding(f) -> ReportFinding:
         type=f.category,
         severity=Severity(f.severity),
         confidence=f.confidence,
-        status=FindingStatus.LIKELY,  # the setting is present in the source
-        status_reason="Insecure configuration present in source.",
+        # the setting is present in the source; supply-chain name checks are only a reason to look
+        status=FindingStatus.SUSPICIOUS if f.category in SUSPICIOUS else FindingStatus.LIKELY,
+        status_reason=(
+            "A declared package name needs a human check (see the evidence)."
+            if f.category in SUSPICIOUS
+            else "Insecure configuration present in source."
+        ),
         endpoint=f"{f.relpath}:{f.line}",
         evidence=f"{f.rule} — {f.evidence}",
         validation_method="static configuration analysis",

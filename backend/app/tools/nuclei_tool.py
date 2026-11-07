@@ -38,6 +38,9 @@ def run_nuclei(target_url: str, ctx: RequestContext) -> list[RawToolAlert]:
         "-exclude-tags",
         EXCLUDED_TAGS,
     ]
+    for template in (t.strip() for t in settings.nuclei_templates.split(",")):
+        if template and not template.startswith("-"):
+            cmd += ["-t", template]
     try:
         proc = subprocess.run(  # noqa: S603 - argv list from settings + validated URL, never shell
             cmd,
@@ -46,11 +49,19 @@ def run_nuclei(target_url: str, ctx: RequestContext) -> list[RawToolAlert]:
             check=False,
             shell=False,
         )
+        stdout = proc.stdout
     except FileNotFoundError as exc:
         raise NucleiUnavailable("Nuclei binary is not installed") from exc
     except subprocess.TimeoutExpired as exc:
-        raise NucleiUnavailable("Nuclei timed out") from exc
-    stdout = proc.stdout[:MAX_STDOUT]
+        # Keep what was found before the cap instead of discarding a long scan's results.
+        stdout = exc.stdout or b""
+        if not stdout:
+            raise NucleiUnavailable("Nuclei timed out before reporting anything") from exc
+    return parse_output(stdout, target_url, ctx)
+
+
+def parse_output(stdout: bytes, target_url: str, ctx: RequestContext) -> list[RawToolAlert]:
+    stdout = stdout[:MAX_STDOUT]
     alerts: list[RawToolAlert] = []
     for line in stdout.splitlines()[:500]:
         try:

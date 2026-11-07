@@ -1334,3 +1334,32 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
 - Audit fixes: `expiry` counts as payment only with payment context (`card_expiry` explicit); `pin_code` is
   not a credential; data detection skips test/fixture/example paths (`validation.is_test_path`, shared with
   the `test_or_example_code` rule).
+
+## 2026-11-07 (ten research-driven features -- ADR-046)
+
+- Dependencies: CISA KEV + FIRST EPSS lookup (`exploit_intel.py`, keyless, KEV cached 24 h), import
+  reachability (`reachability.py`), fix-order `priority` (urgent/high/normal/low) shown in CLI/JSON/report;
+  OSV aliases give GHSA advisories their CVE; `MAL-` advisories -> "Malicious package", critical.
+- Supply chain: typosquat check (offline) and public-registry existence check (online, OSV switch) on
+  declared packages (`supply_chain.py`) -> `typosquat_package` / `unregistered_package` (suspicious).
+- AI apps: LLM API output is a taint source (OWASP LLM05); request data in system/developer prompts ->
+  `prompt_injection` (LLM01); `@mcp.tool` / `@tool` arguments are untrusted; MCP client configs
+  (unpinned `npx`/`uvx` servers, plain-http remote servers); LLM keys in NEXT_PUBLIC_/VITE_ vars or
+  `dangerouslyAllowBrowser`. `.vscode` / `.cursor` are now ingested (they hold `mcp.json`).
+- Live: two-account BOLA check stage (`access_control_check`) with an optional form on the target page;
+  confirmed `bola` findings; credentials in memory only. Live audits can be retried / resumed from the
+  failed stage (stage outputs stored in `stage_state`); stages after a failure no longer run.
+- Nuclei: pinned v3.4.2 in the backend image (sha256-verified); first real run found 2 genuine alerts
+  and two bugs (full template set exceeds the cap; timeout discarded all output) -- fixed with
+  `NUCLEI_TEMPLATES` and partial-output parsing.
+- `secureagent specs` (AI-suggested `secureagent-taint.json`, names/signatures only) and engine support
+  for project taint specs; `secureagent fix --ai` and the web AI fix now verify AI patches like the
+  deterministic ones; `scan --verify-secrets` (opt-in GitHub/Slack/Stripe liveness).
+- Optional tree-sitter JS/TS engine (`js_ast.py`, `secureagent[js]`; in the Docker image) adding
+  per-function scope, argument-level sinks and one-hop helper flow on top of the regex engine.
+- Evidence: 712 backend passed (2 skipped), 47 Vitest, benchmark unchanged 98%/98%.
+- Held-out recall re-measured on fresh clones of all 35 apps at their pinned commits: 274/361 before
+  (the old "273" was stale), 275/361 (76.2%) with the tree-sitter engine; the only added findings across
+  all apps are two genuine SSRFs; no new findings in clean files / fixed dirs. The measurement exposed
+  three typosquat false positives (grequests, djongo, scapy) -> the rule now matches only typing slips
+  (transposition, doubled letter, dropped letter).

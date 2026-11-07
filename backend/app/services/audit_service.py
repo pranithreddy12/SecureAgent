@@ -195,7 +195,7 @@ async def reset_for_retry(
     Either way the original request (path, exclude patterns, authorization) is kept: a retry
     re-runs the *same* authorized analysis, it does not widen it.
     """
-    if audit.audit_type != "source" or audit.status is not AuditStatus.FAILED:
+    if audit.audit_type not in {"source", "live"} or audit.status is not AuditStatus.FAILED:
         raise AuditNotRetryable
     state = dict(audit.stage_state or {})
     if resume:
@@ -206,7 +206,9 @@ async def reset_for_retry(
     else:
         await db.execute(delete(Vulnerability).where(Vulnerability.audit_id == audit.id))
         await db.execute(delete(SecurityReport).where(SecurityReport.audit_id == audit.id))
-        audit.stage_state = {"exclude": list(state.get("exclude", []))}
+        audit.stage_state = (
+            {"exclude": list(state.get("exclude", []))} if audit.audit_type == "source" else {}
+        )
         audit.started_at = None
     audit.status = AuditStatus.QUEUED
     audit.current_stage = None

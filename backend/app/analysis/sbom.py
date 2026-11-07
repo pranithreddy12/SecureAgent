@@ -76,7 +76,9 @@ def to_cyclonedx(result: ScanResult) -> dict[str, Any]:
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "tools": [{"vendor": "SecureAgent", "name": "secureagent", "version": SECUREAGENT_VERSION}],
+            "tools": [
+                {"vendor": "SecureAgent", "name": "secureagent", "version": SECUREAGENT_VERSION}
+            ],
             "component": {"type": "application", "name": "scanned-project"},
         },
         "components": components,

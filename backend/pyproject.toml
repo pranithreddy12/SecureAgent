@@ -8,6 +8,8 @@ dependencies = ["jinja2>=3.1", "pydantic>=2"]
 
 [project.optional-dependencies]
 pdf = ["weasyprint>=63"]  # `secureagent ... --pdf` (needs Pango; present in the Docker image)
+# Syntax-tree JS/TS taint engine (app/analysis/js_ast.py); without it the regex engine runs alone.
+js = ["tree-sitter>=0.25", "tree-sitter-javascript>=0.25", "tree-sitter-typescript>=0.23"]
 
 [project.scripts]
 secureagent = "app.cli:main"

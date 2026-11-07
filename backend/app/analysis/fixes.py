@@ -320,3 +320,72 @@ def apply_patches(root: str, patches: Sequence[FilePatch]) -> list[str]:
         os.replace(tmp, path)
         written.append(p.path)
     return written
+
+
+# --------------------------------------------------------------------------- AI-drafted patches
+
+
+def apply_loose_diff(original: str, diff: str) -> str | None:
+    """Apply a model's "unified-diff style" hunk to ``original``.
+
+    Context (' ') and removed ('-') lines must appear in the file exactly once, as one contiguous
+    block (compared without trailing whitespace); they are replaced by context + added ('+') lines,
+    keeping the file's line endings. Anything ambiguous returns None -- never a guess."""
+    old: list[str] = []
+    new: list[str] = []
+    for raw in diff.splitlines():
+        if raw.startswith(("---", "+++", "@@")) or raw.strip() == "```" or raw.startswith("```"):
+            continue
+        tag, body = (raw[:1], raw[1:]) if raw[:1] in {"+", "-", " "} else (" ", raw)
+        if tag in {" ", "-"}:
+            old.append(body)
+        if tag in {" ", "+"}:
+            new.append(body)
+    while old and not old[-1].strip() and new and not new[-1].strip():
+        old.pop()
+        new.pop()
+    if not old or old == new:
+        return None
+    lines = original.splitlines(keepends=True)
+    bare = [ln.rstrip("\r\n").rstrip() for ln in lines]
+    want = [ln.rstrip() for ln in old]
+    hits = [i for i in range(len(bare) - len(want) + 1) if bare[i : i + len(want)] == want]
+    if len(hits) != 1:
+        return None
+    i = hits[0]
+    ending = "\r\n" if lines[i].endswith("\r\n") else "\n"
+    replacement = [ln + ending for ln in new]
+    if i + len(want) == len(lines) and not lines[-1].endswith(("\n", "\r")):
+        replacement[-1] = replacement[-1].rstrip("\r\n") if replacement else ""
+    return "".join([*lines[:i], *replacement, *lines[i + len(want) :]])
+
+
+def verify_ai_fix(root: str, endpoint: str, finding_type: str, fix: dict[str, str]) -> FilePatch:
+    """Put an AI-drafted fix through the same check as the deterministic fixers: it must apply
+    cleanly, parse, remove the finding on re-scan, and add no new finding type. The returned
+    patch is ``verified`` only if all of that holds; ``apply_patches`` writes nothing else."""
+    m = _LOCATION.match(endpoint or "")
+    rel = m["file"] if m else ""
+    line = int(m["line"]) if m else 0
+    root_path = Path(root).resolve()
+    path = (root_path / rel).resolve()
+    if not rel or root_path not in path.parents or path.is_symlink() or not path.is_file():
+        return FilePatch(rel, "", "", note="file not found inside the project; not verified")
+    original = path.read_bytes().decode("utf-8", errors="replace")
+    change = Change(
+        line,
+        finding_type,
+        f"AI-drafted: {fix.get('description', '').strip()}",
+        fix.get("caveat", "").strip() or "Review the change; it was written by a language model.",
+    )
+    patched = apply_loose_diff(original, fix.get("diff", ""))
+    if patched is None:
+        return FilePatch(
+            rel, original, original, [change],
+            note="the AI diff does not match the file exactly once; not verified",
+        )  # fmt: skip
+    patch = FilePatch(rel, original, patched, [change])
+    _verify(patch)
+    if not patch.verified and "re-scan still reports" in patch.note:
+        patch.note += " (single-file re-scan; cross-file findings cannot be re-checked this way)"
+    return patch

@@ -24,6 +24,7 @@ PROGRESS = {
     "reconnaissance": 30,
     "attack_surface_processing": 35,
     "vulnerability_scanning": 60,
+    "access_control_check": 68,
     "safe_validation": 75,
     "validator": 85,
     "report_generation": 95,

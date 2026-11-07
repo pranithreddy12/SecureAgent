@@ -12,6 +12,7 @@ from app.analysis.access_control import IdorFinding, analyze_access_control
 from app.analysis.authz_matrix import authz_outliers
 from app.analysis.business_logic import LogicFinding, analyze_business_logic
 from app.analysis.dependencies import Dependency, is_lockfile, parse_dependencies
+from app.analysis.exploit_intel import ExploitIntelClient, priority
 from app.analysis.gitignore import GitIgnore
 from app.analysis.hardening import LOCKS, MANIFESTS, recommend
 from app.analysis.ingest import (
@@ -30,7 +31,9 @@ from app.analysis.intent import (
     load_profile,
 )
 from app.analysis.logging_checks import LoggingFinding, scan_logging
+from app.analysis.misconfig import CATEGORY as MISCONFIG_CATEGORY
 from app.analysis.misconfig import MisconfigFinding, scan_misconfig
+from app.analysis.misconfig import MisconfigFinding as _MisconfigFinding
 from app.analysis.openapi_spec import (
     SPEC_HANDLERS,
     SPEC_OPERATIONS,
@@ -40,6 +43,7 @@ from app.analysis.openapi_spec import (
     parse_spec,
 )
 from app.analysis.osv import OsvClient, OsvError, Vuln
+from app.analysis.reachability import imported_modules, is_imported
 from app.analysis.recon import ApplicationModel
 from app.analysis.routes import (
     Route,
@@ -50,13 +54,24 @@ from app.analysis.routes import (
 )
 from app.analysis.secrets import SecretFinding
 from app.analysis.sinks import SinkFinding, scan_sinks
+from app.analysis.supply_chain import (
+    DeclaredPackage,
+    RegistryClient,
+    declared_packages,
+    typosquat_target,
+)
 from app.analysis.suppressions import FILENAME as SUPPRESSIONS_FILENAME
 from app.analysis.suppressions import Suppression
 from app.analysis.suppressions import load as load_suppressions
 from app.analysis.taint import JS_EXTENSIONS, TaintFinding, analyze_taint_project
+from app.analysis.taint_specs import FILENAME as TAINT_SPEC_FILENAME
+from app.analysis.taint_specs import TaintSpec
+from app.analysis.taint_specs import active as taint_spec_active
+from app.analysis.taint_specs import load as load_taint_spec
 from app.analysis.workflow import analyze_workflow
 from app.schemas.report import HardeningSummary
 
+PRIORITY_ORDER = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4, "informational": 5}
 
 # `# secureagent: ignore`, `// secureagent:ignore`, ... on the line a finding is reported at.
@@ -69,11 +84,40 @@ class DependencyFinding:
     vulns: list[Vuln]
     severity: str
     confidence: float
+    kev: bool = False  # a CVE of this package is on CISA's Known Exploited Vulnerabilities list
+    epss: float | None = None  # highest FIRST EPSS probability among its CVEs (None = unknown)
+    imported: bool | None = None  # first-party code imports it (None = cannot tell)
+
+    @property
+    def malicious(self) -> bool:
+        return any(v.malicious for v in self.vulns)
 
     @property
     def title(self) -> str:
         d = self.dependency
-        return f"Vulnerable dependency: {d.name} {d.version}"
+        kind = "Malicious package" if self.malicious else "Vulnerable dependency"
+        return f"{kind}: {d.name} {d.version}"
+
+    @property
+    def priority(self) -> str:
+        if self.malicious:
+            return "urgent"
+        return priority(self.kev, self.epss, self.imported, self.severity)
+
+    @property
+    def priority_reason(self) -> str:
+        parts = []
+        if self.malicious:
+            parts.append("OSV lists this package as malicious")
+        if self.kev:
+            parts.append("on CISA KEV: exploited in the wild")
+        if self.epss is not None:
+            parts.append(f"EPSS {self.epss:.1%} chance of exploitation in 30 days")
+        if self.imported is True:
+            parts.append("imported by first-party code")
+        elif self.imported is False:
+            parts.append("not imported directly by first-party code (may be transitive)")
+        return "; ".join(parts) or "no exploit intelligence available"
 
     @property
     def worst_cvss(self) -> Vuln | None:
@@ -189,7 +233,12 @@ class ScanResult:
     def ordered_dependency_findings(self) -> list[DependencyFinding]:
         return sorted(
             self.dependency_findings,
-            key=lambda f: (SEVERITY_ORDER.get(f.severity, 9), f.dependency.name),
+            key=lambda f: (
+                PRIORITY_ORDER[f.priority],
+                SEVERITY_ORDER.get(f.severity, 9),
+                -(f.epss or 0.0),
+                f.dependency.name,
+            ),
         )
 
     def severity_counts(self) -> dict[str, int]:
@@ -224,6 +273,8 @@ def scan_repo(
     exclude: Sequence[str] = (),
     intent: str | None = None,
     suppressions: str | None = None,
+    intel_client: ExploitIntelClient | None = None,
+    registry_client: RegistryClient | None = None,
 ) -> ScanResult:
     """Ingest ``root`` (read-only) and run all static analysers (see ``_scan_repo``).
 
@@ -245,16 +296,21 @@ def scan_repo(
             continue
     handlers = SPEC_HANDLERS.set(frozenset({o.function for o in ops} | url_views))
     operations = SPEC_OPERATIONS.set(tuple(ops))
+    spec_path = os.path.join(str(root), TAINT_SPEC_FILENAME)
+    spec = load_taint_spec(spec_path) if os.path.isfile(spec_path) else TaintSpec()
     try:
-        return _scan_repo(
-            root,
-            max_files=max_files,
-            check_osv=check_osv,
-            osv_client=osv_client,
-            exclude=exclude,
-            intent=intent,
-            suppressions=suppressions,
-        )
+        with taint_spec_active(spec):
+            return _scan_repo(
+                root,
+                max_files=max_files,
+                check_osv=check_osv,
+                osv_client=osv_client,
+                exclude=exclude,
+                intent=intent,
+                suppressions=suppressions,
+                intel_client=intel_client,
+                registry_client=registry_client,
+            )
     finally:
         SPEC_OPERATIONS.reset(operations)
         SPEC_HANDLERS.reset(handlers)
@@ -269,6 +325,8 @@ def _scan_repo(
     exclude: Sequence[str] = (),
     intent: str | None = None,
     suppressions: str | None = None,
+    intel_client: ExploitIntelClient | None = None,
+    registry_client: RegistryClient | None = None,
 ) -> ScanResult:
     """Ingest ``root`` (read-only) and run all static analysers.
 
@@ -296,6 +354,7 @@ def _scan_repo(
 
     gitignore = GitIgnore.from_root(root)
     taint_sources: list[tuple[str, str]] = []
+    declared: list[DeclaredPackage] = []
     ignored_lines: dict[str, set[int]] = {}
     file: SourceFile
     for file in iter_source_files(root, **kwargs):
@@ -322,6 +381,7 @@ def _scan_repo(
             taint_sources.append((file.relpath, text))
         if is_lockfile(file.relpath):
             result.dependencies.extend(parse_dependencies(file.relpath, text))
+        declared.extend(declared_packages(file.relpath, text))
         base = file.relpath.rsplit("/", 1)[-1].lower()
         if base in MANIFESTS:
             result.manifests.append(file.relpath)
@@ -357,8 +417,15 @@ def _scan_repo(
     _dedupe_route_findings(result)
     _apply_inline_ignores(result, ignored_lines)
 
+    # The live feeds (KEV/EPSS, registry existence) follow the OSV switch; with an injected OSV
+    # client (tests, offline callers) they run only when injected too.
+    if check_osv and osv_client is None:
+        intel_client = intel_client or ExploitIntelClient()
+        registry_client = registry_client or RegistryClient()
+    _check_declared_packages(result, declared, registry_client if check_osv else None)
     if check_osv and result.dependencies:
         _run_osv(result, osv_client or OsvClient())
+        _annotate_dependencies(result, intel_client, imported_modules(taint_sources))
     elif result.dependencies:
         result.osv_note = "Known-vulnerability lookup skipped (--no-osv)."
 
@@ -425,7 +492,57 @@ def _run_osv(result: ScanResult, client: OsvClient) -> None:
                 DependencyFinding(
                     dependency=dep,
                     vulns=vulns,
-                    severity=_worst_severity(vulns),
+                    severity=(
+                        "critical" if any(v.malicious for v in vulns) else _worst_severity(vulns)
+                    ),
                     confidence=0.9,  # the lockfile declares this exact affected version
                 )
             )
+
+
+def _check_declared_packages(
+    result: ScanResult, declared: list[DeclaredPackage], registry: RegistryClient | None
+) -> None:
+    """Typosquat names (offline) and names the public registry does not know (online)."""
+
+    def add(category: str, pkg: DeclaredPackage, rule: str) -> None:
+        sev, conf = MISCONFIG_CATEGORY[category][3], MISCONFIG_CATEGORY[category][4]
+        result.misconfig_findings.append(
+            _MisconfigFinding(category, rule, sev, conf, pkg.relpath, pkg.line, pkg.name)
+        )
+
+    for pkg in declared:
+        target = typosquat_target(pkg.ecosystem, pkg.name)
+        if target:
+            add("typosquat_package", pkg, f"{pkg.name} is one edit away from {target}")
+    if registry is not None and declared:
+        for pkg in registry.missing(declared):
+            add("unregistered_package", pkg, f"{pkg.ecosystem} has no package named {pkg.name}")
+
+
+def _annotate_dependencies(
+    result: ScanResult,
+    intel_client: ExploitIntelClient | None,
+    imports: tuple[set[str], set[str], bool, bool],
+) -> None:
+    """Attach KEV / EPSS / import reachability to dependency findings (never drops one)."""
+    intel = None
+    if intel_client is not None and result.dependency_findings:
+        intel = intel_client.lookup(
+            {v.cve for f in result.dependency_findings for v in f.vulns if v.cve}
+        )
+        if intel.note:
+            result.osv_note = " ".join(n for n in (result.osv_note, intel.note) if n)
+    annotated = []
+    for f in result.dependency_findings:
+        cves = {v.cve for v in f.vulns if v.cve}
+        scores = [intel.epss[c] for c in cves if intel and c in intel.epss]
+        annotated.append(
+            replace(
+                f,
+                kev=bool(intel and cves & intel.kev),
+                epss=max(scores) if scores else None,
+                imported=is_imported(f.dependency, imports),
+            )
+        )
+    result.dependency_findings = annotated

@@ -18,6 +18,7 @@ import re
 from dataclasses import dataclass
 
 from app.analysis import extra_detectors as xd
+from app.analysis import taint_specs
 from app.analysis.openapi_spec import SPEC_HANDLERS
 from app.analysis.routes import _CBV_BASE_HINTS, _CBV_METHOD_MAP, HTTP_METHODS
 
@@ -107,6 +108,13 @@ TAINT_META = {
         "Scope the lookup to the authenticated user (owner / tenant) as well as the id.",
         False,
     ),
+    "prompt_injection": (
+        "CWE-1427",
+        "LLM01:2025 Prompt Injection",
+        "Keep the system prompt fixed. Put user text only in a user-role message, delimit it, and "
+        "never let it change the model's instructions or tool permissions.",
+        False,
+    ),
 }
 SEVERITY = {
     "sql_injection": "high",
@@ -122,6 +130,7 @@ SEVERITY = {
     "idor": "high",
     "mass_assignment": "high",
     "sensitive_data_in_log": "medium",
+    "prompt_injection": "medium",
 }
 
 
@@ -178,7 +187,14 @@ def analyze_taint_project(sources: list[tuple[str, str]]) -> list[TaintFinding]:
 
     for relpath, text in sources:
         if relpath.endswith(JS_EXTENSIONS):
-            findings += _js_taint(relpath, text)
+            js = _js_taint(relpath, text)
+            findings += js
+            from app.analysis import js_ast  # optional tree-sitter engine; adds, never removes
+
+            have = {(f.vuln_type, f.line) for f in js}
+            findings += [
+                f for f in js_ast.analyze(relpath, text) if (f.vuln_type, f.line) not in have
+            ]
             continue
         if not relpath.endswith(".py"):
             continue
@@ -205,7 +221,7 @@ def analyze_taint_project(sources: list[tuple[str, str]]) -> list[TaintFinding]:
     ctxs = {rel: _Ctx(funcs, 0, {}) for rel, _t, _l, funcs, _i in parsed}
     for relpath, ptree, _lines, _funcs, _imports in parsed:
         for func in _all_function_nodes(ptree):
-            if _is_handler(func):
+            if _is_entry(func):
                 tainted = _function_tainted(func, _handler_param_taint(func), ctxs.get(relpath))
                 findings += _propagate_cross(
                     func, relpath, tainted, gfuncs, imports_by_file, 0, set(), ctxs
@@ -306,11 +322,11 @@ def _python_taint_tree(tree, relpath: str, lines: list[str], functions: dict) ->
     ctx = _Ctx(functions, 0, {})
     all_funcs = _all_function_nodes(tree)
     for func in all_funcs:
-        init = _handler_param_taint(func) if _is_handler(func) else set()
+        init = _handler_param_taint(func) if _is_entry(func) else set()
         tainted = _function_tainted(func, init, ctx)
         findings += _sinks_in_function(func, tainted, relpath, lines, ctx)
     for func in all_funcs:
-        if _is_handler(func):
+        if _is_entry(func):
             tainted = _function_tainted(func, _handler_param_taint(func), ctx)
             findings += _propagate(func, tainted, functions, relpath, lines, 0, set(), ctx)
     return findings
@@ -577,7 +593,12 @@ def _function_tainted(
     tainted.parents = {}
     tainted.orm_names = _orm_statement_names(func)
     if origins is None:  # entry point: its parameters are the request input
-        origins = {n: [f"handler parameter `{n}` (request input)"] for n in initial}
+        label = (
+            "tool argument `{}` (chosen by an LLM: untrusted)"
+            if _is_tool(func) and not _is_handler(func)
+            else "handler parameter `{}` (request input)"
+        )
+        origins = {n: [label.format(n)] for n in initial}
     tainted.origins = origins
     assigns = _collect_assignments_lined(func)
     changed = True
@@ -672,9 +693,10 @@ def _trace_expr(expr, tainted, relpath: str, ctx: _Ctx | None = None) -> list[st
                 )
                 return
             if _is_source(sub):
-                steps.append(
-                    f"{relpath}:{getattr(sub, 'lineno', '?')}  {_short(sub)}  (request input)"
+                origin = (
+                    "LLM output: untrusted" if getattr(sub, "_sa_llm", False) else "request input"
                 )
+                steps.append(f"{relpath}:{getattr(sub, 'lineno', '?')}  {_short(sub)}  ({origin})")
                 return
 
     def from_name(name: str) -> None:
@@ -686,7 +708,10 @@ def _trace_expr(expr, tainted, relpath: str, ctx: _Ctx | None = None) -> list[st
         if name in parents:
             lineno, value = parents[name]
             if _is_source(value):  # `q = request.args.get("q")`: one step, not two
-                steps.append(f"{relpath}:{lineno}  {name} = {_short(value)}  (request input)")
+                origin = (
+                    "LLM output: untrusted" if getattr(value, "_sa_llm", False) else "request input"
+                )
+                steps.append(f"{relpath}:{lineno}  {name} = {_short(value)}  ({origin})")
                 return
             from_expr(value)
             steps.append(f"{relpath}:{lineno}  {name} = {_short(value)}")
@@ -788,6 +813,11 @@ def _check_sink(
     kw = {k.arg: k.value for k in call.keywords if k.arg}
     a0 = args[0] if args else None
 
+    spec_sink = getattr(call, "_sa_spec_sink", None)
+    if spec_sink and any(_tainted(a, tainted, ctx) for a in [*args, *kw.values()]):
+        return spec_sink, f"{name} [taint spec]"
+    if getattr(call, "_sa_llm", False):
+        return ("prompt_injection", name) if _system_prompt_tainted(call, tainted, ctx) else None
     if (
         last in {"execute", "executemany", "executescript", "raw"}
         and _tainted(a0, tainted, ctx)
@@ -1202,6 +1232,90 @@ def _mark_http_server_handlers(tree: ast.AST) -> None:
                     node._sa_source = True  # type: ignore[attr-defined]
 
 
+_LLM_CALL_SUFFIXES = (
+    "chat.completions.create",  # OpenAI-compatible (OpenAI, Groq, Together, vLLM, ...)
+    "completions.create",
+    "responses.create",
+    "messages.create",  # Anthropic
+    "generate_content",  # Google Gemini
+    "chat.complete",  # Mistral
+    "ollama.chat",
+    "ollama.generate",
+    "litellm.completion",
+)
+_LANGCHAIN_CALLS = {"invoke", "ainvoke"}
+
+
+def _mark_llm_calls(tree: ast.AST) -> None:
+    """Mark calls to an LLM API: their *output* is untrusted (OWASP LLM05: improper output
+    handling), and their system prompt is a prompt-injection sink (LLM01).
+
+    LangChain-style ``.invoke()`` is only treated as an LLM call in a module that imports
+    LangChain / LangGraph / LlamaIndex, so an unrelated ``.invoke`` is not."""
+    imports_lc = any(
+        isinstance(n, (ast.Import, ast.ImportFrom))
+        and any(
+            (m or "").split(".")[0] in {"langchain", "langchain_core", "langgraph", "llama_index"}
+            or (m or "").startswith("langchain_")
+            for m in ([a.name for a in n.names] if isinstance(n, ast.Import) else [n.module])
+        )
+        for n in ast.walk(tree)
+    )
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _dotted(node.func) or ""
+        last = name.rsplit(".", 1)[-1]
+        if name.endswith(_LLM_CALL_SUFFIXES) or (
+            imports_lc and last in _LANGCHAIN_CALLS and "." in name
+        ):
+            node._sa_source = True  # type: ignore[attr-defined]
+            node._sa_llm = True  # type: ignore[attr-defined]
+
+
+def _mark_spec_apis(tree: ast.AST) -> None:
+    """Apply the project's taint spec (``secureagent-taint.json``): extra sources and sinks."""
+    spec = taint_specs.ACTIVE.get()
+    if not (spec.sources or spec.sinks):
+        return
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _dotted(node.func) or ""
+        if spec.sources and taint_specs.matches(name, spec.sources):
+            node._sa_source = True  # type: ignore[attr-defined]
+        for api, vuln_type in spec.sinks.items():
+            if name == api or name.endswith("." + api):
+                node._sa_spec_sink = vuln_type  # type: ignore[attr-defined]
+                break
+
+
+def _system_prompt_tainted(call: ast.Call, tainted: set[str], ctx) -> bool:
+    """Request data in the *instructions* of an LLM call (not in a user-role message)."""
+    for kw in call.keywords:
+        if kw.arg in {"system", "instructions", "system_instruction"} and _tainted(
+            kw.value, tainted, ctx
+        ):
+            return True
+        if kw.arg == "messages" and isinstance(kw.value, ast.List):
+            for msg in kw.value.elts:
+                if not isinstance(msg, ast.Dict):
+                    continue
+                fields = {
+                    k.value: v
+                    for k, v in zip(msg.keys, msg.values, strict=False)
+                    if isinstance(k, ast.Constant)
+                }
+                role = fields.get("role")
+                if (
+                    isinstance(role, ast.Constant)
+                    and role.value in {"system", "developer"}
+                    and _tainted(fields.get("content"), tainted, ctx)
+                ):
+                    return True
+    return False
+
+
 def _mark_constant_lookups(tree: ast.AST) -> None:
     """Mark ``CONFIG[key]`` / ``CONFIG.get(key)`` where CONFIG is a module-level dict literal.
 
@@ -1255,6 +1369,8 @@ def mark_view_handlers(tree: ast.AST) -> None:
     the requesting user are additionally marked ``_sa_scoped`` (ownership enforced there)."""
     _mark_constant_lookups(tree)
     _mark_http_server_handlers(tree)
+    _mark_llm_calls(tree)
+    _mark_spec_apis(tree)
     spec_handlers = SPEC_HANDLERS.get()
     if spec_handlers:  # functions named by an OpenAPI operationId
         for fn in ast.walk(tree):
@@ -1292,6 +1408,24 @@ def _get_queryset_scopes_to_user(cls: ast.ClassDef) -> bool:
 
 def _all_function_nodes(tree: ast.AST) -> list:
     return [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+
+
+def _is_tool(func) -> bool:
+    """An MCP server tool (``@mcp.tool()``, ``@server.tool``) or an agent tool (``@tool``).
+
+    Its arguments are chosen by a language model that may be steered by prompt injection, so for
+    taint purposes they are untrusted input -- the agentic equivalent of request parameters."""
+    for dec in func.decorator_list:
+        f = dec.func if isinstance(dec, ast.Call) else dec
+        if (isinstance(f, ast.Attribute) and f.attr == "tool") or (
+            isinstance(f, ast.Name) and f.id == "tool"
+        ):
+            return True
+    return False
+
+
+def _is_entry(func) -> bool:
+    return _is_handler(func) or _is_tool(func)
 
 
 def _is_handler(func) -> bool:
@@ -1399,6 +1533,9 @@ def _is_basename_or_char_filter(n: ast.AST) -> bool:
 def _is_sanitizer_call(call: ast.Call) -> bool:
     name = _dotted(call.func) or ""
     if name.rsplit(".", 1)[-1] in _SANITIZER_NAMES:
+        return True
+    sanitizers = taint_specs.ACTIVE.get().sanitizers
+    if sanitizers and taint_specs.matches(name, sanitizers):
         return True
     return any(name == d or name.endswith("." + d) for d in _SANITIZER_DOTTED)
 
