@@ -665,5 +665,5 @@ passed (2 skipped), 43 Vitest, benchmark unchanged at 98%/98%. New tests live in
 `tests/test_hardening_recommendations.py` (`test_hardening.py` already covers login throttling).
 Not evaluated for usefulness. Audited 2026-11-02: three false triggers fixed with regression tests
 (`token_expiry` -> payment, `pin_code` -> credentials, test/fixture files feeding data categories; data
-detection now uses `validation.is_test_path`). Open minor gaps: report TOC links section 20 even when absent;
-web triage does not recompute `related_findings`; no end-to-end suppressions-file test for hardening.
+detection now uses `validation.is_test_path`). The three minor gaps (report TOC linking absent section 20; web
+triage not adjusting `related_findings`; no end-to-end suppressions-file test) were closed 2026-11-13.

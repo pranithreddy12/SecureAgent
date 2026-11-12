@@ -174,3 +174,14 @@ def test_demo_report_leads_with_the_critical_issue() -> None:
     assert html.index("Fix first") < html.index('id="s2"')  # surfaced up front
     # Consolidation: the demo has far more findings than distinct issue types.
     assert len(c.finding_groups) < len(c.reportable_findings)
+
+
+def test_toc_lists_hardening_section_only_when_present() -> None:
+    from app.schemas.report import HardeningSummary
+
+    c = ctx_of(finding())
+    c.hardening = None
+    assert 'href="#s20"' not in render_html(c)
+    c.hardening = HardeningSummary(recommendations=[])
+    html = render_html(c)
+    assert 'href="#s20"' in html and 'id="s20"' in html

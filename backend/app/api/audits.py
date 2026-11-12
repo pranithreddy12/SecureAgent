@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated
@@ -177,6 +178,16 @@ async def list_findings(audit_id: uuid.UUID, db: DbSession, user: CurrentUser):
     return out
 
 
+def _shift_related(audit, finding_type: str, delta: int) -> None:
+    """Keep each hardening recommendation's related_findings count in step with triage."""
+    state = copy.deepcopy(audit.stage_state or {})
+    for rec in (state.get("hardening") or {}).get("recommendations", []):
+        rel = rec.get("related_findings") or {}
+        if finding_type in rel:
+            rel[finding_type] = max(0, rel[finding_type] + delta)
+    audit.stage_state = state  # reassign so the JSONB change is persisted
+
+
 @router.patch("/{audit_id}/findings/{finding_id}/triage", response_model=FindingOut)
 async def triage_finding(
     audit_id: uuid.UUID,
@@ -205,6 +216,7 @@ async def triage_finding(
     vr = dict(row.validation_result or {})
     if data.false_positive:
         if "triage" not in vr:  # keep the first original status across repeated edits
+            _shift_related(audit, row.type, -1)
             vr["triage"] = {
                 "previous_status": row.status.value,
                 "previous_reason": row.status_reason,
@@ -215,7 +227,8 @@ async def triage_finding(
         row.status_reason = f"Marked false positive by {user.email}: {data.reason.strip()}"
     elif "triage" in vr:
         previous = vr.pop("triage")
-        row.status = FindingStatus(previous["previous_status"])
+        _shift_related(audit, row.type, +1)
+        row.status =FindingStatus(previous["previous_status"])
         row.status_reason = previous.get("previous_reason")
     row.validation_result = vr
     await db.commit()

@@ -1363,3 +1363,11 @@ delete) and the MCP server over stdio against the demo app (34 findings, `explai
   all apps are two genuine SSRFs; no new findings in clean files / fixed dirs. The measurement exposed
   three typosquat false positives (grequests, djongo, scapy) -> the rule now matches only typing slips
   (transposition, doubled letter, dropped letter).
+
+## 2026-11-13 (ADR-045 leftover gaps)
+
+- Report TOC lists section 20 only when hardening exists. Web triage (mark / undo false positive) now
+  adjusts each recommendation's `related_findings` count (`_shift_related` in `api/audits.py`).
+  New tests: TOC presence, triage shift (unit), suppressions file -> recommendation dropped end to end.
+- Evidence: 92 passed, 1 skipped on the affected test files. DB-backed `test_audits.py` tests could not run
+  (Postgres not running), so the triage endpoint itself is untested live.

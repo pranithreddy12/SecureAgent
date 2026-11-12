@@ -322,3 +322,18 @@ async def test_unread_files_are_disclosed_not_hidden(
     detail = (await client.get(f"/api/audits/{res.json()['id']}")).json()
     notes = " ".join(detail["validation_notes"])
     assert "Not analysed" in notes and "too_large" in notes.replace(" ", "_")
+
+
+def test_triage_shift_keeps_hardening_related_counts_in_step() -> None:
+    from types import SimpleNamespace
+
+    from app.api.audits import _shift_related
+
+    audit = SimpleNamespace(
+        stage_state={"hardening": {"recommendations": [{"related_findings": {"ssrf": 2}}, {}]}}
+    )
+    _shift_related(audit, "ssrf", -1)
+    assert audit.stage_state["hardening"]["recommendations"][0]["related_findings"] == {"ssrf": 1}
+    _shift_related(audit, "ssrf", +1)
+    _shift_related(audit, "xss", -1)  # unrelated type: untouched
+    assert audit.stage_state["hardening"]["recommendations"][0]["related_findings"] == {"ssrf": 2}

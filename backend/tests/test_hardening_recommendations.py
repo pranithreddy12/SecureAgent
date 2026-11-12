@@ -473,3 +473,25 @@ def test_report_has_section_20_and_the_executive_line(tmp_path: Path) -> None:
     (no_profile / "app.py").write_text(LOGIN, encoding="utf-8")
     html2 = render_html(scan_to_report_context(scan_repo(str(no_profile), check_osv=False)))
     assert "No application profile declared" in html2
+
+
+def test_suppressions_file_removes_related_findings_end_to_end(tmp_path: Path) -> None:
+    from app.analysis.baseline import fingerprint
+
+    route = FLASK + '@app.route("/b", methods=["POST"])\ndef b():\n    return "x"\n'
+    result = scan(tmp_path, {"app.py": route}, {"expected_users": "1k-10k"})
+    f = next(
+        f for f in scan_to_report_context(result).findings
+        if f.type == "missing_function_level_authorization"
+    )  # fmt: skip
+    (tmp_path / "secureagent-suppressions.json").write_text(
+        json.dumps({"version": 1, "suppressions": [{
+            "fingerprint": fingerprint(f), "type": f.type, "location": "app.py",
+            "title": f.title, "reason": "auth is enforced by an upstream gateway",
+            "by": "test", "created": "2026-11-13", "count": 1}]}),
+        encoding="utf-8",
+    )  # fmt: skip
+    after = scan_repo(str(tmp_path), check_osv=False)
+    ctx = scan_to_report_context(after)
+    assert ctx.hardening is not None
+    assert "HR-AUTHZ-REVIEW" not in {r.id for r in ctx.hardening.recommendations}
